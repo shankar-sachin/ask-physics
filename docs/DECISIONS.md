@@ -182,7 +182,8 @@ other suppressions.
 
 ## ADR-008: CLI first, website after v1.0
 
-**Status:** Accepted (v0.1.0), decided by the maintainer
+**Status:** Accepted (v0.1.0), decided by the maintainer. Superseded in part
+by ADR-013: an in-browser website ships early; the hosted API still waits.
 
 **Context.** Ask Physics needs a user-facing surface. A website reaches more
 people, but building one now would mean designing UI around an LLM layer and
@@ -349,3 +350,42 @@ them the moment v0.3 wires the models in.
 - A full install, torch included, is a few hundred MB. Accepted: the
   maintainer chose to keep torch for inference rather than add a separate
   numpy engine.
+
+---
+
+## ADR-013: An in-browser website, early
+
+**Status:** Accepted (v0.2.0), decided by the maintainer
+
+**Context.** ADR-008 put the website after v1.0, mostly to avoid hosting,
+auth, rate limiting, and cost control for public traffic. The maintainer
+wants Ask Physics usable at askphysics.vercel.app now, with the actual
+program, not a mock-up.
+
+**Decision.**
+- The site runs the real `askphysics` package in the visitor's browser with
+  Pyodide (Python on WebAssembly), in a Web Worker. SymPy, pydantic, and
+  numpy come from Pyodide; Pint comes from PyPI. Nothing runs on our servers,
+  so there is no hosting cost per question, nothing to rate-limit, and no
+  accounts or keys.
+- `askphysics.web` is the only bridge: a question in, the `Answer` plus
+  pre-formatted strings out, formatted by `askphysics.pretty` exactly like
+  the CLI card. The browser bundle leaves out the terminal (`cli`, `ui`) and
+  torch (`lm`) code.
+- One page: the pitch, a live "Ask a question" box, how it works, the model
+  portraits, and the install commands. The engine (about 15 MB) loads only
+  when the visitor reaches the question box, then is cached.
+- `scripts/build_site.sh` builds it (Vercel runs it, ADR-011); a CI workflow
+  drives the built page in headless Chromium against the real Pyodide CDN
+  and PyPI on every change.
+
+**Consequences.**
+- Until v0.3 the site runs the same stand-in planner as the CLI and says so
+  on the page.
+- The Fermi models can't run in the browser through torch. Before they
+  power the site, they need a browser-capable inference path (for example a
+  small numpy forward pass reading the same safetensors weights); that
+  choice gets its own ADR in v0.3.
+- Accounts stay unnecessary while all compute is on the visitor's device.
+  They arrive with the hosted API after v1.0 (Q18), the first thing that
+  costs us money per question.

@@ -12,6 +12,8 @@
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-pre--alpha-red.svg" alt="Status: pre-alpha"></a>
 </p>
 
+<p align="center"><b><a href="https://askphysics.vercel.app">Try it in your browser at askphysics.vercel.app</a></b>: no install, no account.</p>
+
 Ask any physics question, from a textbook problem to "how many rubber ducks
 would it take to stop a freight train?", and get an answer you can check: the
 equations it used (with ids and sources), every assumption spelled out, units
@@ -194,8 +196,8 @@ implementation.
 v0.2 Fermi model foundations, v0.3 Fermi models trained and wired in, v0.4
 solver expansion, v0.5 eval harness, v0.6 retrieval and data expansion, v0.7
 Fermi engine, v0.8 self-verification, v0.9 hardening, v1.0 release. After
-v1.0 comes a website. Until then the CLI is
-the interface. Details, deliverables, and exit criteria are in
+v1.0 comes the hosted API. The CLI is the main interface, and
+[askphysics.vercel.app](https://askphysics.vercel.app) runs the same package in your browser (ADR-013). Details, deliverables, and exit criteria are in
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the near-term backlog is
 [`TODO.md`](TODO.md).
 
