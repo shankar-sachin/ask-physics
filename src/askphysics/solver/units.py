@@ -18,6 +18,8 @@ Quantity = pint.Quantity[Any]  # annotation alias; use pint.Quantity for isinsta
 
 
 def _parse_unit(unit: str) -> pint.Unit:
+    if not unit.strip():
+        raise UnitParseError("empty unit; use 'dimensionless' for pure numbers")
     try:
         parsed = ureg.parse_units(unit)
     except (pint.errors.UndefinedUnitError, pint.errors.DefinitionSyntaxError) as exc:
@@ -53,7 +55,7 @@ def parse_quantity(text: str) -> Quantity:
         raise UnitParseError(f"cannot parse quantity {text!r}") from exc
     except (AttributeError, TypeError, ValueError, SyntaxError) as exc:
         raise UnitParseError(f"cannot parse quantity {text!r}") from exc
-    if not isinstance(parsed, pint.Quantity):
+    if not isinstance(parsed, pint.Quantity) or parsed.unitless:
         raise UnitParseError(f"{text!r} is a bare number; quantities need units")
     return parsed
 
