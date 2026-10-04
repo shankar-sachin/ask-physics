@@ -6,6 +6,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The one-line installers now live at
+  `https://askphysics.vercel.app/installers/install.sh` and `install.ps1`.
+
 ## [0.2.0] - 2026-10-04
 
 ### Added

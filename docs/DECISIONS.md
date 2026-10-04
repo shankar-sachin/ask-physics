@@ -304,6 +304,9 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 - **Not:** WinGet (not submitting), and PyPI only at v1.0.
 - A CI workflow runs both installers on real Linux, macOS, and Windows
   machines whenever they change.
+- The installers are served from `askphysics.vercel.app/installers/`, built
+  from this repo's `main` by `vercel.json` (copied, never edited, with a
+  `text/plain` content type so `irm | iex` works).
 
 **Consequences.**
 - Each release needs the tap's formula bumped (URL and sha256); the steps
