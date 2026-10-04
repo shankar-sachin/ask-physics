@@ -14,7 +14,7 @@ from typing import Literal, cast, get_args
 
 from askphysics.errors import ConfigError
 
-Provider = Literal["fake", "anthropic"]
+Provider = Literal["fake"]  # "fermi" joins once the Fermi models are wired in (v0.3)
 
 ENV_PREFIX = "ASKPHYSICS_"
 
@@ -24,15 +24,16 @@ class Settings:
     """Pipeline settings.
 
     Attributes:
-        llm_provider: Which ``LLMClient`` to build. ``fake`` needs no API key.
-        model: Model id passed to real providers.
+        llm_provider: Which ``LLMClient`` to build. ``fake`` needs no weights.
+        model: Which Fermi model handles planning: fermi-pulsar-1, fermi-quasar-1,
+            or fermi-magnetar-1 (ADR-009).
         top_k: Number of equations retrieved per question.
-        temperature: Sampling temperature, sent only to providers that accept
-            it. Current Claude models reject sampling parameters (ADR-006).
+        temperature: Sampling temperature for the explain stage. Classify and
+            plan always decode greedily (ADR-009).
     """
 
     llm_provider: Provider = "fake"
-    model: str = "claude-opus-5-5"
+    model: str = "fermi-quasar-1"
     top_k: int = 5
     temperature: float = 0.0
 

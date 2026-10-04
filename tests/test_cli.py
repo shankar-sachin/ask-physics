@@ -62,8 +62,7 @@ def test_bad_config_exits_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "invalid value" in result.output
 
 
-def test_anthropic_without_key_exits_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    result = runner.invoke(cli.app, ["ask", "--llm", "anthropic", DEMO_QUESTION])
+def test_unknown_provider_exits_cleanly() -> None:
+    result = runner.invoke(cli.app, ["ask", "--llm", "skynet", DEMO_QUESTION])
     assert result.exit_code == 1
-    assert "ANTHROPIC_API_KEY" in result.output
+    assert "unknown llm_provider" in result.output

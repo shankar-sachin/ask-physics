@@ -392,13 +392,9 @@ class Pipeline:
     def from_settings(cls, settings: Settings, data: DataStore | None = None) -> Pipeline:
         """Build a pipeline with the configured LLM provider and the keyword retriever."""
         store = data or load_all()
-        llm: LLMClient
-        if settings.llm_provider == "anthropic":
-            from askphysics.llm.anthropic_client import AnthropicClient
-
-            llm = AnthropicClient(model=settings.model)
-        else:
-            llm = FakeLLMClient()
+        # TODO: Build a FermiClient (pulsar classifies, quasar plans, one escalation to
+        # magnetar; ADR-010) when settings.llm_provider == "fermi" (v0.3).
+        llm: LLMClient = FakeLLMClient()
         retriever = KeywordRetriever(store.equations.values(), store.examples.values())
         return cls(llm=llm, retriever=retriever, data=store, settings=settings)
 
