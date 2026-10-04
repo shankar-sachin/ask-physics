@@ -61,6 +61,8 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
 
 ## v0.3.0 Fermi models trained and wired in
 
+The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md).
+
 ### Training (on the maintainer's M5 Pro)
 - [ ] Measure real tokens per second for each config; update `docs/MODELS.md`.
 - [ ] Train `fermi-tellus-1`; record the loss curve and held-out plan validity.
@@ -94,3 +96,13 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
 ### Docs
 - [ ] Model cards for each trained model: config, data, tokens, time, curves,
       results, known failure modes.
+
+## After v0.3: the Ask Physics Wiki (v0.4)
+
+- [ ] `docs/wiki/` as the single source: guides, FAQ, glossary, model cards.
+- [ ] Generate an equation page per database entry (formula, variables with
+      units, validity, source, license).
+- [ ] CI workflow that publishes `docs/wiki/` to the GitHub Wiki.
+- [ ] Website wiki at `/wiki/` built from the same pages, with rendered math
+      and search; link each equation id on the answer card to its page.
+

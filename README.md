@@ -210,6 +210,7 @@ v1.0 comes the hosted API. The CLI is the main interface, and
 - [`docs/EVALS.md`](docs/EVALS.md): how answers are graded
 - [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/RISKS.md`](docs/RISKS.md), [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md)
 - [`docs/RELEASING.md`](docs/RELEASING.md): how a release is tagged and the Homebrew tap bumped
+- [`docs/TRAINING.md`](docs/TRAINING.md): the runbook for training the Fermi models
 
 ## Contributing
 
