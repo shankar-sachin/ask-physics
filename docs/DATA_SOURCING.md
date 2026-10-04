@@ -38,7 +38,7 @@ the project, with a textbook cited as the `source` for verification, are
   pasted.
 - **Cleaning effort:** high per entry, low total. About 10 to 15 minutes per
   equation including review.
-- **Recommendation:** **Do first, keep forever.** v0.1 seeds about 12; v0.3
+- **Recommendation:** **Do first, keep forever.** v0.1 seeds about 12; v0.4
   grows this to about 60 across the five target domains.
 
 ### 2. Open textbooks (OpenStax)
@@ -52,7 +52,7 @@ the project, with a textbook cited as the `source` for verification, are
   are trademarks and cannot be used to imply endorsement.
 - **Cleaning effort:** medium. Problems are in HTML or CNXML with MathML.
   Converting to our schema means extracting known values and units by hand
-  or with LLM assistance plus verification. Answers are only given for some
+  or with the data factory's extraction helpers plus verification. Answers are only given for some
   problems.
 - **Recommendation:** **Primary source for worked examples in v0.6.** Use as
   a verification reference (the `source` field) for hand-curated equations
@@ -88,22 +88,23 @@ the project, with a textbook cited as the `source` for verification, are
   when a new CODATA release lands (2022 is current; next expected around
   2026 to 2027). Defined constants (c, h, e, k_B, N_A) have uncertainty 0.
 
-### 5. Synthetic examples (LLM-generated, SymPy-verified)
+### 5. Synthetic examples (data factory, SymPy-verified)
 
 - **What we get:** unlimited worked examples, targeted at gaps (unusual
   equation combinations, unit conversions, Fermi decompositions).
-- **License risk:** low for licensing, medium for contamination. Generated
-  text must not reproduce copyrighted problems verbatim, and the generator
-  must never be shown eval questions.
-- **Cleaning effort:** low per item, but needs a pipeline: generate problem
-  and claimed answer, re-solve with `solve_for`, keep only items where the
-  SymPy answer matches within 0.1% and the units agree, then human
-  spot-check 10% of each batch.
-- **Recommendation:** **v0.6, after the solver is trustworthy (v0.3).**
+- **License risk:** none for licensing (templates are project-authored, `MIT`),
+  medium for contamination: the factory must never read eval questions.
+  No external model generates data (ADR-009).
+- **Cleaning effort:** low per item, but needs a pipeline: render a problem
+  from templates and sampled values, solve it with `solve_for`, keep only
+  items the symbolic algebra machine solves with consistent units, then
+  human spot-check 10% of each batch.
+- **Recommendation:** **v0.2 for Fermi model training data; v0.6 for worked
+  examples in the database, after the solver handles chains (v0.4).**
   Tag every synthetic entry with `source: "synthetic:<generator-version>"`
   so it can be filtered or dropped wholesale. Cap synthetic examples at 50%
-  of the examples set, so retrieval does not learn the generator's style
-  instead of physics.
+  of the database examples set, so retrieval does not learn the generator's
+  style instead of physics.
 
 ### 6. Community contributions
 
@@ -134,11 +135,11 @@ Every data PR, human or scripted, must pass:
 - [ ] For equations: `typical_range` is set on any variable that could be
       an answer, and the range is defensible.
 - [ ] For worked examples: re-solving with the pipeline reproduces
-      `final_answer` within 0.1% (enforced in v0.3).
+      `final_answer` within 0.1% (enforced in v0.4).
 - [ ] For Fermi assumptions: `rationale` explains `low` and `high`, not
       just the default.
 - [ ] No near-duplicate of any question in `evals/` (enforced by a
-      similarity check from v0.4; reviewer judgment before that).
+      similarity check from v0.5; reviewer judgment before that).
 - [ ] No duplicated entry: same expression under a different id. Search
       before adding.
 - [ ] `confidence_in_entry` reflects the reviewer's honest opinion; below

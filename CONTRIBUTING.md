@@ -5,7 +5,8 @@ keep the answers honest, so read the golden rules before writing code.
 
 ## Golden rules
 
-1. **The LLM never does arithmetic.** It classifies, plans, and explains.
+1. **The LLM never does arithmetic.** Our Fermi models classify, plan, and
+   explain.
    Numbers come out of SymPy and Pint, full stop.
 2. **Every number has units.** Bare floats do not cross module boundaries.
    Use Pint quantities or the `(value, unit)` fields on the pydantic models.
@@ -30,8 +31,10 @@ make lint             # ruff check + ruff format --check
 make typecheck        # mypy
 ```
 
-No API key is needed for development. Tests and the default CLI path use
-`FakeLLMClient`.
+No API keys, no GPU, and no trained weights are needed for development.
+Tests and the default CLI path use `FakeLLMClient`; model code is tested on
+the tiny `fermi-nano` config on CPU. Training the real Fermi models is
+covered in [`docs/MODELS.md`](docs/MODELS.md).
 
 ## Workflow
 

@@ -8,7 +8,7 @@ the old one "Superseded by ADR-NNN".
 
 ## ADR-001: RAG plus symbolic computation over pure fine-tuning
 
-**Status:** Accepted (v0.1.0)
+**Status:** Accepted (v0.1.0). Amended by ADR-009: the LLM is now our own from-scratch Fermi family; retrieval plus symbolic computation is unchanged.
 
 **Context.** Two broad ways to build a physics answerer: fine-tune a model
 until it "knows" physics and does the math, or have a model plan around a
@@ -65,7 +65,7 @@ dimensional errors during evaluation.
 
 ## ADR-003: Provider-agnostic LLM interface
 
-**Status:** Accepted (v0.1.0)
+**Status:** Accepted (v0.1.0). Amended by ADR-009: the `LLMClient` protocol stays, external providers are dropped, and the real implementation is `FermiClient`.
 
 **Context.** The project should not be married to one LLM vendor: costs and
 quality shift fast, v0.7 may swap in a local fine-tuned model, and tests
@@ -137,7 +137,7 @@ rebuilt from the JSON, never edited directly.
 
 ## ADR-006: Determinism without sampling temperature on Anthropic models
 
-**Status:** Accepted (v0.1.0)
+**Status:** Superseded by ADR-009. We control decoding, so classify and plan are greedy and fully deterministic.
 
 **Context.** The original spec called for "temperature 0 for planning".
 Current Claude models (including the default, `claude-opus-5-5`) reject
@@ -173,9 +173,6 @@ any exceptions listed here.
   wrapper functions in `solver/symbolic.py`. Pint ships type hints and needs
   no exception; annotations use the `Quantity = pint.Quantity[Any]` alias
   from `solver/units.py`.
-- `anthropic`: the optional extra is not installed in CI, so imports of it
-  happen inside the client method and are covered by
-  `ignore_missing_imports`.
 
 **Consequences.** Type safety stops at the wrapper boundary for SymPy
 objects; the wrappers' own signatures are fully typed. v0.1.0 passes with no
@@ -203,3 +200,81 @@ release eval thresholds.
 - Hosting, auth, rate limiting, and cost control for public traffic are
   deferred, but the v0.9 caching and cost caps are designed with them in
   mind.
+
+---
+
+## ADR-009: The Fermi model family, built from scratch, no external APIs
+
+**Status:** Accepted (v0.2.0), decided by the maintainer
+
+**Context.** v0.1 planned an API-backed LLM (Anthropic) behind the
+`LLMClient` protocol. The maintainer wants Ask Physics powered by its own
+language models, written in Python, trained from scratch, running locally,
+with no external API calls. The original repo description already promised
+"a simple Python LLM that runs on your device." Training hardware is an M5
+Pro with 48 GB of unified memory.
+
+**Decision.**
+- Three decoder-only transformers written in PyTorch in this repo:
+  `fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), and
+  `fermi-magnetar-1` (~120M), plus `fermi-nano` for tests. Design and
+  training plan in `docs/MODELS.md`.
+- Our own byte-level BPE tokenizer with single-digit tokens and task tokens.
+- Training data comes from a data factory in this repo, built from the
+  equation database and verified by the symbolic algebra machine. No
+  pretrained weights, no external models generating data.
+- **Constrained decoding** enforces the golden rules structurally: only
+  retrieved equation ids, only numbers present in the input or tables, only
+  valid units, only schema-valid JSON.
+- Classify and plan decode greedily, so they're deterministic.
+  `Settings.temperature` applies only to explain.
+- `AnthropicClient`, the `[anthropic]` extra, and API keys are removed. The
+  `LLMClient` protocol and `FakeLLMClient` stay.
+- `torch` and `safetensors` become dependencies in v0.2. Weights are
+  safetensors in `~/.cache/askphysics/models/`, never in git, never pickled.
+
+**Consequences.**
+- No API cost, no network, no key management; Ask Physics works offline.
+- Small from-scratch models understand phrasing close to their training
+  data. Unusual wording fails more often than with a big pretrained model.
+  Constraints keep failures safe (degraded, not invented), and v0.5 evals
+  measure the rate.
+- Language quality now depends on our data factory. Template diversity and
+  leakage control become core engineering work, not side tasks.
+- ~1B-parameter training is out of reach on a laptop; magnetar stays ~120M
+  until there's both the data and the compute to justify more.
+- Supersedes ADR-006; amends ADR-001 and ADR-003. The v0.1 non-goal "no
+  training from scratch" is dropped.
+
+---
+
+## ADR-010: Model routing: split and escalate locally, usage tiers online
+
+**Status:** Accepted (v0.2.0), decided by the maintainer
+
+**Context.** Three model sizes trade speed for quality. The maintainer
+specified a scheme: start on quasar, get one magnetar, drop to pulsar after
+five quasar tries, or otherwise use the models in different ways. On a
+local machine there's no cost to meter, so quotas protect nothing. On a
+hosted website, they cap the cost.
+
+**Decision.** Both, each where it makes sense.
+- **CLI (v0.3): split and escalate.** pulsar classifies every question.
+  quasar plans and explains. If quasar's plan fails validation, or the
+  symbolic algebra machine rejects it, quasar retries up to 5 attempts in
+  total (varying context order and seed). Then magnetar gets one attempt.
+  Then the answer degrades. Missing weights are skipped, and pulsar alone
+  can run every task.
+- **Website (after v1.0): usage tiers.** A visitor starts on quasar, gets one
+  magnetar answer per day, and drops to pulsar after five quasar answers in
+  a window. Limits are server config, built with the v0.9 API server. The
+  CLI never enforces them.
+- Every `Answer` records which model handled each stage.
+
+**Consequences.**
+- Worst case for a hard question is 5 quasar attempts plus 1 magnetar
+  attempt. Latency is bounded, and stays acceptable at these model sizes.
+- Escalation statistics (how often magnetar rescues quasar) become an eval
+  metric that justifies magnetar's existence, or not.
+- The exact numbers (5 attempts, 1 escalation, the website limits) live in
+  `Settings`, not in code.

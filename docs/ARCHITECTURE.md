@@ -33,8 +33,11 @@
                                                                    +----------------+
 ```
 
-Arrows point in the direction data flows. The LLM touches three stages and
-never sees or produces the numbers that end up in `Answer.final_value`.
+Arrows point in the direction data flows. The LLM (our own Fermi models,
+[`MODELS.md`](MODELS.md)) touches three stages and never produces the
+numbers that end up in `Answer.final_value`. From v0.3, `LLMClient` is
+implemented by `FermiClient`: pulsar classifies, quasar plans and explains,
+and magnetar gets one escalation shot (ADR-010).
 
 ## Module responsibilities
 
@@ -47,10 +50,11 @@ never sees or produces the numbers that end up in `Answer.final_value`.
 | `errors.py` | Exception taxonomy rooted at `AskPhysicsError` | stdlib |
 | `llm/base.py` | `LLMClient` protocol | `models` |
 | `llm/fake.py` | `FakeLLMClient`: deterministic canned responses for tests and demos | `models` |
-| `llm/anthropic_client.py` | `AnthropicClient` (stub in v0.1) | `anthropic` (optional extra) |
+| `llm/fermi_client.py` (v0.3) | `FermiClient`: routes tasks across pulsar, quasar, magnetar | `lm` |
+| `lm/` (v0.2) | The Fermi models: config, tokenizer, transformer, constrained decoding, data factory, training | torch, safetensors |
 | `retrieval/base.py` | `Retriever` and `VectorStore` protocols | `models` |
 | `retrieval/keyword.py` | `KeywordRetriever`: in-memory tag and token scorer | `models` |
-| `retrieval/vector.py` | `VectorRetriever` (stub until v0.2) | `retrieval/base` |
+| `retrieval/vector.py` | `VectorRetriever` (stub until v0.6) | `retrieval/base` |
 | `solver/units.py` | One shared Pint registry; parse, convert, dimension checks | pint |
 | `solver/symbolic.py` | Safe equation parsing; `solve_for` | sympy, `solver/units` |
 | `solver/fermi.py` | `AssumptionTable`; range propagation (stub) | `models` |
@@ -176,11 +180,11 @@ class LLMClient(Protocol):
     def complete_text(self, *, system: str, user: str) -> str: ...
 ```
 
-`complete_json` returns a validated pydantic instance, so every provider has
-to deliver the same typed contract, whether through native structured
-outputs (Anthropic), JSON mode, or parse-and-retry. **Swappable because**
-provider lock-in is a top-10 risk, the fake client must be drop-in for tests,
-and v0.7 swaps a fine-tuned local model into the plan stage only.
+`complete_json` returns a validated pydantic instance. `FermiClient`
+guarantees that with constrained decoding against the schema, then
+validates with pydantic anyway. **Swappable because** the fake client must
+be drop-in for fast tests, and the router swaps pulsar, quasar, and magnetar
+behind the same two methods.
 
 ### `Retriever` (`retrieval/base.py`)
 
@@ -189,7 +193,7 @@ class Retriever(Protocol):
     def search(self, query: str, k: int, *, domains: Sequence[str] | None = None) -> RetrievalResult: ...
 ```
 
-**Swappable because** v0.1 keyword, v0.2 hybrid, and any reranked variant
+**Swappable because** v0.1 keyword, v0.6 hybrid, and any reranked variant
 must be comparable on the same eval set by changing one constructor argument.
 
 ### `VectorStore` (`retrieval/base.py`)
@@ -200,7 +204,7 @@ class VectorStore(Protocol):
     def query(self, vector: Sequence[float], k: int) -> list[tuple[str, float]]: ...
 ```
 
-**Swappable because** the sqlite-vec choice in v0.2 is a bet on scale staying
+**Swappable because** the sqlite-vec choice in v0.6 is a bet on scale staying
 small. If that bet is wrong, FAISS or a hosted store plugs in without
 touching the retriever logic.
 
@@ -219,6 +223,9 @@ same signature (see `docs/OPEN_QUESTIONS.md`).
 ## Security boundary: what the LLM may emit
 
 The planner emits **equation ids and numbers with units**, never expressions.
+From v0.3 this is enforced during decoding: the Fermi models physically
+cannot emit an unretrieved equation id, a number absent from the input, or
+an invalid unit.
 Expressions only come from `equations.json`, which is reviewed and validated.
 That keeps untrusted text away from SymPy's parser, which uses `eval`
 internally. Seed expressions are additionally parsed with a restricted
@@ -229,14 +236,15 @@ LLM go through Pint's unit parser, which does not evaluate code.
 
 | Source | Where | Mitigation |
 |--------|-------|------------|
-| LLM sampling | classify, plan, explain | Strict structured outputs for classify and plan (schema-constrained, then pydantic-validated). Lowest effort that holds quality for classify. **Note:** current Claude models reject `temperature`/`top_p`, so "temperature 0" is not available on Anthropic; `Settings.temperature` is only passed to providers that accept it (see ADR-006 in `docs/DECISIONS.md`). |
-| LLM output drift across model versions | all LLM stages | Model id pinned in `Settings.model`; prompt versions recorded in traces; evals re-run on every model or prompt change. |
+| Model decoding | classify, plan, explain | Classify and plan decode greedily, so the same input always gives the same output (ADR-009). Only explain samples, at `Settings.temperature`, and its digits are constrained. |
+| Model retraining | all model stages | Weights versioned by name (`fermi-quasar-1`) and checksum; task format version recorded in traces; evals re-run on every retrain. |
+| Training runs | `lm/train.py` | Seeded initialization and data order. MPS kernels are not bit-exact across runs, so retrains are compared by eval scores, not weights. |
 | Retrieval ties | `KeywordRetriever` | Ties broken by equation id, so ordering is stable. |
-| Vector search (v0.2) | ANN index | Exact search at our scale; if approximate, a fixed index build seed. |
+| Vector search (v0.6) | ANN index | Exact search at our scale; if approximate, a fixed index build seed. |
 | SymPy solution ordering | `solve_for` | Roots sorted by value after filtering; the choice rule is documented and noted in caveats. |
-| Monte Carlo (v0.5) | `solver/fermi.py` | Fixed seed per question (hash of question text plus prompt version), sample count in `Settings`. |
+| Monte Carlo (v0.7) | `solver/fermi.py` | Fixed seed per question (hash of question text plus format version), sample count in `Settings`. |
 | Floating point | compute | Values are reported to 6 significant figures; comparisons in evals use relative tolerance, never equality. |
 
-For regression testing, the plan is to cache `(question, prompt_version,
-model) -> plan JSON` traces (v0.9). Replaying from the cache makes every
-stage after `plan` fully deterministic.
+Because plans are greedy, a given model and input always produce the same
+plan, and everything after `plan` is deterministic given a plan. The whole
+pipeline is reproducible on a fixed set of weights.

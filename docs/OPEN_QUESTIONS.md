@@ -65,7 +65,7 @@ higher.
 `R` is resistance in Ohm's law and the gas constant in the ideal gas law.
 `G`, `g`, `e`, and `E` all collide with something eventually. Today symbols
 are scoped per equation and constants are looked up by `name`, not symbol.
-Once multi-equation chaining exists (v0.3), how do we tell a shared symbol
+Once multi-equation chaining exists (v0.4), how do we tell a shared symbol
 (the same `v` across two equations) from a coincidence?
 
 **Default for now:** symbols are per-equation; the plan uses one equation;
@@ -97,7 +97,7 @@ states its operational definition as an assumption.
 ### Q9. How do we fit the confidence weights?
 
 The `PLAN.md` formula weights (0.35/0.30/0.20/0.15) are invented. Fit them by
-logistic regression on eval outcomes (v0.4 data)? Calibrate so "0.8" means
+logistic regression on eval outcomes (v0.5 data)? Calibrate so "0.8" means
 right 80% of the time? Is a single number even the right output, versus
 separate "inputs confidence" and "method confidence"?
 
@@ -108,7 +108,7 @@ separate "inputs confidence" and "method confidence"?
 Pint offset units cannot be multiplied (`degC * J/K` is ambiguous). Users
 will write "at 25 degrees C".
 
-**Default for now:** data uses kelvin only. In v0.3 the planner is told to
+**Default for now:** data uses kelvin only. In v0.4 the planner is trained to
 pass temperatures as given, and the compute stage converts offset units to
 kelvin before substitution.
 
@@ -122,38 +122,58 @@ Homebrew **formula** (for CLI tools) later? A Homebrew **cask** is for GUI
 **Default for now:** pip-installable from source; PyPI at v1.0 per the
 roadmap. Releases are tagged only with the maintainer's approval.
 
-### Q12. The repo description says "a simple Python LLM that runs on your device". Is local inference a goal?
+### Q12. Should worked examples be part of the plan input?
 
-The original one-line README promises on-device inference. This spec
-defaults to the fake client and an optional Anthropic API extra. A local
-model (llama.cpp, Ollama, or a small Hugging Face model) would fit behind
-`LLMClient`, but would need to manage structured outputs without native
-schema enforcement, and quality for the plan stage is unproven.
+Retrieved worked examples could help the Fermi models plan, but they eat
+the 1024-token context and risk the model copying numbers from the example
+(constrained decoding allows any number in the input, including the
+example's).
 
-**Maintainer intent (2026-10-04):** "we make both the LLM and the symbolic
-algebra machine." The symbolic algebra machine is ours: the solver layer in
-`solver/` built on SymPy and Pint (not a from-scratch CAS). Still to
-confirm: does "make the LLM" mean training or fine-tuning our own model,
-which would pull the v0.7 fine-tuning milestone forward and make on-device
-a goal, or building the LLM layer (prompts, plans, validation) around a
-hosted model?
+**Default for now:** plan inputs include equations, constants, and Fermi
+assumptions only. Worked examples are training data, not inference context.
 
-**Default for now:** provider-agnostic interface; Anthropic is the first
-real provider; v0.7's fine-tuned small open model is the natural path to
-on-device. The repo description should be updated once decided.
+### Q13. How are task formats and weights versioned alongside eval reports?
 
-### Q13. Should few-shot examples be in the plan prompt, and how are they chosen?
+Each eval report should record the model names, weight checksums, and
+`FORMAT_VERSION` it ran against. Is a manual version string enough, or do
+we hash the format templates?
 
-Retrieved worked examples are natural few-shot material, but they make the
-prompt longer and more variable (bad for caching) and risk the planner
-copying numbers from the example.
+**Default for now:** a manual `FORMAT_VERSION` integer in `src/askphysics/lm/`
+(v0.2), recorded in every eval report (v0.5).
 
-**Default for now:** worked examples are retrieved and passed to the planner
-as context, but not formatted as few-shot demonstrations.
+### Q14. Is an 8,192-token vocabulary right for physics text?
 
-### Q14. How are prompts versioned alongside eval reports?
+A bigger vocabulary shortens sequences (more context for equations) but
+costs embedding parameters, which matters a lot for pulsar: at d=160, 8k
+tokens is already about 1.3M of its ~3.2M parameters.
 
-Each eval report should record the prompt versions and model id it ran
-against. Hash the prompt text, or bump a manual version string?
+**Default for now:** 8,192 shared across the family. Revisit with pulsar's
+v0.3 eval numbers.
 
-**Default for now:** not tracked (no real prompts in v0.1).
+### Q15. What happens when retrieved context outgrows 1024 tokens?
+
+At 12 equations it fits easily. At 500 (v0.6), top-k retrieval keeps the
+input small, but long equations with many variables add up.
+
+**Default for now:** `top_k` caps context; the plan input lists only each
+equation's id, expression, and variable symbols and units. Longer contexts
+(2048) are a retrain away if needed.
+
+### Q16. Is there enough training data to justify magnetar?
+
+~120M parameters wants roughly 2.4B training tokens. A data factory built
+from 12 to 60 equations will repeat itself long before that. Magnetar may
+just memorize templates better than quasar does.
+
+**Default for now:** train magnetar last, and keep it only if its rescue
+rate on quasar failures (ADR-010) justifies the extra weights. CC-BY text
+(v0.6) is the main path to more real tokens.
+
+### Q17. How are the website usage tiers windowed?
+
+ADR-010 says a visitor starts on quasar, gets one magnetar answer per day,
+and drops to pulsar after five quasar answers. Five per what window, per
+visitor how (account, IP, cookie), and does the pulsar fallback reset daily?
+
+**Default for now:** undecided until the website milestone; values live in
+server config so they can change without a release.

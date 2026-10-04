@@ -6,11 +6,13 @@ Guidance for Claude Code sessions working on this repo.
 
 Ask Physics answers physics questions, from textbook to absurd, through a
 six-stage pipeline: classify, retrieve, plan, compute, sanity_check, explain.
-The LLM handles language; SymPy and Pint do all math and units. v0.1.0 is a
-skeleton: many functions are stubs that raise `NotImplementedError`.
+Language comes from our own from-scratch Fermi models (pulsar ~3M, quasar
+~30M, magnetar ~120M; `docs/MODELS.md`); SymPy and Pint do all math and
+units. No external LLM APIs, ever (ADR-009). Many functions are still stubs
+that raise `NotImplementedError`.
 
 Read [`PLAN.md`](PLAN.md) first, then the relevant file in [`docs/`](docs/):
-`ARCHITECTURE.md` (modules, interfaces, payloads), `DATA_SCHEMA.md`,
+`ARCHITECTURE.md` (modules, interfaces, payloads), `MODELS.md`, `DATA_SCHEMA.md`,
 `DECISIONS.md` (ADRs), `OPEN_QUESTIONS.md`, `ROADMAP.md`. The backlog is in
 `TODO.md`.
 
@@ -31,9 +33,9 @@ commit.
 
 ## Golden rules
 
-1. **The LLM never does arithmetic.** It classifies, plans (ids and numbers
-   copied from the question or tables), and writes prose. Every number in an
-   `Answer` comes from SymPy and Pint.
+1. **The models never do arithmetic.** They classify, plan (ids and numbers
+   copied from the question or tables, enforced by constrained decoding), and
+   write prose. Every number in an `Answer` comes from SymPy and Pint.
 2. **Every number has units.** Use Pint quantities from
    `askphysics.solver.units` (one shared registry). No bare floats across
    module boundaries.
@@ -44,7 +46,8 @@ commit.
 5. **The LLM never emits expressions.** Plans reference equation ids;
    expressions come only from reviewed JSON. Never call `sympify` on
    untrusted text.
-6. **Tests never need an API key.** Use `FakeLLMClient`.
+6. **Tests never need weights or a GPU.** Use `FakeLLMClient` or
+   `fermi-nano` on CPU. Weights are safetensors, never pickle, never in git.
 
 ## Conventions
 
