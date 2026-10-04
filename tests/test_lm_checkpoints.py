@@ -15,7 +15,7 @@ from askphysics.lm.checkpoints import (
     load_model,
     save_model,
 )
-from askphysics.lm.config import NANO
+from askphysics.lm.config import LUNA
 from askphysics.lm.model import FermiLM
 from askphysics.lm.tokenizer import Tokenizer
 
@@ -25,20 +25,20 @@ SRC = Path(checkpoints.__file__).parent
 @pytest.fixture
 def saved(tmp_path: Path) -> Path:
     torch.manual_seed(0)
-    model = FermiLM(NANO)
+    model = FermiLM(LUNA)
     tokenizer = Tokenizer.train(["the quick brown fox jumps over the lazy dog"] * 3, 300)
-    save_model(model, tokenizer, tmp_path / "fermi-nano")
-    return tmp_path / "fermi-nano"
+    save_model(model, tokenizer, tmp_path / "fermi-luna-1")
+    return tmp_path / "fermi-luna-1"
 
 
 def test_round_trip_gives_identical_logits(saved: Path) -> None:
     torch.manual_seed(0)
-    original = FermiLM(NANO).eval()
+    original = FermiLM(LUNA).eval()
     loaded, tokenizer = load_model(saved)
-    ids = torch.randint(0, NANO.vocab_size, (1, 10))
+    ids = torch.randint(0, LUNA.vocab_size, (1, 10))
     assert torch.equal(original(ids)[0], loaded(ids)[0])
     assert not loaded.training
-    assert tokenizer.vocab_size <= NANO.vocab_size
+    assert tokenizer.vocab_size <= LUNA.vocab_size
 
 
 def test_files_written(saved: Path) -> None:
@@ -69,9 +69,9 @@ def test_tokenizer_bigger_than_model_rejected(tmp_path: Path) -> None:
     rng = random.Random(0)
     words = ["".join(rng.choice("abcdefghijklmnop") for _ in range(6)) for _ in range(3000)]
     big = Tokenizer.train([" ".join(words)] * 2, vocab_size=1000)
-    assert big.vocab_size > NANO.vocab_size
+    assert big.vocab_size > LUNA.vocab_size
     with pytest.raises(ConfigError, match="tokenizer has"):
-        save_model(FermiLM(NANO), big, tmp_path / "x")
+        save_model(FermiLM(LUNA), big, tmp_path / "x")
 
 
 def test_default_model_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

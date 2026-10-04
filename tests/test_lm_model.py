@@ -1,85 +1,85 @@
 import pytest
 import torch
 
-from askphysics.lm.config import NANO, PRESETS, ModelConfig
+from askphysics.lm.config import LUNA, PRESETS, ModelConfig
 from askphysics.lm.model import IGNORE_INDEX, FermiLM, RMSNorm, apply_rope, rope_tables
 
 
 @pytest.fixture
-def nano() -> FermiLM:
+def luna() -> FermiLM:
     torch.manual_seed(0)
-    return FermiLM(NANO).eval()
+    return FermiLM(LUNA).eval()
 
 
 @pytest.mark.parametrize("name", list(PRESETS))
 def test_built_parameters_match_config(name: str) -> None:
     config = PRESETS[name]
-    with torch.device("meta"):  # no memory allocated, so magnetar is cheap to check
+    with torch.device("meta"):  # no memory allocated, so celeste is cheap to check
         model = FermiLM(config)
     assert model.num_parameters() == config.num_parameters()
 
 
-def test_output_head_is_tied(nano: FermiLM) -> None:
-    names = [n for n, _ in nano.named_parameters()]
+def test_output_head_is_tied(luna: FermiLM) -> None:
+    names = [n for n, _ in luna.named_parameters()]
     assert not any("head" in n for n in names)
     assert sum(1 for n in names if n == "embed.weight") == 1
 
 
-def test_forward_shapes_and_loss(nano: FermiLM) -> None:
-    ids = torch.randint(0, NANO.vocab_size, (3, 17))
-    targets = torch.randint(0, NANO.vocab_size, (3, 17))
-    logits, loss = nano(ids, targets)
-    assert logits.shape == (3, 17, NANO.vocab_size)
+def test_forward_shapes_and_loss(luna: FermiLM) -> None:
+    ids = torch.randint(0, LUNA.vocab_size, (3, 17))
+    targets = torch.randint(0, LUNA.vocab_size, (3, 17))
+    logits, loss = luna(ids, targets)
+    assert logits.shape == (3, 17, LUNA.vocab_size)
     assert loss is not None and loss.ndim == 0
     # A freshly initialized model is close to uniform over the vocabulary.
-    assert abs(loss.item() - torch.log(torch.tensor(float(NANO.vocab_size))).item()) < 0.5
+    assert abs(loss.item() - torch.log(torch.tensor(float(LUNA.vocab_size))).item()) < 0.5
 
 
-def test_no_loss_without_targets(nano: FermiLM) -> None:
-    _, loss = nano(torch.zeros(1, 4, dtype=torch.long))
+def test_no_loss_without_targets(luna: FermiLM) -> None:
+    _, loss = luna(torch.zeros(1, 4, dtype=torch.long))
     assert loss is None
 
 
-def test_ignored_targets_do_not_count(nano: FermiLM) -> None:
-    ids = torch.randint(0, NANO.vocab_size, (1, 8))
+def test_ignored_targets_do_not_count(luna: FermiLM) -> None:
+    ids = torch.randint(0, LUNA.vocab_size, (1, 8))
     targets = ids.clone()
-    _, full = nano(ids, targets)
+    _, full = luna(ids, targets)
     targets[0, :4] = IGNORE_INDEX
-    _, partial = nano(ids, targets)
+    _, partial = luna(ids, targets)
     assert full is not None and partial is not None
     assert not torch.isclose(full, partial)
 
 
-def test_attention_is_causal(nano: FermiLM) -> None:
-    ids = torch.randint(0, NANO.vocab_size, (1, 12))
+def test_attention_is_causal(luna: FermiLM) -> None:
+    ids = torch.randint(0, LUNA.vocab_size, (1, 12))
     changed = ids.clone()
-    changed[0, 8:] = (changed[0, 8:] + 1) % NANO.vocab_size
-    a, _ = nano(ids)
-    b, _ = nano(changed)
+    changed[0, 8:] = (changed[0, 8:] + 1) % LUNA.vocab_size
+    a, _ = luna(ids)
+    b, _ = luna(changed)
     assert torch.allclose(a[0, :8], b[0, :8], atol=1e-5)
     assert not torch.allclose(a[0, 8:], b[0, 8:], atol=1e-5)
 
 
-def test_kv_cache_matches_full_forward(nano: FermiLM) -> None:
-    ids = torch.randint(0, NANO.vocab_size, (2, 20))
-    full, _ = nano(ids)
-    logits, past = nano.step(ids[:, :12])
+def test_kv_cache_matches_full_forward(luna: FermiLM) -> None:
+    ids = torch.randint(0, LUNA.vocab_size, (2, 20))
+    full, _ = luna(ids)
+    logits, past = luna.step(ids[:, :12])
     steps = [logits]
     for t in range(12, 20):
-        logits, past = nano.step(ids[:, t : t + 1], past)
+        logits, past = luna.step(ids[:, t : t + 1], past)
         steps.append(logits)
     assert torch.allclose(full, torch.cat(steps, dim=1), atol=1e-5)
 
 
-def test_cache_requires_single_token_steps(nano: FermiLM) -> None:
-    _, past = nano.step(torch.zeros(1, 4, dtype=torch.long))
+def test_cache_requires_single_token_steps(luna: FermiLM) -> None:
+    _, past = luna.step(torch.zeros(1, 4, dtype=torch.long))
     with pytest.raises(ValueError, match="one token"):
-        nano.step(torch.zeros(1, 2, dtype=torch.long), past)
+        luna.step(torch.zeros(1, 2, dtype=torch.long), past)
 
 
-def test_context_length_enforced(nano: FermiLM) -> None:
+def test_context_length_enforced(luna: FermiLM) -> None:
     with pytest.raises(ValueError, match="exceeds context"):
-        nano(torch.zeros(1, NANO.context_length + 1, dtype=torch.long))
+        luna(torch.zeros(1, LUNA.context_length + 1, dtype=torch.long))
 
 
 def test_rope_preserves_norm() -> None:

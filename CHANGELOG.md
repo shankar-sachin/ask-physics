@@ -9,8 +9,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The language side is now the Fermi model family, built and trained from
-  scratch in this repo: `fermi-pulsar-1` (~3M params), `fermi-quasar-1`
-  (~30M), `fermi-magnetar-1` (~120M). Design in `docs/MODELS.md`; ADR-009
+  scratch in this repo: `fermi-tellus-1` (~3M params), `fermi-solem-1`
+  (~30M), `fermi-celeste-1` (~120M). Design in `docs/MODELS.md`; ADR-009
   and ADR-010.
 - Roadmap rebuilt around the Fermi models (v0.2 foundations, v0.3 trained
   and wired in); later milestones renumbered.

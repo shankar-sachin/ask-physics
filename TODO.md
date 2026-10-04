@@ -12,8 +12,8 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
 ### Tooling
 - [ ] Add `torch` and `safetensors` dependencies; CI installs the CPU-only
       torch wheel.
-- [ ] `lm/config.py`: `ModelConfig` presets for nano, pulsar, quasar, and
-      magnetar, with a parameter-count function and a test pinning each count.
+- [ ] `lm/config.py`: `ModelConfig` presets for luna, tellus, solem, and
+      celeste, with a parameter-count function and a test pinning each count.
 - [ ] `lm/device.py`: pick MPS, then CUDA, then CPU; honor an override.
 
 ### Tokenizer
@@ -55,7 +55,7 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
       bf16 autocast on MPS and CUDA, seeded data order.
 - [ ] Checkpointing and resumption; loss and throughput logging.
 - [ ] `askphysics model train-tokenizer`, `train`, and `info` commands.
-- [ ] CI test: `fermi-nano` trains 50 steps on CPU and its loss drops.
+- [ ] CI test: `fermi-luna-1` trains 50 steps on CPU and its loss drops.
 
 ---
 
@@ -63,16 +63,16 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
 
 ### Training (on the maintainer's M5 Pro)
 - [ ] Measure real tokens per second for each config; update `docs/MODELS.md`.
-- [ ] Train `fermi-pulsar-1`; record the loss curve and held-out plan validity.
-- [ ] Train `fermi-quasar-1`; same.
-- [ ] Train `fermi-magnetar-1` (~120M) only if quasar's held-out results leave
+- [ ] Train `fermi-tellus-1`; record the loss curve and held-out plan validity.
+- [ ] Train `fermi-solem-1`; same.
+- [ ] Train `fermi-celeste-1` (~120M) only if solem's held-out results leave
       room for it to help (open question Q16).
 
 ### Integration
 - [ ] `FermiClient` implementing `LLMClient` with the task formats from
       `docs/PROMPTS.md`.
-- [ ] Router per ADR-010: pulsar classifies, quasar plans and explains, up
-      to 5 quasar attempts, one magnetar escalation, pulsar-only fallback.
+- [ ] Router per ADR-010: tellus classifies, solem plans and explains, up
+      to 5 solem attempts, one celeste escalation, tellus-only fallback.
 - [ ] Record the model used per stage on `Answer`.
 - [ ] Add the `fermi` provider to `Settings`; make it the default when
       weights are installed, with a clear message when they aren't.
@@ -80,7 +80,7 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
 
 ### Evals
 - [ ] Held-out factory set (unseen templates): valid-plan rate per model and
-      magnetar rescue rate.
+      celeste rescue rate.
 - [ ] Run the 8 eval questions per model and record results in the model cards.
 
 ### Docs

@@ -24,7 +24,7 @@ class ModelConfig:
     """Shape of one Fermi model.
 
     Attributes:
-        name: Model id, for example ``fermi-quasar-1``.
+        name: Model id, for example ``fermi-solem-1``.
         vocab_size: Tokenizer vocabulary size, shared by the family.
         d_model: Embedding and residual width.
         n_layers: Number of transformer blocks.
@@ -70,23 +70,23 @@ class ModelConfig:
         return self.vocab_size * d + self.n_layers * per_layer + d  # + final norm
 
 
-PULSAR = ModelConfig(
-    name="fermi-pulsar-1", vocab_size=VOCAB_SIZE, d_model=160, n_layers=6, n_heads=5,
+TELLUS = ModelConfig(
+    name="fermi-tellus-1", vocab_size=VOCAB_SIZE, d_model=160, n_layers=6, n_heads=5,
     context_length=1024,
 )  # fmt: skip
-QUASAR = ModelConfig(
-    name="fermi-quasar-1", vocab_size=VOCAB_SIZE, d_model=512, n_layers=8, n_heads=8,
+SOLEM = ModelConfig(
+    name="fermi-solem-1", vocab_size=VOCAB_SIZE, d_model=512, n_layers=8, n_heads=8,
     context_length=1024, mlp_multiple_of=64,
 )  # fmt: skip
-MAGNETAR = ModelConfig(
-    name="fermi-magnetar-1", vocab_size=VOCAB_SIZE, d_model=768, n_layers=16, n_heads=12,
+CELESTE = ModelConfig(
+    name="fermi-celeste-1", vocab_size=VOCAB_SIZE, d_model=768, n_layers=16, n_heads=12,
     context_length=1024, mlp_multiple_of=64,
 )  # fmt: skip
-NANO = ModelConfig(
-    name="fermi-nano", vocab_size=512, d_model=64, n_layers=2, n_heads=4, context_length=256,
+LUNA = ModelConfig(
+    name="fermi-luna-1", vocab_size=512, d_model=64, n_layers=2, n_heads=4, context_length=256,
 )  # fmt: skip
 
-PRESETS: dict[str, ModelConfig] = {c.name: c for c in (PULSAR, QUASAR, MAGNETAR, NANO)}
+PRESETS: dict[str, ModelConfig] = {c.name: c for c in (TELLUS, SOLEM, CELESTE, LUNA)}
 
 
 def get_config(name: str) -> ModelConfig:

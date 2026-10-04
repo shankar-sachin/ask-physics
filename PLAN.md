@@ -42,14 +42,14 @@ traces back to an entry in the database with a source and a license.
 
 The models are the Fermi family, written and trained from scratch in this
 repo, running locally with no external APIs (ADR-009):
-`fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), and
-`fermi-magnetar-1` (~120M). Throughout this plan, "the LLM" means them.
+`fermi-tellus-1` (~3M params), `fermi-solem-1` (~30M), and
+`fermi-celeste-1` (~120M). Throughout this plan, "the LLM" means them.
 
 ## 3. Non-goals for v0.x
 
 - **No external LLM APIs and no pretrained weights.** The Fermi models are
   ours, trained from scratch (ADR-009).
-- **No giant models.** Magnetar stays around 120M parameters until there is
+- **No giant models.** Celeste stays around 120M parameters until there is
   both the data and the compute to justify more.
 - **No multimodal input.** No diagrams, photos of homework, or handwriting.
 - **No web UI in v0.x.** CLI first; an optional API server is a v0.9
@@ -116,8 +116,8 @@ classify -> retrieve -> plan -> compute -> sanity_check -> explain
 - **Graceful degradation:** the plan is validated before compute: unknown
   equation ids, unparseable units, or a `target` not in `unknowns` raise
   `PlanValidationError`. In v0.1 that ends in a degraded answer. From v0.3
-  the router retries quasar (up to 5 attempts), then escalates once to
-  magnetar, then degrades (ADR-010).
+  the router retries solem (up to 5 attempts), then escalates once to
+  celeste, then degrades (ADR-010).
 
 ### 4.4 compute
 
@@ -249,8 +249,8 @@ assumptions. v0.5 eval data will be used to fit the weights (see
 | Version | Metric | Target |
 |---------|--------|--------|
 | v0.1 | `pytest`, `ruff`, `mypy` clean; CLI runs end to end with the fake LLM | Pass |
-| v0.2 | `fermi-nano` trains in CI with falling loss; constrained decoding property-tested | Pass |
-| v0.3 | quasar valid-plan rate on held-out templates; magnetar rescue rate | 90% or more; a third or more of quasar failures |
+| v0.2 | `fermi-luna-1` trains in CI with falling loss; constrained decoding property-tested | Pass |
+| v0.3 | solem valid-plan rate on held-out templates; celeste rescue rate | 90% or more; a third or more of solem failures |
 | v0.4 | Standard questions within 2% relative tolerance, correct unit | 80% or more |
 | v0.5 | Eval set size; automated scoring coverage | 100+ questions; 100% scored |
 | v0.6 | Recall@5 on the retrieval set; equations / examples with validated license | 90% or more; 500+ / 1000+ |

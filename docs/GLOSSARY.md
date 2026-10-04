@@ -41,7 +41,7 @@ meters to seconds is a dimension error.
 with units, domain, assumptions, validity conditions, tags, source, and
 license.
 
-**Escalation.** ADR-010 routing: when quasar can't produce a valid plan in 5 attempts, magnetar gets one attempt before the answer degrades.
+**Escalation.** ADR-010 routing: when solem can't produce a valid plan in 5 attempts, celeste gets one attempt before the answer degrades.
 
 **Eval leakage.** Eval questions (or near-paraphrases) appearing in data,
 prompts, or training sets, which inflates scores without improving the
@@ -50,7 +50,7 @@ system.
 **Fake LLM.** `FakeLLMClient`: a deterministic stand-in returning canned,
 schema-valid responses, so tests and demos run without trained weights.
 
-**Fermi models.** Our own from-scratch language models: `fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), `fermi-magnetar-1` (~120M), and `fermi-nano` for tests. Not to be confused with Fermi questions or the Fermi engine. See `docs/MODELS.md`.
+**Fermi models.** Our own from-scratch language models: `fermi-tellus-1` (~3M params), `fermi-solem-1` (~30M), `fermi-celeste-1` (~120M), and `fermi-luna-1` for tests. Not to be confused with Fermi questions or the Fermi engine. See `docs/MODELS.md`.
 
 **Fermi question / Fermi estimation.** A question answered by decomposing it
 into estimable quantities, multiplying through, and reporting an order of

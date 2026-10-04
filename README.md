@@ -15,8 +15,8 @@ verified end to end, and an honest confidence score. Both halves are built here,
 machine, and call no external APIs:
 
 - **The Fermi models**, our own language models trained from scratch:
-  `fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), and
-  `fermi-magnetar-1` (~120M). They read the question, pick the right
+  `fermi-tellus-1` (~3M params), `fermi-solem-1` (~30M), and
+  `fermi-celeste-1` (~120M). They read the question, pick the right
   equations, copy the values, and write the explanation. They never do math.
 - **The symbolic algebra machine**, built on SymPy and Pint, which solves the
   equations and checks every unit.
@@ -29,7 +29,7 @@ machine, and call no external APIs:
                                               v
   +-----------+   +-----------+   +--------+   +-----------+   +--------------+   +---------+
   | 1 classify|-->| 2 retrieve|-->| 3 plan |-->| 4 compute |-->| 5 sanity     |-->| 6 explain|
-  |  (pulsar) |   | equation  |   |(quasar:|   | symbolic  |   |   check      |   |(quasar:  |
+  |  (tellus) |   | equation  |   |(solem:|   | symbolic  |   |   check      |   |(solem:  |
   | standard/ |   | database  |   | ids +  |   | algebra   |   | units, order |   |  prose   |
   | fermi/    |   | search    |   | values |   | machine:  |   | of magnitude |   |  only)   |
   | nonsense  |   |           |   | only)  |   | SymPy+Pint|   |              |   |          |
@@ -42,7 +42,7 @@ machine, and call no external APIs:
 The planner can only cite equations that retrieval actually found, and it
 copies numbers and units out of the question without computing anything.
 Constrained decoding makes anything else impossible, not just unlikely. If
-quasar can't produce a valid plan, magnetar gets one shot (ADR-010). The
+solem can't produce a valid plan, celeste gets one shot (ADR-010). The
 machine does the algebra, and Pint rejects any calculation whose units don't
 add up. Confidence comes from a documented formula, never from the LLM grading
 itself. Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
