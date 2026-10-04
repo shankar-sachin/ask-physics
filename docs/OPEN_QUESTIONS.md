@@ -119,8 +119,12 @@ Still open: do we publish to PyPI during v0.x or only at v1.0? Do we want a
 Homebrew **formula** (for CLI tools) later? A Homebrew **cask** is for GUI
 `.app` bundles and does not fit a CLI.
 
-**Default for now:** pip-installable from source; PyPI at v1.0 per the
-roadmap. Releases are tagged only with the maintainer's approval.
+**Update (v0.2):** install channels are decided in ADR-011: curl and irm
+installers plus a Homebrew tap, no WinGet. Still open: publishing to PyPI
+before v1.0.
+
+**Default for now:** installers and the tap install from GitHub releases;
+PyPI at v1.0. Releases are tagged only with the maintainer's approval.
 
 ### Q12. Should worked examples be part of the plan input?
 
@@ -177,3 +181,16 @@ visitor how (account, IP, cookie), and does the tellus fallback reset daily?
 
 **Default for now:** undecided until the website milestone; values live in
 server config so they can change without a release.
+
+### Q18. How do API keys for the hosted API work?
+
+The post-v1.0 website comes with a public HTTP API, and that needs API keys.
+Open: who can get a key (self-serve sign-up, or approval), how keys map to
+the ADR-010 usage tiers (a free tier on solem, trusted keys getting more
+celeste answers), how keys are stored (hashed, with a recognizable prefix
+such as `ap_live_` so leaks are easy to search for), rotation and
+revocation, per-key rate limits and quotas, and whether the local CLI ever
+needs a key (default: no).
+
+**Default for now:** the CLI needs no key, ever. Keys are designed with the
+v0.9 API server and ship with the website.

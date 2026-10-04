@@ -16,11 +16,17 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   number, a confidence meter, a "try instead" redirect for refusals, and a
   live training progress bar. `Answer` gains `inputs` and `redirect`.
 - README screenshots, regenerated with `make screenshots`.
+- One-line installers: `install.sh` (curl, macOS and Linux) and `install.ps1`
+  (irm, Windows), tested on all three platforms in CI, plus a Homebrew tap
+  (ADR-011).
+- Plan for Ask Physics API keys on the future hosted API (PLAN.md, Q18).
 
 ### Fixed
 
 - The solver raised a raw `ZeroDivisionError` on a zero in a division; it is
   now a `SolverError`, so answers degrade instead of crashing.
+- Output piped or redirected on Windows (cp1252) crashed on symbols like ◉;
+  unencodable glyphs now print as `?`.
 
 ### Changed
 

@@ -43,6 +43,32 @@ machine, and call no external APIs:
 
 Every screenshot is real CLI output, regenerated with `make screenshots`.
 
+## Install
+
+**macOS and Linux**
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.sh | sh
+```
+
+**Windows** (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.ps1 | iex
+```
+
+**Homebrew** (macOS and Linux)
+
+```bash
+brew install shankar-sachin/ask-physics/askphysics
+```
+
+The scripts install `askphysics` into its own isolated environment with
+[uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
+touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.1.0`.
+Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`).
+No API keys, no accounts: everything runs on your machine.
+
 ## How it works
 
 ```
@@ -146,6 +172,7 @@ the interface. Details, deliverables, and exit criteria are in
 - [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md) and [`docs/DATA_SOURCING.md`](docs/DATA_SOURCING.md): what data looks like and where it comes from
 - [`docs/EVALS.md`](docs/EVALS.md): how answers are graded
 - [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/RISKS.md`](docs/RISKS.md), [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md)
+- [`docs/RELEASING.md`](docs/RELEASING.md): how a release is tagged and the Homebrew tap bumped
 
 ## Contributing
 

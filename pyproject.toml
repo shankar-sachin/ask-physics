@@ -71,6 +71,17 @@ skip_covered = true
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
 
 # ---------------------------------------------------------------- ruff
+# uv (the one-line installers and the Homebrew formula) takes torch on Linux from
+# PyTorch's CPU-only index; the PyPI wheel bundles ~2 GB of CUDA the CLI never uses.
+# Only torch comes from there (explicit = true). pip ignores this table.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
