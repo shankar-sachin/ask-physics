@@ -233,7 +233,7 @@ def moon_map() -> Array:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
     image = Image.open(io.BytesIO(path.read_bytes())).convert("RGB")
-    return np.asarray(image, dtype=np.float64) ** 2.2 / 255**2.2
+    return np.asarray(np.asarray(image, dtype=np.float64) ** 2.2 / 255**2.2)
 
 
 def render_luna(n: int = ART) -> Array:
