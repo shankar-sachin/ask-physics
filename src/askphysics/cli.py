@@ -2,72 +2,42 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 import typer
-from rich.console import Console
-from rich.markup import escape
-from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from askphysics import __version__
 from askphysics.config import Provider, Settings
 from askphysics.data.loader import load_all
 from askphysics.errors import AskPhysicsError, DataValidationError
-from askphysics.models import Answer
 from askphysics.pipeline import Pipeline
+from askphysics.ui import answer_card, banner, make_console, safe, training_progress
 
 app = typer.Typer(
     name="askphysics",
-    help="Ask a physics question. Answers come from retrieved equations and symbolic math.",
+    help="Ask a physics question. Our own language models read it; real math answers it.",
     no_args_is_help=True,
     add_completion=False,
+    rich_markup_mode="rich",
 )
-console = Console()
-
-_STATUS_STYLE = {"answered": "green", "degraded": "yellow", "refused": "red"}
-_CONFIDENCE_STYLE = {"high": "green", "medium": "yellow", "low": "red"}
+console = make_console()
 
 
-def render_answer(answer: Answer) -> None:
-    """Pretty-print an answer with Rich."""
-    style = _STATUS_STYLE[answer.status]
-    if answer.final_value is not None:
-        headline = f"[bold]{answer.final_value:.6g} {escape(answer.unit or '')}[/bold]"
-    else:
-        headline = f"[bold]{answer.status.upper()}[/bold]"
-    console.print(
-        Panel(
-            f"{headline}\n\n{escape(answer.explanation)}",
-            title=f"[{style}]{answer.status}[/{style}] · {answer.category}",
-            subtitle=escape(answer.question),
-            expand=False,
-        )
-    )
-
-    conf = answer.confidence
-    cstyle = _CONFIDENCE_STYLE[conf.label]
-    console.print(f"Confidence: [{cstyle}]{conf.label}[/{cstyle}] ({conf.score:.2f})")
-
-    if answer.equations_used:
-        table = Table("Equation id", "Name", title="Equations used", title_justify="left")
-        for ref in answer.equations_used:
-            table.add_row(ref.id, ref.name)
-        console.print(table)
-    for heading, items in (("Assumptions", answer.assumptions), ("Caveats", answer.caveats)):
-        if items:
-            console.print(f"[bold]{heading}[/bold]")
-            for item in items:
-                console.print(f"  - {escape(item)}")
+def _fail(message: str) -> typer.Exit:
+    console.print(Text("✗ ", style="bad") + Text(message))
+    return typer.Exit(code=1)
 
 
 @app.command()
 def ask(
     question: Annotated[str, typer.Argument(help="The physics question, in quotes.")],
     json_output: Annotated[
-        bool, typer.Option("--json", help="Print the Answer as JSON instead of a panel.")
+        bool, typer.Option("--json", help="Print the Answer as JSON instead of a card.")
     ] = False,
     llm: Annotated[
         str | None,
@@ -79,20 +49,26 @@ def ask(
         settings = Settings.from_env()
         if llm is not None:
             settings = replace(settings, llm_provider=cast(Provider, llm))
-        answer = Pipeline.from_settings(settings).run(question)
+        pipeline = Pipeline.from_settings(settings)
+        if json_output:
+            answer = pipeline.run(question)
+        else:
+            with console.status("[muted]reading the question, then doing the math"):
+                answer = pipeline.run(question)
     except AskPhysicsError as exc:
-        console.print(f"[red]Error:[/red] {escape(str(exc))}")
-        raise typer.Exit(code=1) from exc
+        raise _fail(str(exc)) from exc
     if json_output:
         typer.echo(answer.model_dump_json(indent=2))
     else:
-        render_answer(answer)
+        console.print(answer_card(answer, pipeline.data.equations))
 
 
 @app.command()
 def version() -> None:
     """Print the installed version."""
-    typer.echo(f"askphysics {__version__}")
+    text = banner()
+    text.append(f"\n  askphysics {__version__}", style="value")
+    console.print(text)
 
 
 @app.command("validate-data")
@@ -101,18 +77,29 @@ def validate_data() -> None:
     try:
         store = load_all()
     except DataValidationError as exc:
-        console.print(f"[red]Data validation failed with {len(exc.problems)} problem(s):[/red]")
+        console.print(
+            Text(f"✗ data validation failed with {len(exc.problems)} problem(s)", style="bad")
+        )
         for problem in exc.problems:
-            console.print(f"  - {escape(problem)}")
+            console.print(f"  [muted]•[/] {safe(problem)}")
         raise typer.Exit(code=1) from exc
-    table = Table("File", "Entries", title="Seed data: all valid", title_justify="left")
+    table = Table(
+        title=Text("✓ seed data: all valid", style="ok"),
+        title_justify="left",
+        border_style="muted",
+        header_style="label",
+    )
+    table.add_column("file")
+    table.add_column("entries", justify="right", style="value")
     for name, count in store.summary().items():
-        table.add_row(name, str(count))
+        table.add_row(name.replace("_", " "), str(count))
     console.print(table)
 
 
 model_app = typer.Typer(
-    help="Build training data for, train, and inspect the Fermi models.", no_args_is_help=True
+    help="Build training data for, train, and inspect the Fermi models.",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
 )
 app.add_typer(model_app, name="model")
 
@@ -134,19 +121,23 @@ def build_data(
 
     blocked = load_blocklist(blocklist)
     if not blocked:
-        console.print(
-            f"[yellow]Warning:[/yellow] no eval questions found at {escape(str(blocklist))}"
-        )
-    with console.status(f"Generating {examples:,} examples with {workers} worker(s)..."):
+        console.print(f"[warn]![/] no eval questions found at {safe(str(blocklist))}")
+    with console.status(f"[muted]generating {examples:,} examples with {workers} worker(s)"):
         manifest = build_dataset(out, examples, seed=seed, workers=workers, blocklist=blocked)
     table = Table(
-        "Split / task", "Examples", title=f"Dataset written to {out}", title_justify="left"
+        title=Text(f"✓ dataset written to {out}", style="ok"),
+        title_justify="left",
+        border_style="muted",
+        header_style="label",
     )
+    table.add_column("split / task")
+    table.add_column("examples", justify="right", style="value")
     for key, count in manifest["counts"].items():
         table.add_row(key, f"{count:,}")
     console.print(table)
     console.print(
-        f"Dropped {manifest['dropped']:,} attempts (unsolvable or too close to an eval question)."
+        f"[muted]Dropped {manifest['dropped']:,} attempts "
+        "(unsolvable, or too close to an eval question).[/]"
     )
 
 
@@ -164,11 +155,11 @@ def train_tokenizer_cmd(
     """Train the byte-level BPE tokenizer on the dataset's training split."""
     from askphysics.lm.train import train_tokenizer
 
-    with console.status(f"Learning up to {vocab_size:,} tokens from {escape(str(data))}..."):
+    with console.status(f"[muted]learning up to {vocab_size:,} tokens from {safe(str(data))}"):
         tokenizer = train_tokenizer(data, vocab_size, max_examples)
     out.parent.mkdir(parents=True, exist_ok=True)
     tokenizer.save(out)
-    console.print(f"Tokenizer with {tokenizer.vocab_size:,} tokens written to {escape(str(out))}")
+    console.print(f"[ok]✓[/] tokenizer with {tokenizer.vocab_size:,} tokens → {safe(str(out))}")
 
 
 @model_app.command("train")
@@ -201,8 +192,7 @@ def train_cmd(
     try:
         config = get_config(model)
     except KeyError as exc:
-        console.print(f"[red]Error:[/red] {escape(str(exc.args[0]))}")
-        raise typer.Exit(code=1) from exc
+        raise _fail(str(exc.args[0])) from exc
     out_dir = out or default_model_dir() / config.name
     cfg = TrainConfig(
         steps=steps,
@@ -211,26 +201,34 @@ def train_cmd(
         warmup_steps=max(1, min(500, steps // 20)),
         eval_every=max(1, min(500, steps // 10)),
         checkpoint_every=max(1, min(2000, steps // 4)),
-        log_every=max(1, min(100, steps // 50)),
+        log_every=max(1, min(50, steps // 100)),
         seed=seed,
         device=device,
     )
-    console.print(
-        f"Training [bold]{config.name}[/bold] ({config.num_parameters():,} params) "
-        f"for {steps:,} steps, writing to {escape(str(out_dir))}"
+    head = banner()
+    head.append(f"\n  training {config.name}", style="value")
+    head.append(
+        f"  {config.num_parameters():,} params · {steps:,} steps · → {out_dir}", style="muted"
     )
+    console.print(head)
 
-    def show(entry: dict[str, object]) -> None:
-        if "val_loss" in entry:
-            console.print(f"  step {entry['step']:>7}  [cyan]val loss {entry['val_loss']}[/cyan]")
-        else:
-            console.print(
-                f"  step {entry['step']:>7}  loss {entry['loss']}  "
-                f"lr {float(entry['lr']):.2e}  {entry['target_tokens_per_s']} tok/s"  # type: ignore[arg-type]
-            )
+    with training_progress(console) as progress:
+        task = progress.add_task(config.name, total=steps, loss="…", val="…", speed="")
 
-    train(config, Tokenizer.load(tokenizer), data, out_dir, cfg, resume=resume, on_log=show)
-    console.print(f"[green]Done.[/green] {config.name} saved to {escape(str(out_dir))}")
+        def show(entry: dict[str, Any]) -> None:
+            if "val_loss" in entry:
+                progress.update(task, val=f"{entry['val_loss']:.3f}")
+            else:
+                progress.update(
+                    task,
+                    completed=entry["step"],
+                    loss=f"{entry['loss']:.3f}",
+                    speed=f"{entry['target_tokens_per_s']:,.0f} tok/s",
+                )
+
+        train(config, Tokenizer.load(tokenizer), data, out_dir, cfg, resume=resume, on_log=show)
+        progress.update(task, completed=steps)
+    console.print(f"[ok]✓[/] {config.name} saved to {safe(str(out_dir))}")
 
 
 @model_app.command("info")
@@ -240,43 +238,45 @@ def info_cmd(
     ] = None,
 ) -> None:
     """List installed Fermi models."""
-    import json as _json
-
     from askphysics.lm.checkpoints import CONFIG_FILE, WEIGHTS_FILE, default_model_dir
     from askphysics.lm.config import ModelConfig
 
     root = directory or default_model_dir()
     table = Table(
-        "Model",
-        "Params",
-        "Size",
-        "Last val loss",
-        title=f"Fermi models in {root}",
+        title=Text(f"Fermi models in {root}", style="brand"),
         title_justify="left",
+        border_style="muted",
+        header_style="label",
     )
+    table.add_column("model")
+    table.add_column("params", justify="right")
+    table.add_column("size", justify="right")
+    table.add_column("last val loss", justify="right")
     found = 0
     for path in sorted(root.glob("*")) if root.exists() else []:
         if not (path / CONFIG_FILE).exists() or not (path / WEIGHTS_FILE).exists():
             continue
         found += 1
-        config = ModelConfig(**_json.loads((path / CONFIG_FILE).read_text()))
+        config = ModelConfig(**json.loads((path / CONFIG_FILE).read_text()))
         size = (path / WEIGHTS_FILE).stat().st_size / 1e6
         val = "-"
         metrics = path / "metrics.jsonl"
         if metrics.exists():
             losses = [
-                _json.loads(line)["val_loss"]
+                json.loads(line)["val_loss"]
                 for line in metrics.read_text().splitlines()
                 if '"val_loss"' in line
             ]
             val = f"{losses[-1]:.4f}" if losses else "-"
-        table.add_row(config.name, f"{config.num_parameters():,}", f"{size:.1f} MB", val)
+        table.add_row(
+            f"[accent]{config.name}[/]", f"{config.num_parameters():,}", f"{size:.1f} MB", val
+        )
     if found:
         console.print(table)
     else:
         console.print(
-            f"No Fermi models installed in {escape(str(root))} yet. "
-            "Train one with [bold]askphysics model train[/bold]."
+            f"No Fermi models installed in {safe(str(root))} yet. "
+            "Train one with [brand]askphysics model train[/]."
         )
 
 

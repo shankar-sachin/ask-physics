@@ -249,10 +249,12 @@ class Answer(_Model):
     unit: str | None = None
     value_range: ValueRange | None = None
     equations_used: list[EquationRef] = Field(default_factory=list)
+    inputs: list[KnownValue] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     confidence: Confidence
     caveats: list[str] = Field(default_factory=list)
     explanation: str
+    redirect: str | None = None
 
     @model_validator(mode="after")
     def _value_has_unit(self) -> Answer:
