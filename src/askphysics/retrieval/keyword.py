@@ -4,7 +4,8 @@ Scoring is deliberately simple. Each query token earns the weight of the
 best field it matches in an equation (tags 3, name 2, domain 2, variable
 names and descriptions 1). The sum is normalized by the best possible score
 for the query, so scores land in [0, 1]. A classifier domain hint adds a
-small boost. Ties break by id, so ordering is deterministic.
+small boost and breaks ties in favor of hinted domains. Remaining ties break
+by id, so ordering is deterministic.
 """
 
 from __future__ import annotations
@@ -109,7 +110,7 @@ class KeywordRetriever:
             if eq.domain in boosted:
                 score += DOMAIN_BOOST
             eq_hits.append(ScoredEquation(equation=eq, score=min(score, 1.0)))
-        eq_hits.sort(key=lambda h: (-h.score, h.equation.id))
+        eq_hits.sort(key=lambda h: (-h.score, h.equation.domain not in boosted, h.equation.id))
 
         ex_hits = [
             ScoredExample(example=ex, score=min(s, 1.0))
