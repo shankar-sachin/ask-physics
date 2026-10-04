@@ -66,3 +66,5 @@ commit.
 Branch from `main` with a prefix (`feat/`, `fix/`, `docs/`, `test/`,
 `data/`, `build/`, `chore/`), keep commits conceptually separated, and open
 a PR using the template. CI runs ruff, mypy, and pytest on 3.11 and 3.12.
+PRs may be merged once CI is green. Never tag or publish a release without
+asking the maintainer first.
