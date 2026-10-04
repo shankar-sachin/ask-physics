@@ -43,7 +43,7 @@ Validation rules enforced by `load_questions()`:
 
 1. Load and validate `questions.yaml` (works today).
 2. For each question, run `Pipeline.run(question)` once per model setup
-   (pulsar, quasar, magnetar, and the ADR-010 router). Plans are greedy, so
+   (tellus, solem, celeste, and the ADR-010 router). Plans are greedy, so
    one run per setup is deterministic.
 3. Score each `Answer` with the category rubric from `docs/EVALS.md`:
    - **Numeric:** convert `final_value` to `unit` with Pint, then apply

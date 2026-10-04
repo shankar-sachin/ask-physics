@@ -25,15 +25,15 @@ class Settings:
 
     Attributes:
         llm_provider: Which ``LLMClient`` to build. ``fake`` needs no weights.
-        model: Which Fermi model handles planning: fermi-pulsar-1, fermi-quasar-1,
-            or fermi-magnetar-1 (ADR-009).
+        model: Which Fermi model handles planning: fermi-tellus-1, fermi-solem-1,
+            or fermi-celeste-1 (ADR-009).
         top_k: Number of equations retrieved per question.
         temperature: Sampling temperature for the explain stage. Classify and
             plan always decode greedily (ADR-009).
     """
 
     llm_provider: Provider = "fake"
-    model: str = "fermi-quasar-1"
+    model: str = "fermi-solem-1"
     top_k: int = 5
     temperature: float = 0.0
 

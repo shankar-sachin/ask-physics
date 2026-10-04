@@ -1,15 +1,15 @@
 import pytest
 
-from askphysics.lm.config import MAGNETAR, NANO, PRESETS, PULSAR, QUASAR, ModelConfig, get_config
+from askphysics.lm.config import CELESTE, LUNA, PRESETS, SOLEM, TELLUS, ModelConfig, get_config
 
 
 @pytest.mark.parametrize(
     ("config", "expected"),
     [
-        (PULSAR, 3_217_440),
-        (QUASAR, 29_893_120),
-        (MAGNETAR, 119_563_008),
-        (NANO, 139_584),
+        (TELLUS, 3_217_440),
+        (SOLEM, 29_893_120),
+        (CELESTE, 119_563_008),
+        (LUNA, 139_584),
     ],
 )
 def test_parameter_counts_are_pinned(config: ModelConfig, expected: int) -> None:
@@ -18,11 +18,11 @@ def test_parameter_counts_are_pinned(config: ModelConfig, expected: int) -> None
 
 
 def test_family_shares_a_vocabulary() -> None:
-    assert PULSAR.vocab_size == QUASAR.vocab_size == MAGNETAR.vocab_size == 8192
+    assert TELLUS.vocab_size == SOLEM.vocab_size == CELESTE.vocab_size == 8192
 
 
 def test_family_names() -> None:
-    assert set(PRESETS) == {"fermi-pulsar-1", "fermi-quasar-1", "fermi-magnetar-1", "fermi-nano"}
+    assert set(PRESETS) == {"fermi-tellus-1", "fermi-solem-1", "fermi-celeste-1", "fermi-luna-1"}
 
 
 def test_mlp_hidden_is_about_eight_thirds() -> None:
@@ -32,7 +32,7 @@ def test_mlp_hidden_is_about_eight_thirds() -> None:
 
 
 def test_get_config() -> None:
-    assert get_config("fermi-quasar-1") is QUASAR
+    assert get_config("fermi-solem-1") is SOLEM
     with pytest.raises(KeyError, match="presets"):
         get_config("fermi-blackhole-1")
 

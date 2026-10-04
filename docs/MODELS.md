@@ -11,10 +11,10 @@ does every piece of math. Decisions: ADR-009 (from scratch) and ADR-010
 
 | Model | Params | Layers | d_model | Heads | Context | Role |
 |-------|--------|--------|---------|-------|---------|------|
-| `fermi-pulsar-1` | ~3.2M | 6 | 160 | 5 | 1024 | Classifies every question; full fallback when bigger weights are missing |
-| `fermi-quasar-1` | ~29M | 8 | 512 | 8 | 1024 | Default planner and explainer |
-| `fermi-magnetar-1` | ~119M | 16 | 768 | 12 | 1024 | One escalation shot when quasar can't produce a valid plan |
-| `fermi-nano` | ~0.1M | 2 | 64 | 4 | 256 | Tests and CI only; never ships |
+| `fermi-tellus-1` | ~3.2M | 6 | 160 | 5 | 1024 | Classifies every question; full fallback when bigger weights are missing |
+| `fermi-solem-1` | ~29M | 8 | 512 | 8 | 1024 | Default planner and explainer |
+| `fermi-celeste-1` | ~119M | 16 | 768 | 12 | 1024 | One escalation shot when solem can't produce a valid plan |
+| `fermi-luna-1` | ~0.1M | 2 | 64 | 4 | 256 | Tests and CI only; never ships |
 
 All share one tokenizer (vocabulary 8,192), so data, prompts, and decoding
 constraints are identical across sizes. Parameter counts are approximate
@@ -33,7 +33,7 @@ Decoder-only transformer, written in PyTorch:
 - **Rotary position embeddings (RoPE)**.
 - **Causal self-attention** through `torch.nn.functional.scaled_dot_product_attention`.
 - **SwiGLU MLP** with hidden size about 8/3 of `d_model`.
-- No biases, no dropout at these sizes (revisit if magnetar overfits).
+- No biases, no dropout at these sizes (revisit if celeste overfits).
 
 Devices: Apple Silicon (MPS) first, then CUDA, then CPU, picked automatically.
 
@@ -77,21 +77,21 @@ failures are impossible by construction rather than caught afterwards:
 **CLI (now): split and escalate.**
 
 ```
-question -> pulsar: classify
-         -> quasar: plan  --valid?--> compute -> quasar: explain
+question -> tellus: classify
+         -> solem: plan  --valid?--> compute -> solem: explain
                       |
-                      +-- invalid plan or compute failure: retry quasar (up to 5 attempts,
+                      +-- invalid plan or compute failure: retry solem (up to 5 attempts,
                           varying the retrieved context order and sampling seed)
-                      +-- still failing: ONE attempt on magnetar
+                      +-- still failing: ONE attempt on celeste
                       +-- still failing: degraded answer
 ```
 
-If quasar or magnetar weights are not installed, the router skips them, and
-pulsar does every task on its own. Every answer records which model produced
+If solem or celeste weights are not installed, the router skips them, and
+tellus does every task on its own. Every answer records which model produced
 each stage.
 
-**Website (after v1.0): usage tiers.** Each visitor starts on quasar, gets
-one magnetar answer per day, and drops to pulsar after five quasar answers
+**Website (after v1.0): usage tiers.** Each visitor starts on solem, gets
+one celeste answer per day, and drops to tellus after five solem answers
 in a window. Limits live in server config. They exist to cap hosting cost,
 so the local CLI never enforces them.
 
@@ -124,9 +124,9 @@ The factory never reads `evals/`, and a similarity check enforces it
 
 | Model | Tokens | Estimated time |
 |-------|--------|----------------|
-| pulsar | ~60M | Minutes |
-| quasar | ~600M | 1 to 2 hours |
-| magnetar | ~2.4B | About a day |
+| tellus | ~60M | Minutes |
+| solem | ~600M | 1 to 2 hours |
+| celeste | ~2.4B | About a day |
 
 These are estimates until v0.3 measures real throughput.
 
