@@ -298,7 +298,7 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
   `pyproject.toml` (passing the index to uv globally makes it resolve every
   package there first). The default installs the latest GitHub release;
   `ASKPHYSICS_REF` pins a tag or branch.
-- **Also:** a Homebrew tap, `shankar-sachin/homebrew-ask-physics`, for people
+- **Also:** a Homebrew tap, `shankar-sachin/homebrew-tap` (`brew install shankar-sachin/tap/askphysics`), for people
   who live in brew. Its formula builds a virtualenv in `libexec` from the
   release tarball.
 - **Not:** WinGet (not submitting), and PyPI only at v1.0.

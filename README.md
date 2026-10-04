@@ -93,7 +93,7 @@ irm https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.ps
 **Homebrew** (macOS and Linux)
 
 ```bash
-brew install shankar-sachin/ask-physics/askphysics
+brew install shankar-sachin/tap/askphysics
 ```
 
 The scripts install `askphysics` into its own isolated environment with

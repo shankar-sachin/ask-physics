@@ -9,7 +9,7 @@ Releases are tagged only with the maintainer's approval (`CLAUDE.md`).
 2. **Tag.** On GitHub, open Releases, then "Draft a new release", create the
    tag `vX.Y.Z` on `main`, paste the CHANGELOG section as the notes, and
    publish.
-3. **Bump the Homebrew tap.** In `shankar-sachin/homebrew-ask-physics`, update
+3. **Bump the Homebrew tap.** In `shankar-sachin/homebrew-tap`, update
    `Formula/askphysics.rb`:
 
    ```bash
