@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "askphysics"
 version = "0.1.0"
-description = "Answers physics questions, from textbook to absurd, with retrieved equations and symbolic math instead of LLM arithmetic."
+description = "Answers physics questions, from textbook to absurd, with our own small language models and a symbolic algebra machine."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -32,7 +32,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-anthropic = ["anthropic>=1.0"]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -107,5 +106,5 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 # See ADR-007 in docs/DECISIONS.md: incomplete third-party type information.
-module = ["sympy.*", "anthropic.*"]
+module = ["sympy.*"]
 ignore_missing_imports = true

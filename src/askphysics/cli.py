@@ -70,7 +70,7 @@ def ask(
     ] = False,
     llm: Annotated[
         str | None,
-        typer.Option(help="LLM provider: fake (default, no API key) or anthropic."),
+        typer.Option(help="LLM provider: fake (default). The Fermi models arrive in v0.3."),
     ] = None,
 ) -> None:
     """Answer a physics question."""
