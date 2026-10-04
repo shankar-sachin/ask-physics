@@ -26,6 +26,10 @@ the LLM.
 **Constant.** A physical constant with value, unit, uncertainty, and source
 (`data/constants.json`), for example standard gravity or the gas constant.
 
+**Constrained decoding.** Masking tokens during generation so a Fermi model can only emit schema-valid JSON, retrieved equation ids, numbers present in its input, and valid units. Makes hallucinated equations and invented numbers impossible by construction.
+
+**Data factory.** The code that generates Fermi model training data from the equation database and templates, with every standard example verified by the symbolic algebra machine.
+
 **Degraded answer.** An answer where a stage failed but the pipeline still
 returns something useful: what it tried, where it failed, and why.
 
@@ -37,12 +41,16 @@ meters to seconds is a dimension error.
 with units, domain, assumptions, validity conditions, tags, source, and
 license.
 
+**Escalation.** ADR-010 routing: when quasar can't produce a valid plan in 5 attempts, magnetar gets one attempt before the answer degrades.
+
 **Eval leakage.** Eval questions (or near-paraphrases) appearing in data,
 prompts, or training sets, which inflates scores without improving the
 system.
 
 **Fake LLM.** `FakeLLMClient`: a deterministic stand-in returning canned,
-schema-valid responses, so tests and demos run without an API key.
+schema-valid responses, so tests and demos run without trained weights.
+
+**Fermi models.** Our own from-scratch language models: `fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), `fermi-magnetar-1` (~120M), and `fermi-nano` for tests. Not to be confused with Fermi questions or the Fermi engine. See `docs/MODELS.md`.
 
 **Fermi question / Fermi estimation.** A question answered by decomposing it
 into estimable quantities, multiplying through, and reporting an order of
@@ -53,7 +61,7 @@ retrieved equation id, a constant from the table, or an explicit assumption.
 An ungrounded claim is a guess.
 
 **Hybrid search.** Combining keyword (lexical) search with vector (semantic)
-search, usually by rank fusion. Planned for v0.2.
+search, usually by rank fusion. Planned for v0.6.
 
 **Known value.** A quantity the plan treats as given: a value, a unit, and
 an origin (`given`, `constant`, or `assumption`).
@@ -76,7 +84,7 @@ units, equation ids, assumptions, and strategy. Strict JSON, validated
 before compute.
 
 **Recall@k.** The fraction of questions where the correct equation appears
-in the top k retrieval results. The v0.2 release metric.
+in the top k retrieval results. A v0.6 release metric.
 
 **Redirect.** The "closest answerable version" offered with a refusal.
 
@@ -89,10 +97,16 @@ question. Keyword-based in v0.1.
 **Sanity check.** Stage 5: dimension check, order-of-magnitude check against
 typical ranges, and (from v0.8) limit cases.
 
+**Symbolic algebra machine.** The compute layer: SymPy rearranges and solves equations, Pint carries and checks units. Does all the math.
+
 **SymPy.** The Python symbolic math library. Rearranges equations and
 evaluates solutions.
 
 **Target.** The symbol the question asks for (for example `v`).
+
+**Task format.** The fixed text layout (task token plus JSON payload) a Fermi model was trained on for classify, plan, or explain. See `docs/PROMPTS.md`.
+
+**Tokenizer.** Our byte-level BPE that turns text into token ids. Digits are single tokens so numbers copy exactly.
 
 **Typical range.** Per-variable `[low, high]` bounds in equation data, used
 by the magnitude check.

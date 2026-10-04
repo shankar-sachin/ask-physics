@@ -19,29 +19,38 @@ can be.
 
 ## 2. Core thesis
 
-**Retrieval plus symbolic computation beats a raw LLM guessing arithmetic.**
+**Retrieval plus symbolic computation beats a language model guessing
+arithmetic.**
 
-LLMs are good at language: reading a messy question, deciding which physics
-applies, laying out a plan, and explaining the result. They are bad at
-arithmetic, careless with units, and happy to invent formulas that look
-right. So we split the work:
+Language models are good at language: reading a messy question, deciding
+which physics applies, laying out a plan, and explaining the result. They are
+bad at arithmetic, careless with units, and happy to invent formulas that
+look right. So we split the work, and we build both halves ourselves:
 
 | Job | Who does it |
 |-----|-------------|
-| Understand the question, pick a strategy, write the explanation | LLM |
+| Understand the question, pick a strategy, write the explanation | Our Fermi language models ([`docs/MODELS.md`](docs/MODELS.md)) |
 | Know which equations exist and where they came from | Curated database + retrieval |
 | Rearrange equations, substitute values, compute numbers | SymPy |
 | Track, convert, and check units | Pint |
 | Decide how much to trust the answer | Deterministic confidence formula (section 7) |
 
-The LLM never produces a number that appears in the final answer. If it does
-arithmetic in its explanation, that is a bug. Every equation in an answer
+The language model never produces a number that appears in the final answer.
+Constrained decoding makes it impossible for a plan to cite an unretrieved
+equation or a number that wasn't in the input. Every equation in an answer
 traces back to an entry in the database with a source and a license.
+
+The models are the Fermi family, written and trained from scratch in this
+repo, running locally with no external APIs (ADR-009):
+`fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), and
+`fermi-magnetar-1` (~120M). Throughout this plan, "the LLM" means them.
 
 ## 3. Non-goals for v0.x
 
-- **No training from scratch.** We use existing LLMs. A small fine-tune for
-  the plan stage is an experiment in v0.7, not a foundation.
+- **No external LLM APIs and no pretrained weights.** The Fermi models are
+  ours, trained from scratch (ADR-009).
+- **No giant models.** Magnetar stays around 120M parameters until there is
+  both the data and the compute to justify more.
 - **No multimodal input.** No diagrams, photos of homework, or handwriting.
 - **No web UI in v0.x.** CLI first; an optional API server is a v0.9
   stretch. A public website comes after v1.0, once the LLM layer and the
@@ -106,8 +115,9 @@ classify -> retrieve -> plan -> compute -> sanity_check -> explain
   (for example, constant-acceleration kinematics for a rocket burning fuel).
 - **Graceful degradation:** the plan is validated before compute: unknown
   equation ids, unparseable units, or a `target` not in `unknowns` raise
-  `PlanValidationError`. In v0.1 that ends in a degraded answer; from v0.3 it
-  triggers one re-plan with the validation error fed back.
+  `PlanValidationError`. In v0.1 that ends in a degraded answer. From v0.3
+  the router retries quasar (up to 5 attempts), then escalates once to
+  magnetar, then degrades (ADR-010).
 
 ### 4.4 compute
 
@@ -170,7 +180,7 @@ physics question wearing a silly hat. The policy:
 5. **Report a range, not fake precision.** The answer is an order of
    magnitude ("about 10^8 ducks, plausibly 3x10^7 to 2x10^9"), produced by
    propagating `low` and `high` through the calculation (Monte Carlo or
-   interval arithmetic, decided in v0.5). Never "243,912,016 ducks".
+   interval arithmetic, decided in v0.7). Never "243,912,016 ducks".
 6. **Flag the silly parts with a straight face.** Caveats state the physical
    absurdities plainly ("this many ducks would form a pile roughly X m
    high; the train would derail before stopping") without jokes overriding
@@ -231,7 +241,7 @@ below that. Refusals and degraded answers report `low` with score 0.0.
 
 **Known weaknesses:** the weights are made up; the retrieval score is not
 calibrated; a large `n` penalizes careful answers that list obvious
-assumptions. v0.4 eval data will be used to fit the weights (see
+assumptions. v0.5 eval data will be used to fit the weights (see
 [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md)).
 
 ## 8. Success metrics per version
@@ -239,12 +249,12 @@ assumptions. v0.4 eval data will be used to fit the weights (see
 | Version | Metric | Target |
 |---------|--------|--------|
 | v0.1 | `pytest`, `ruff`, `mypy` clean; CLI runs end to end with the fake LLM | Pass |
-| v0.2 | Recall@5 for the correct equation on a 50-question retrieval set | 90% or more |
-| v0.3 | Standard questions within 2% relative tolerance, correct unit | 80% or more |
-| v0.4 | Eval set size; automated scoring coverage | 100+ questions; 100% scored |
-| v0.5 | Fermi answers within one order of magnitude of reference | 70% or more |
-| v0.6 | Equations / worked examples with validated source and license | 500+ / 1000+ |
-| v0.7 | Fine-tuned planner vs prompted baseline on plan validity | No worse, at lower cost |
+| v0.2 | `fermi-nano` trains in CI with falling loss; constrained decoding property-tested | Pass |
+| v0.3 | quasar valid-plan rate on held-out templates; magnetar rescue rate | 90% or more; a third or more of quasar failures |
+| v0.4 | Standard questions within 2% relative tolerance, correct unit | 80% or more |
+| v0.5 | Eval set size; automated scoring coverage | 100+ questions; 100% scored |
+| v0.6 | Recall@5 on the retrieval set; equations / examples with validated license | 90% or more; 500+ / 1000+ |
+| v0.7 | Fermi answers within one order of magnitude of reference | 70% or more |
 | v0.8 | Wrong answers flagged by self-verification | 50% or more of wrong answers caught |
 | v1.0 | All eval categories at threshold; no category regressed | See [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
@@ -263,9 +273,10 @@ The full register, with likelihood, impact, and owner, is in
 
 ## 10. Milestones
 
-v0.1 Skeleton -> v0.2 Real retrieval -> v0.3 Real solver -> v0.4 Eval
-harness -> v0.5 Fermi engine -> v0.6 Data expansion -> v0.7 Fine-tuning ->
-v0.8 Self-verification -> v0.9 Hardening -> v1.0 Release.
+v0.1 Skeleton -> v0.2 Fermi foundations -> v0.3 Fermi models trained and
+wired in -> v0.4 Solver expansion -> v0.5 Eval harness -> v0.6 Retrieval and
+data expansion -> v0.7 Fermi engine -> v0.8 Self-verification -> v0.9
+Hardening -> v1.0 Release -> website.
 
 Goals, deliverables, exit criteria, and effort for each:
 [`docs/ROADMAP.md`](docs/ROADMAP.md). The near-term backlog is in

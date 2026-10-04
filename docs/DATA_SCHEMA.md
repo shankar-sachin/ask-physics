@@ -148,7 +148,7 @@ Validation runs in two layers:
   least one referenced equation.
 - All units parse; `final_answer.unit` has the same dimensionality as the
   unknown's declared unit in the equation that defines it.
-- (v0.3) Re-solving with `solve_for` reproduces `final_answer` within 0.1%.
+- (v0.4) Re-solving with `solve_for` reproduces `final_answer` within 0.1%.
 - No `problem_text` may be a near-duplicate of an eval question (see
   `docs/EVALS.md`, leakage policy).
 

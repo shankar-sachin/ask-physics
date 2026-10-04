@@ -1,7 +1,7 @@
 """Fermi estimation support: the assumptions table (working) and range propagation (stub).
 
 The table loader is real in v0.1 so the planner and data validation can use
-it. Uncertainty propagation lands in v0.5 (``docs/ROADMAP.md``); the method
+it. Uncertainty propagation lands in v0.7 (``docs/ROADMAP.md``); the method
 choice is open question Q8.
 """
 
@@ -65,8 +65,8 @@ def propagate_range(
     """
     # TODO: Sample each assumption log-uniformly between low and high with a seeded
     # numpy Generator, evaluate the lambdified expression on the samples, and return
-    # the 5th and 95th percentiles. Cross-check with interval arithmetic on the bounds (v0.5, Q8).
-    raise NotImplementedError("Fermi range propagation lands in v0.5")
+    # the 5th and 95th percentiles. Cross-check with interval arithmetic on the bounds (v0.7, Q8).
+    raise NotImplementedError("Fermi range propagation lands in v0.7")
 
 
 def order_of_magnitude(value: float) -> int:
