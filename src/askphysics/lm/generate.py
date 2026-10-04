@@ -18,7 +18,7 @@ what the models are trained on.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 import torch
@@ -37,7 +37,7 @@ from askphysics.lm.formats import (
     relevant_constants,
 )
 from askphysics.lm.model import FermiLM, KVCache
-from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer
+from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer, pretokenize
 from askphysics.models import Classification, Constant, Equation, FermiAssumption, Plan
 
 CATEGORIES = ("standard", "fermi", "out_of_scope")
@@ -150,6 +150,10 @@ class Decoder:
         self._string_safe = string_safe.to(self.device)
         self._prose_safe = prose_safe.to(self.device)
         self._quote_start = quote_start.to(self.device)
+        self._ids_by_text = {text: i for i, text in self._text.items()}
+        self._ids_by_first: dict[str, list[int]] = {}
+        for i, text in self._text.items():
+            self._ids_by_first.setdefault(text[:1], []).append(i)
         self._state = _State(text="", ids=[], past=None)
 
     # ------------------------------------------------------------------ cache plumbing
@@ -226,17 +230,68 @@ class Decoder:
         self._sync(self._state.text + fixed)
 
     def choose(self, options: Sequence[str], closer: str = "") -> str:
-        """Append whichever option the model finds most likely (``closer`` is scored, not kept)."""
+        """Append the option the model writes when it may only write legal options.
+
+        Greedy decoding through a trie of ``option + closer`` strings: at each
+        step only tokens that keep some option reachable are allowed, and the
+        model's best one is taken. This matches how the model was trained
+        (next-token prediction) and has no bias toward short options, unlike
+        comparing summed log-probabilities. ``closer`` marks where an option
+        ends (so "1" and "1200" are told apart) and is not kept.
+        """
         if not options:
             raise ValueError("no options to choose from")
         if len(options) == 1:
             self.emit(options[0])
             return options[0]
         base = self._state.text
-        scores = [self._score(base + option + closer) for option in options]
-        best = options[max(range(len(options)), key=scores.__getitem__)]
-        self.emit(best)
-        return best
+        # Hold back the last pretokenizer chunk: in training it may merge with what follows
+        # (`"` + `],` is one chunk `"],`), so the model must be free to write them together.
+        cut = self._pending_start(base)
+        pending = base[cut:]
+        self._sync(base[:cut])
+        targets = {pending + option + closer: option for option in options}
+        written = ""
+        for _ in range(max(len(t) for t in targets) + 1):
+            if any(written.startswith(t) for t in targets):
+                break
+            logits = self._state.logits
+            assert logits is not None
+            best_id, best_logit = -1, float("-inf")
+            for token in self._continuations(written, targets):
+                if float(logits[token]) > best_logit:
+                    best_id, best_logit = token, float(logits[token])
+            if best_id < 0:  # pragma: no cover - single bytes always exist
+                raise LLMError("no token can continue any option")
+            written += self._text[best_id]
+            self._state.past, self._state.logits = self._feed(self._state.past, [best_id])
+            self._state.ids.append(best_id)
+            self._state.text += self._text[best_id]
+        chosen = targets[max((t for t in targets if written.startswith(t)), key=len)]
+        self._sync(base + chosen)  # drop the closer and re-canonicalize the tokens
+        return chosen
+
+    def _pending_start(self, text: str) -> int:
+        """Index where the last pretokenizer chunk of ``text`` starts (after any task token)."""
+        start = next((len(t) for t in SPECIAL_TOKENS if text.startswith(t)), 0)
+        chunks = pretokenize(text[start:])
+        return len(text) - len(chunks[-1]) if chunks else len(text)
+
+    def _continuations(self, written: str, targets: Iterable[str]) -> set[int]:
+        """Tokens that keep some target reachable, including ones that run past its end."""
+        out: set[int] = set()
+        for target in targets:
+            if not target.startswith(written):
+                continue
+            rest = target[len(written) :]
+            for k in range(1, len(rest) + 1):
+                token = self._ids_by_text.get(rest[:k])
+                if token is not None:
+                    out.add(token)
+            for token in self._ids_by_first.get(rest[:1], ()):
+                if self._text[token].startswith(rest):
+                    out.add(token)
+        return out
 
     def free_text(
         self,
