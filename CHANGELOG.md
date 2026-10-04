@@ -6,6 +6,22 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Fermi model code in `src/askphysics/lm/`: configs, byte-level BPE
+  tokenizer, transformer with KV cache, safetensors checkpoints, canonical
+  task formats, constrained decoding, the data factory, and the training loop.
+- `askphysics model build-data`, `train-tokenizer`, `train`, and `info`.
+- A redesigned CLI: answer cards with one-line math, the inputs behind every
+  number, a confidence meter, a "try instead" redirect for refusals, and a
+  live training progress bar. `Answer` gains `inputs` and `redirect`.
+- README screenshots, regenerated with `make screenshots`.
+
+### Fixed
+
+- The solver raised a raw `ZeroDivisionError` on a zero in a division; it is
+  now a `SolverError`, so answers degrade instead of crashing.
+
 ### Changed
 
 - The language side is now the Fermi model family, built and trained from
