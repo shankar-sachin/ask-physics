@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Annotated, Any, cast
@@ -16,7 +17,14 @@ from askphysics.config import Provider, Settings
 from askphysics.data.loader import load_all
 from askphysics.errors import AskPhysicsError, DataValidationError
 from askphysics.pipeline import Pipeline
-from askphysics.ui import answer_card, banner, make_console, safe, training_progress
+from askphysics.ui import (
+    answer_card,
+    banner,
+    make_console,
+    safe,
+    tolerate_narrow_encodings,
+    training_progress,
+)
 
 app = typer.Typer(
     name="askphysics",
@@ -26,6 +34,11 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 console = make_console()
+
+
+@app.callback()
+def main() -> None:
+    tolerate_narrow_encodings(sys.stdout, sys.stderr)
 
 
 def _fail(message: str) -> typer.Exit:

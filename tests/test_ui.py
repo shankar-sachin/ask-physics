@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from rich.console import Console
 
@@ -11,6 +13,7 @@ from askphysics.ui import (
     pretty_number,
     pretty_symbol,
     pretty_unit,
+    tolerate_narrow_encodings,
 )
 
 
@@ -129,3 +132,18 @@ def test_degraded_card() -> None:
         explanation="No answer: the plan stage failed.",
     )
     assert "PARTIAL" in _render(answer_card(answer))
+
+
+def test_narrow_encodings_replace_glyphs_instead_of_crashing() -> None:
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="cp1252")
+    tolerate_narrow_encodings(stream)
+    stream.write("◉ Ask Physics ✓")
+    stream.flush()
+    assert raw.getvalue() == b"? Ask Physics ?"
+
+
+def test_utf8_streams_stay_strict() -> None:
+    stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    tolerate_narrow_encodings(stream, object())
+    assert stream.errors == "strict"

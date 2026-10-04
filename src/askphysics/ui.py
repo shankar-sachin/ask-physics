@@ -6,6 +6,8 @@ the symbolic algebra machine produced.
 
 from __future__ import annotations
 
+import codecs
+import io
 import math
 import re
 from collections.abc import Mapping
@@ -60,6 +62,16 @@ _SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 def make_console(**kwargs: object) -> Console:
     return Console(theme=THEME, highlight=False, **kwargs)  # type: ignore[arg-type]
+
+
+def tolerate_narrow_encodings(*streams: object) -> None:
+    """Print ``?`` for glyphs a stream can't encode instead of crashing.
+
+    Windows pipes and redirects default to cp1252, which has no ◉, ✓, or ━.
+    """
+    for stream in streams:
+        if isinstance(stream, io.TextIOWrapper) and codecs.lookup(stream.encoding).name != "utf-8":
+            stream.reconfigure(errors="replace")
 
 
 def pretty_unit(unit: str) -> str:
