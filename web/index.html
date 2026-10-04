@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask Physics</title>
+  <meta name="description" content="Ask a physics question and get an answer you can check: the equations, every input and assumption, units verified, and an honest confidence score. Runs in your browser.">
+  <meta name="theme-color" content="#07080f">
+  <meta property="og:title" content="Ask Physics">
+  <meta property="og:description" content="Physics answers you can check. Our own language models read the question; real math answers it.">
+  <meta property="og:image" content="https://askphysics.vercel.app/images/banner.png">
+  <link rel="icon" href="images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Ask Physics home">
+      <img src="images/logo.svg" alt="" width="34" height="34">
+      <span>Ask <b>Physics</b></span>
+    </a>
+    <nav>
+      <a href="#ask">Try it</a>
+      <a href="#how">How it works</a>
+      <a href="#models">Models</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/shankar-sachin/ask-physics" class="gh">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <img class="hero-logo" src="images/logo.svg" alt="Ask Physics logo" width="140" height="140">
+      <h1>Physics answers<br><span class="grad">you can check.</span></h1>
+      <p class="lede">
+        Ask anything from a textbook problem to <em>"how many rubber ducks would it take to stop a
+        freight train?"</em> Our own small language models read the question; a symbolic algebra
+        machine does every bit of the math. You get the equations, every input and assumption,
+        units checked end to end, and an honest confidence score.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="#ask">Ask a question</a>
+        <a class="btn" href="#install">Install the CLI</a>
+      </div>
+      <p class="fine">No account, no API key. It runs in your browser.</p>
+    </section>
+
+    <section id="ask" class="ask">
+      <h2>Ask a question</h2>
+      <form id="ask-form" autocomplete="off">
+        <label for="question" class="sr-only">Your physics question</label>
+        <input id="question" name="question" type="text" maxlength="500"
+               placeholder="A ball is dropped from 20 m. How fast does it land?">
+        <button id="ask-button" type="submit" class="btn primary">Ask</button>
+      </form>
+      <div class="examples" id="examples">
+        <span>Try:</span>
+        <button type="button">A ball is dropped from 45 m. How fast does it hit the ground?</button>
+        <button type="button">How much does the color blue weigh?</button>
+        <button type="button">How many rubber ducks would it take to stop a freight train?</button>
+      </div>
+      <p class="engine" id="engine" aria-live="polite">
+        <span class="dot"></span><span id="engine-text">Physics engine loads when you're ready (about 15 MB, cached after).</span>
+      </p>
+      <div id="result" aria-live="polite"></div>
+      <aside class="preview">
+        <b>Preview.</b> Our Fermi models are still training, so v0.2 plans with a stand-in that only
+        knows dropped-object questions. Everything else gets an honest "can't answer yet" that names
+        the stage that stopped. The real models arrive in v0.3.
+      </aside>
+    </section>
+
+    <section id="how" class="how">
+      <h2>How it works</h2>
+      <p class="sub">Six stages. The language models never do arithmetic: every number comes from SymPy and Pint.</p>
+      <ol class="stages">
+        <li><b>Classify</b><span>Standard, Fermi estimate, or not physics at all.</span></li>
+        <li><b>Retrieve</b><span>Find candidate equations in a reviewed database.</span></li>
+        <li><b>Plan</b><span>Pick equations by id and copy the values. No free-form math.</span></li>
+        <li><b>Compute</b><span>SymPy solves, Pint carries units through every step.</span></li>
+        <li><b>Sanity check</b><span>Dimensions and orders of magnitude, before you see it.</span></li>
+        <li><b>Explain</b><span>Plain words, every assumption listed, confidence scored.</span></li>
+      </ol>
+    </section>
+
+    <section id="models" class="models">
+      <h2>Meet the Fermi models</h2>
+      <p class="sub">Trained from scratch in this project. No external APIs, ever.</p>
+      <div class="grid">
+        <figure><img src="images/fermi-tellus-1.jpg" alt="fermi-tellus-1: the Earth with physics equations" loading="lazy"><figcaption><b>fermi-tellus-1</b> · ~3.2M<br>reads every question</figcaption></figure>
+        <figure><img src="images/fermi-solem-1.jpg" alt="fermi-solem-1: the Sun with physics equations" loading="lazy"><figcaption><b>fermi-solem-1</b> · ~29.9M<br>plans and explains</figcaption></figure>
+        <figure><img src="images/fermi-celeste-1.jpg" alt="fermi-celeste-1: a black hole quasar" loading="lazy"><figcaption><b>fermi-celeste-1</b> · ~119.6M<br>the last resort</figcaption></figure>
+        <figure><img src="images/fermi-luna-1.jpg" alt="fermi-luna-1: a crescent Moon" loading="lazy"><figcaption><b>fermi-luna-1</b> · ~0.14M<br>runs the tests</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="install" class="install">
+      <h2>Install the CLI</h2>
+      <div class="cmd"><span>macOS / Linux</span><code>curl -LsSf https://askphysics.vercel.app/installers/install.sh | sh</code><button type="button" class="copy">Copy</button></div>
+      <div class="cmd"><span>Windows</span><code>irm https://askphysics.vercel.app/installers/install.ps1 | iex</code><button type="button" class="copy">Copy</button></div>
+      <div class="cmd"><span>Homebrew</span><code>brew install shankar-sachin/tap/askphysics</code><button type="button" class="copy">Copy</button></div>
+      <p class="sub">Then: <code>askphysics ask "How fast does a ball dropped from 20 m hit the ground?"</code></p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="https://github.com/shankar-sachin/ask-physics">GitHub</a> · MIT license ·
+      <span id="version">v0.2</span>
+    </p>
+    <p class="credits">
+      Earth imagery: NASA Blue Marble and NOAA ETOPO1 (public domain). Moon map:
+      <a href="https://www.solarsystemscope.com/textures/">Solar System Scope</a>, from NASA LRO
+      data (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>). Python in the
+      browser by <a href="https://pyodide.org">Pyodide</a>.
+    </p>
+  </footer>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

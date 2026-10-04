@@ -1,4 +1,4 @@
-.PHONY: help install test lint format typecheck ask validate check screenshots brand
+.PHONY: help install test lint format typecheck ask validate check screenshots brand site site-smoke
 
 PYTHON ?= python
 Q ?= How fast does a falling object hit the ground if it is dropped from 20 m?
@@ -36,3 +36,9 @@ screenshots:  ## Regenerate docs/images from real CLI output (needs Node + Playw
 
 brand:  ## Render the logo, banner, and model artwork (needs Pillow, Node + Playwright)
 	$(PYTHON) scripts/brand.py
+
+site:  ## Build the askphysics.vercel.app site into build/site
+	sh scripts/build_site.sh
+
+site-smoke: site  ## Ask questions through the built site in headless Chromium (needs Playwright)
+	node scripts/site_smoke.mjs

@@ -37,3 +37,4 @@ htmlcov/
 *.sqlite
 *.sqlite3
 *.db
+node_modules/

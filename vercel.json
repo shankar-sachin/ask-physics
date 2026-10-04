@@ -2,23 +2,26 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "true",
-  "buildCommand": "mkdir -p build/site/installers && cp install.sh install.ps1 build/site/installers/",
+  "buildCommand": "sh scripts/build_site.sh",
   "outputDirectory": "build/site",
   "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    },
     {
       "source": "/installers/(.*)",
       "headers": [
         { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
-        { "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        { "key": "Cache-Control", "value": "public, max-age=300, must-revalidate" }
       ]
-    }
-  ],
-  "redirects": [
+    },
     {
-      "source": "/",
-      "destination": "https://github.com/shankar-sachin/ask-physics",
-      "permanent": false
+      "source": "/images/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
     }
   ]
 }
