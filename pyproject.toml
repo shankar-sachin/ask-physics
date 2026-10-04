@@ -114,6 +114,8 @@ select = [
 # The terminal UI uses real typography on purpose (×, superscripts, box glyphs).
 "src/askphysics/ui.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_ui.py" = ["RUF001"]
+# The artwork typesets real equations (Greek letters), one long HTML row per equation.
+"scripts/brand.py" = ["RUF001", "E501"]
 
 # ---------------------------------------------------------------- mypy
 [tool.mypy]

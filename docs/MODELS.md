@@ -9,6 +9,17 @@ does every piece of math. Decisions: ADR-009 (from scratch) and ADR-010
 
 ## The family
 
+<p align="center">
+  <img src="images/fermi-luna-1.jpg" alt="fermi-luna-1" width="24%">
+  <img src="images/fermi-tellus-1.jpg" alt="fermi-tellus-1" width="24%">
+  <img src="images/fermi-solem-1.jpg" alt="fermi-solem-1" width="24%">
+  <img src="images/fermi-celeste-1.jpg" alt="fermi-celeste-1" width="24%">
+</p>
+
+Each model is named for a body that grows with it: luna the Moon, tellus the
+Earth, solem the Sun, and celeste a quasar, the brightest thing in the sky.
+The artwork comes from `make brand` (`scripts/brand.py`).
+
 | Model | Params | Layers | d_model | Heads | Context | Role |
 |-------|--------|--------|---------|-------|---------|------|
 | `fermi-tellus-1` | ~3.2M | 6 | 160 | 5 | 1024 | Classifies every question; full fallback when bigger weights are missing |

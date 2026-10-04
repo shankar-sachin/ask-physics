@@ -20,6 +20,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (irm, Windows), tested on all three platforms in CI, plus a Homebrew tap
   (ADR-011).
 - Plan for Ask Physics API keys on the future hosted API (PLAN.md, Q18).
+- An Ask Physics logo, a README banner, and artwork for each Fermi model,
+  rendered by `make brand`: a ray-traced black hole quasar, a cratered
+  crescent Moon from LRO data, the Earth from NASA's Blue Marble, and the Sun.
 
 ### Fixed
 
