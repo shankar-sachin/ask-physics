@@ -48,9 +48,11 @@ machine, and call no external APIs:
 
 The artwork is rendered, not drawn: `make brand` runs
 [`scripts/brand.py`](scripts/brand.py), which ray-traces the black hole
-through Schwarzschild geodesics and shades the Moon, Earth, and Sun with
+through Schwarzschild geodesics and lights the Moon, Earth, and Sun with
 numpy. Earth imagery: NASA Blue Marble Next Generation and NOAA ETOPO1
-(public domain). More in [`docs/MODELS.md`](docs/MODELS.md).
+(public domain). Moon map: [Solar System Scope](https://www.solarsystemscope.com/textures/),
+from NASA LRO data ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
+More in [`docs/MODELS.md`](docs/MODELS.md).
 
 ## Screenshots
 

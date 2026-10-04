@@ -22,7 +22,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Plan for Ask Physics API keys on the future hosted API (PLAN.md, Q18).
 - An Ask Physics logo, a README banner, and artwork for each Fermi model,
   rendered by `make brand`: a ray-traced black hole quasar, a cratered
-  crescent Moon, the Earth from NASA's Blue Marble, and the Sun.
+  crescent Moon from LRO data, the Earth from NASA's Blue Marble, and the Sun.
 
 ### Fixed
 

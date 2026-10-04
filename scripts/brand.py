@@ -4,16 +4,17 @@
     python scripts/brand.py luna banner     # some pieces: logo, banner, luna, tellus, solem, celeste
     python scripts/brand.py --reuse banner  # reuse body renders cached in build/brand
 
-The bodies are rendered with numpy, not drawn: the Moon is a cratered sphere
-lit with the Lommel-Seeliger law; the Earth wraps NASA's Blue Marble and NOAA
-relief around a sphere with procedural clouds, ocean glint, city lights, and
-an atmosphere; the Sun has limb darkening, granulation, sunspots, spicules,
+The bodies are rendered with numpy, not drawn: the Moon wraps a lunar map
+from LRO data around a sphere lit with the Lommel-Seeliger law, plus
+earthshine; the Earth wraps NASA's Blue Marble and NOAA relief around a
+sphere with procedural clouds and cyclones, ocean glint, city lights, and an
+atmosphere; the Sun has limb darkening, granulation, sunspots, spicules,
 and loop prominences; and the black hole is ray-traced through Schwarzschild
 geodesics with a Doppler-beamed accretion disk and relativistic jets.
 Headless Chromium then typesets the equations and labels on top.
 
 Needs numpy, Pillow, and Node with Playwright. The first run downloads Google
-Fonts and the Earth maps (basemap-data from PyPI) into build/brand.
+Fonts, the Earth maps (basemap-data from PyPI), and the Moon map into build/brand.
 """
 
 from __future__ import annotations
@@ -211,62 +212,71 @@ def starfield(h: int, w: int, count: int, seed: int) -> Array:
     return blur(img, 0.7 * w / 1200) * 3.5
 
 
+# A global lunar color map from Lunar Reconnaissance Orbiter data, by Solar
+# System Scope (CC BY 4.0), as hosted by the PyVista project.
+MOON_MAP = "https://raw.githubusercontent.com/pyvista/data/master/Data/solar_textures/moon.jpg"
+MOON_MAP_SHA256 = "2764ba6535ea0481a062846ee033cc7a909dae05b31a8fd13f3e98f3a7fd92bd"
+
+
+def moon_map() -> Array:
+    """The lunar albedo map (equirectangular, linear RGB), downloaded once."""
+    import hashlib
+    import io
+
+    from PIL import Image
+
+    path = BUILD / "moon.jpg"
+    if not path.exists():
+        data = _fetch(MOON_MAP)
+        if hashlib.sha256(data).hexdigest() != MOON_MAP_SHA256:
+            raise SystemExit("moon map failed its checksum")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    image = Image.open(io.BytesIO(path.read_bytes())).convert("RGB")
+    return np.asarray(image, dtype=np.float64) ** 2.2 / 255**2.2
+
+
 def render_luna(n: int = ART) -> Array:
     ss = 2
     size = n * ss
     radius = 0.36 * size
     x, y, z, r = sphere(size, 0.56 * size, 0.5 * size, radius)
     inside = r < 1
-    normal = np.stack([x, y, z], axis=-1)
-    view = rotation(0.9, 0.25)
-    pin = normal[inside] @ view.T  # body coordinates of the visible pixels
+    nin = np.stack([x, y, z], axis=-1)[inside]
 
-    # Maria (dark basalt plains), highlands, and fine regolith texture.
-    maria = smoothstep(-0.1, 0.15, fbm(pin * 1.3, 6, seed=1))
-    albedo = 0.62 - 0.33 * maria + 0.1 * fbm(pin * 4, 5, seed=2) + 0.05 * fbm(pin * 22, 3, seed=3)
+    # The near side faces us (libration nudges it a little); north is up.
+    lat0, lon0 = np.radians(-4), np.radians(6)
+    center = np.array([np.cos(lat0) * np.sin(lon0), np.sin(lat0), np.cos(lat0) * np.cos(lon0)])
+    east = np.array([np.cos(lon0), 0.0, -np.sin(lon0)])
+    north = np.cross(center, east)
+    p = nin[:, :1] * east + nin[:, 1:2] * north + nin[:, 2:3] * center
+    lat = np.arcsin(np.clip(p[:, 1], -1, 1))
+    lon = np.arctan2(p[:, 0], p[:, 2])
+    albedo = sample(moon_map(), lat, lon)
 
-    # Craters: a power-law size distribution of bowls with raised rims.
-    rng = np.random.default_rng(7)
-    height = np.zeros(pin.shape[0])
-    for _ in range(1800):
-        c = normalize(rng.normal(size=3))
-        if (c @ view)[2] < -0.1:  # on the far side
-            continue
-        rad = min(0.006 * (1 - rng.random()) ** (-1 / 1.4), 0.14)
-        cosd = pin @ c
-        near = np.nonzero(cosd > np.cos(2.5 * rad))[0]
-        if near.size == 0:
-            continue
-        t = np.sqrt(np.clip(2 * (1 - cosd[near]), 0, None)) / rad
-        depth = 0.2 * rad
-        bowl = np.where(t < 1, depth * (t * t - 1), 0.0)
-        rim = 0.25 * depth * np.exp(-(((t - 1) / 0.22) ** 2))
-        ejecta = np.where(t > 1, 0.1 * depth * np.exp(-(t - 1) * 2.5), 0.0)
-        height[near] += bowl + rim + ejecta
-        if rng.random() < 0.1:  # young craters are brighter, with a halo
-            albedo[near] += 0.12 * np.exp(-((t / 1.8) ** 2))
-
-    height += 0.004 * fbm(pin * 40, 4, seed=4)
-    grid = np.zeros(z.shape)
-    grid[inside] = height
-    gy, gx = np.gradient(grid)
-    bump = 0.7 * radius
+    # Fine relief from the map's own shading, so the terminator isn't a clean edge.
+    lum = np.zeros(z.shape)
+    lum[inside] = albedo.mean(axis=1)
+    relief = lum - blur(lum[..., None], 3.0)[..., 0]
+    gy, gx = np.gradient(relief)
+    bump = 6.0
     lit_normal = normalize(np.stack([x - bump * gx, y + bump * gy, z], axis=-1))[inside]
 
-    # A crescent: the Sun is behind the Moon and off to the right.
-    light = normalize(np.array([0.9, 0.24, -0.62]))
+    # A waxing crescent: the Sun is behind the Moon and off to the right.
+    light = normalize(np.array([0.93, 0.12, -0.42]))
     mu0 = np.clip(lit_normal @ light, 0, None)
-    mu = np.clip(z[inside], 1e-3, None)
-    shade = 0.8 * 2 * mu0 / (mu0 + mu) + 0.2 * mu0
-    terminator = smoothstep(-0.03, 0.06, normal[inside] @ light)
-    lit = (albedo * shade * terminator)[:, None] * np.array([1.0, 0.96, 0.9]) * 0.95
-    earthshine = (0.012 * albedo * (0.4 + 0.6 * mu))[:, None] * np.array([0.6, 0.75, 1.0])
+    mu = np.clip(nin[:, 2], 1e-3, None)
+    lommel = 2 * mu0 / (mu0 + mu)  # the Moon's flat, limb-bright look
+    terminator = smoothstep(-0.02, 0.05, nin @ light)
+    lit = albedo * (lommel * terminator)[:, None] * 2.2
+    # Earthshine: the dark side lit faintly blue by the Earth, maria and all.
+    earthshine = albedo * (0.016 * (0.3 + 0.7 * mu))[:, None] * np.array([0.75, 0.85, 1.0])
 
     img = starfield(size, size, 900, seed=11) * (~inside)[..., None]
     img[inside] = lit + earthshine
     img = downsample(img, ss)
-    img = bloom(img, 0.8, 0.25, (6, 24))
-    return tonemap(img, 1.1)
+    img = bloom(img, 0.85, 0.2, (6, 24))
+    return tonemap(img, 1.0)
 
 
 # NASA's Blue Marble Next Generation and NOAA's ETOPO1 relief (both public
@@ -355,15 +365,28 @@ def render_tellus(n: int = ART) -> Array:
     grid = np.zeros(z.shape)
     grid[inside] = relief * land
     gy, gx = np.gradient(grid)
-    bump = 9.0
+    bump = 4.5
     lit_normal = normalize(np.stack([x - bump * gx, y + bump * gy, z], axis=-1))[inside]
 
-    # Clouds: fractal, lightly swirled, denser away from the subtropical deserts.
-    cwarp = np.stack([fbm(p * 2.5 + s, 4, seed=20 + s) for s in (0, 1, 2)], axis=-1)
-    cq = p + 0.25 * cwarp
-    cloud = fbm(cq * np.array([4.0, 6.0, 4.0]), 8, seed=23, gain=0.55)
-    belt = 0.12 * np.cos(lat * 6) ** 2 - 0.1 * np.exp(-(((np.abs(lat) - 0.42) / 0.12) ** 2))
-    cover = smoothstep(0.18, 0.6, cloud + belt) * 0.8
+    # Clouds: mid-latitude cyclones spiral the field (a twist that fades with
+    # distance from each storm's eye), wisps break up the edges, and the
+    # subtropical deserts stay clear, as they do from orbit.
+    cq = p.copy()
+    storms = ((50, -30, 0.38, 1.6), (62, 12, 0.3, 1.2), (40, 40, 0.25, 0.9))
+    for storm_lat, storm_lon, size_, twist in storms:
+        la, lo = np.radians(storm_lat), np.radians(storm_lon)
+        axis = np.array([np.cos(la) * np.sin(lo), np.sin(la), np.cos(la) * np.cos(lo)])
+        angle = twist * np.exp(-(np.sum((cq - axis) ** 2, axis=1) / size_**2))
+        cos_a, sin_a = np.cos(angle)[:, None], np.sin(angle)[:, None]
+        cq = cq * cos_a + np.cross(axis, cq) * sin_a + axis * (cq @ axis)[:, None] * (1 - cos_a)
+    cwarp = np.stack([fbm(cq * 2.5 + s, 4, seed=20 + s) for s in (0, 1, 2)], axis=-1)
+    cq = cq + 0.3 * cwarp
+    cloud = fbm(cq * np.array([3.5, 5.5, 3.5]), 9, seed=23, gain=0.56)
+    wisps = 1 - np.abs(noise(cq * np.array([14.0, 28.0, 14.0]), seed=24))
+    belt = 0.12 * np.cos(lat * 6) ** 2 - 0.12 * np.exp(-(((np.abs(lat) - 0.42) / 0.12) ** 2))
+    desert = land * smoothstep(0.12, 0.3, surface[:, 0]) * (1 - green)
+    density = cloud + belt + 0.12 * (wisps - 0.6) - 0.3 * desert
+    cover = smoothstep(0.02, 0.6, density) ** 1.5 * 0.75
 
     light = normalize(np.array([-0.85, 0.42, 0.32]))
     ndl = nin @ light
@@ -375,7 +398,8 @@ def render_tellus(n: int = ART) -> Array:
     glint = (spec * ocean * (1 - cover))[:, None] * np.array([1, 0.9, 0.72])
 
     lit = (surface * relief_light + glint) * day
-    clouds = cover[:, None] * np.array([0.9, 0.92, 0.96]) * day
+    thick = smoothstep(0.2, 0.8, cover)[:, None]  # thin cloud reads grey, thick cloud white
+    clouds = cover[:, None] * (0.7 + 0.25 * thick) * np.array([0.95, 0.96, 1.0]) * day
     shaded = lit * (1 - cover[:, None]) + clouds
 
     # Night side: city lights scattered over inhabited (green) land.
