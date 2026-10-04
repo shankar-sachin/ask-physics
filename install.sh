@@ -10,8 +10,9 @@
 # Environment variables:
 #   ASKPHYSICS_REF          git tag, branch, or commit to install (default: latest release)
 #   ASKPHYSICS_SOURCE       install from this local path or URL instead of GitHub
-#   ASKPHYSICS_TORCH_INDEX  package index for torch on Linux
-#                           (default: PyTorch's CPU-only index; set empty to use PyPI)
+#
+# On Linux, torch comes from PyTorch's CPU-only index (pinned in pyproject.toml):
+# the default PyPI wheel bundles about 2 GB of CUDA libraries the CLI doesn't need.
 #
 # Uninstall:  uv tool uninstall askphysics
 set -eu
@@ -72,19 +73,8 @@ else
   info "Installing Ask Physics $ref"
 fi
 
-# 3. Install. On Linux, take torch from the CPU-only index: the default PyPI
-# wheel bundles about 2 GB of CUDA libraries that the CLI doesn't need.
-if [ "$os" = "linux" ]; then
-  torch_index="${ASKPHYSICS_TORCH_INDEX-https://download.pytorch.org/whl/cpu}"
-else
-  torch_index=""
-fi
-if [ -n "$torch_index" ]; then
-  info "Using CPU-only torch from $torch_index"
-  uv tool install --force --python "$PYTHON_VERSION" --index "$torch_index" "$spec"
-else
-  uv tool install --force --python "$PYTHON_VERSION" "$spec"
-fi
+# 3. Install
+uv tool install --force --python "$PYTHON_VERSION" "$spec"
 
 # 4. PATH
 bin_dir="$(uv tool dir --bin)"

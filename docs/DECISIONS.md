@@ -294,7 +294,9 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
   `install.ps1` (`irm ... | iex`) for Windows. Both install uv if missing and
   run `uv tool install`, which gives `askphysics` its own isolated
   environment with a uv-managed Python 3.12. On Linux, torch comes from
-  PyTorch's CPU-only index. The default installs the latest GitHub release;
+  PyTorch's CPU-only index, pinned for torch alone by a uv source in
+  `pyproject.toml` (passing the index to uv globally makes it resolve every
+  package there first). The default installs the latest GitHub release;
   `ASKPHYSICS_REF` pins a tag or branch.
 - **Also:** a Homebrew tap, `shankar-sachin/homebrew-ask-physics`, for people
   who live in brew. Its formula builds a virtualenv in `libexec` from the

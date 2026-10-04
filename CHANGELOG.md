@@ -28,6 +28,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The solver raised a raw `ZeroDivisionError` on a zero in a division; it is
   now a `SolverError`, so answers degrade instead of crashing.
+- Output piped or redirected on Windows (cp1252) crashed on symbols like ◉;
+  unencodable glyphs now print as `?`.
 
 ### Changed
 
