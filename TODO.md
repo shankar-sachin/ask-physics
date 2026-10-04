@@ -78,6 +78,14 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
       weights are installed, with a clear message when they aren't.
 - [ ] `askphysics ask --model` to force a specific Fermi model.
 
+### Distribution (ADR-012)
+- [ ] Export bf16 safetensors per model and a manifest (URL, size, sha256).
+- [ ] `askphysics model pull [--all]` with checksum verification.
+- [ ] Installers run `model pull`; Homebrew formula adds the weights as
+      resources.
+- [ ] Download celeste on first escalation; clear message when no weights
+      are installed.
+
 ### Evals
 - [ ] Held-out factory set (unseen templates): valid-plan rate per model and
       celeste rescue rate.

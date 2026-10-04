@@ -146,7 +146,10 @@ These are estimates until v0.3 measures real throughput.
 - Saved to `~/.cache/askphysics/models/<model-name>/`, never committed to git.
 - Stored as `safetensors`, never pickled `torch.save` files, because loading a
   pickle runs arbitrary code (see `SECURITY.md`).
-- Distribution as GitHub release assets only with the maintainer's approval.
+- Users never train: the maintainer trains and ships the weights as GitHub
+  release assets, pinned by a checksum manifest and fetched with
+  `askphysics model pull` (ADR-012). The installers and the Homebrew formula
+  fetch tellus and solem; celeste comes down on first escalation.
 
 ## Known limits
 
