@@ -153,10 +153,29 @@ def test_context_overflow_is_an_llm_error(tokenizer: Tokenizer) -> None:
         decoder.start(classify_prompt(QUESTION))
 
 
-def test_choose_picks_the_likelier_option(tokenizer: Tokenizer) -> None:
+@pytest.mark.parametrize("favored", ["standard", "fermi"])
+def test_choose_follows_the_models_preference(
+    tokenizer: Tokenizer, monkeypatch: pytest.MonkeyPatch, favored: str
+) -> None:
+    decoder = _decoder(tokenizer, 0)
+    boost = tokenizer.encode(favored)[0]
+    original = decoder.model.step
+
+    def biased(ids: torch.Tensor, past: object = None) -> tuple[torch.Tensor, object]:
+        logits, new_past = original(ids, past)  # type: ignore[arg-type]
+        logits[..., boost] += 100.0
+        return logits, new_past
+
+    monkeypatch.setattr(decoder.model, "step", biased)
+    decoder.start(classify_prompt("x"))
+    decoder.emit('{"category": "')
+    assert decoder.choose(["standard", "fermi", "out_of_scope"], closer='"') == favored
+    assert decoder.text.endswith('"category": "' + favored)
+
+
+def test_choose_tells_prefix_options_apart(tokenizer: Tokenizer) -> None:
     decoder = _decoder(tokenizer, 0)
     decoder.start(classify_prompt("x"))
-    scores = {o: decoder._score(decoder.text + o) for o in ("standard", "fermi")}
-    best = decoder.choose(["standard", "fermi"])
-    assert best == max(scores, key=scores.__getitem__)
-    assert decoder.text.endswith(best)
+    picked = decoder.choose(["1", "12", "120"], closer=", ")
+    assert picked in {"1", "12", "120"}
+    assert not decoder.text.endswith(",")
