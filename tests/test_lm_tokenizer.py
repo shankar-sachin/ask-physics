@@ -101,6 +101,12 @@ def test_training_stops_when_nothing_repeats() -> None:
     assert Tokenizer.train(["abc"], vocab_size=1000).merges == []
 
 
+@pytest.mark.parametrize("merges", [[(97, 300)], [(97, 98), (97, 98)], [(-1, 97)]])
+def test_corrupt_merges_rejected(merges: list[tuple[int, int]]) -> None:
+    with pytest.raises(ValueError):
+        Tokenizer(merges)
+
+
 def test_too_small_vocab_rejected() -> None:
     with pytest.raises(ValueError):
         Tokenizer.train(["abc"], vocab_size=10)
