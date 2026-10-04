@@ -150,5 +150,135 @@ def build_data(
     )
 
 
+@model_app.command("train-tokenizer")
+def train_tokenizer_cmd(
+    data: Annotated[Path, typer.Option(help="Dataset directory from build-data.")] = Path(
+        "build/data"
+    ),
+    out: Annotated[Path, typer.Option(help="Where to write tokenizer.json.")] = Path(
+        "build/tokenizer.json"
+    ),
+    vocab_size: Annotated[int, typer.Option(min=262, help="Vocabulary size.")] = 8192,
+    max_examples: Annotated[int, typer.Option(min=1, help="Training examples to read.")] = 50_000,
+) -> None:
+    """Train the byte-level BPE tokenizer on the dataset's training split."""
+    from askphysics.lm.train import train_tokenizer
+
+    with console.status(f"Learning up to {vocab_size:,} tokens from {escape(str(data))}..."):
+        tokenizer = train_tokenizer(data, vocab_size, max_examples)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tokenizer.save(out)
+    console.print(f"Tokenizer with {tokenizer.vocab_size:,} tokens written to {escape(str(out))}")
+
+
+@model_app.command("train")
+def train_cmd(
+    model: Annotated[str, typer.Option(help="Model preset, e.g. fermi-solem-1.")] = "fermi-luna-1",
+    data: Annotated[Path, typer.Option(help="Dataset directory from build-data.")] = Path(
+        "build/data"
+    ),
+    tokenizer: Annotated[Path, typer.Option(help="tokenizer.json from train-tokenizer.")] = Path(
+        "build/tokenizer.json"
+    ),
+    out: Annotated[
+        Path | None, typer.Option(help="Output directory (default: the installed models dir).")
+    ] = None,
+    steps: Annotated[int, typer.Option(min=1)] = 1000,
+    batch_size: Annotated[int, typer.Option(min=1)] = 16,
+    lr: Annotated[
+        float | None, typer.Option(help="Peak learning rate (default per model).")
+    ] = None,
+    device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu (default: best).")] = None,
+    seed: Annotated[int, typer.Option()] = 0,
+    resume: Annotated[bool, typer.Option(help="Continue from a checkpoint in --out.")] = False,
+) -> None:
+    """Train a Fermi model from scratch on factory data."""
+    from askphysics.lm.checkpoints import default_model_dir
+    from askphysics.lm.config import get_config
+    from askphysics.lm.tokenizer import Tokenizer
+    from askphysics.lm.train import DEFAULT_LR, TrainConfig, train
+
+    try:
+        config = get_config(model)
+    except KeyError as exc:
+        console.print(f"[red]Error:[/red] {escape(str(exc.args[0]))}")
+        raise typer.Exit(code=1) from exc
+    out_dir = out or default_model_dir() / config.name
+    cfg = TrainConfig(
+        steps=steps,
+        batch_size=batch_size,
+        lr=lr or DEFAULT_LR.get(config.name, 1e-3),
+        warmup_steps=max(1, min(500, steps // 20)),
+        eval_every=max(1, min(500, steps // 10)),
+        checkpoint_every=max(1, min(2000, steps // 4)),
+        log_every=max(1, min(100, steps // 50)),
+        seed=seed,
+        device=device,
+    )
+    console.print(
+        f"Training [bold]{config.name}[/bold] ({config.num_parameters():,} params) "
+        f"for {steps:,} steps, writing to {escape(str(out_dir))}"
+    )
+
+    def show(entry: dict[str, object]) -> None:
+        if "val_loss" in entry:
+            console.print(f"  step {entry['step']:>7}  [cyan]val loss {entry['val_loss']}[/cyan]")
+        else:
+            console.print(
+                f"  step {entry['step']:>7}  loss {entry['loss']}  "
+                f"lr {float(entry['lr']):.2e}  {entry['target_tokens_per_s']} tok/s"  # type: ignore[arg-type]
+            )
+
+    train(config, Tokenizer.load(tokenizer), data, out_dir, cfg, resume=resume, on_log=show)
+    console.print(f"[green]Done.[/green] {config.name} saved to {escape(str(out_dir))}")
+
+
+@model_app.command("info")
+def info_cmd(
+    directory: Annotated[
+        Path | None, typer.Option(help="Models directory (default: the installed models dir).")
+    ] = None,
+) -> None:
+    """List installed Fermi models."""
+    import json as _json
+
+    from askphysics.lm.checkpoints import CONFIG_FILE, WEIGHTS_FILE, default_model_dir
+    from askphysics.lm.config import ModelConfig
+
+    root = directory or default_model_dir()
+    table = Table(
+        "Model",
+        "Params",
+        "Size",
+        "Last val loss",
+        title=f"Fermi models in {root}",
+        title_justify="left",
+    )
+    found = 0
+    for path in sorted(root.glob("*")) if root.exists() else []:
+        if not (path / CONFIG_FILE).exists() or not (path / WEIGHTS_FILE).exists():
+            continue
+        found += 1
+        config = ModelConfig(**_json.loads((path / CONFIG_FILE).read_text()))
+        size = (path / WEIGHTS_FILE).stat().st_size / 1e6
+        val = "-"
+        metrics = path / "metrics.jsonl"
+        if metrics.exists():
+            losses = [
+                _json.loads(line)["val_loss"]
+                for line in metrics.read_text().splitlines()
+                if '"val_loss"' in line
+            ]
+            val = f"{losses[-1]:.4f}" if losses else "-"
+        table.add_row(config.name, f"{config.num_parameters():,}", f"{size:.1f} MB", val)
+    if found:
+        console.print(table)
+    else:
+        console.print(
+            f"No Fermi models installed in {escape(str(root))} yet. "
+            "Train one with [bold]askphysics model train[/bold]."
+        )
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
