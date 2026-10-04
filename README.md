@@ -81,13 +81,13 @@ Every screenshot is real CLI output, regenerated with `make screenshots`.
 **macOS and Linux**
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.sh | sh
+curl -LsSf https://askphysics.vercel.app/installers/install.sh | sh
 ```
 
 **Windows** (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.ps1 | iex
+irm https://askphysics.vercel.app/installers/install.ps1 | iex
 ```
 
 **Homebrew** (macOS and Linux)
@@ -100,6 +100,8 @@ The scripts install `askphysics` into its own isolated environment with
 [uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
 touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.2.0`.
 Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`).
+The installer URLs serve the scripts in this repo's `main` branch
+([`install.sh`](install.sh), [`install.ps1`](install.ps1)); read them first if you like.
 No API keys, no accounts: everything runs on your machine.
 
 ## How it works

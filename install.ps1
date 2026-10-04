@@ -1,6 +1,6 @@
 # Ask Physics installer for Windows (PowerShell 5.1 or 7+).
 #
-#   irm https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.ps1 | iex
+#   irm https://askphysics.vercel.app/installers/install.ps1 | iex
 #
 # Installs the `askphysics` command in its own isolated environment with uv
 # (https://docs.astral.sh/uv/), installing uv first if it's missing. Nothing
