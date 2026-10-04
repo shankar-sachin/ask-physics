@@ -139,7 +139,8 @@ The factory never reads `evals/`, and a similarity check enforces it
 | solem | ~600M | 1 to 2 hours |
 | celeste | ~2.4B | About a day |
 
-These are estimates until v0.3 measures real throughput.
+These are estimates until v0.3 measures real throughput. The step-by-step
+commands are in [`TRAINING.md`](TRAINING.md).
 
 ## Weights
 

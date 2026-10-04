@@ -92,6 +92,14 @@ tested on `fermi-luna-1`, without needing a GPU.
 - About 60 equations across mechanics, energy, E&M, and thermodynamics;
   15+ worked examples.
 - Factory regenerated from the bigger database; models retrained.
+- **The Ask Physics Wiki**, one source with two homes:
+  - Pages live in this repo under `docs/wiki/`: guides, FAQ, glossary, the
+    model cards, and a page per equation generated from the database
+    (formula, variables with units, validity conditions, source, license).
+  - A CI workflow publishes them to the repo's GitHub Wiki.
+  - The website renders the same pages at askphysics.vercel.app/wiki/, with
+    rendered math, linked from answer cards (each equation id links to its
+    page).
 
 **Exit criteria**
 - 80% or more of standard eval questions within 2% with the correct unit.
