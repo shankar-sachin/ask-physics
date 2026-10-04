@@ -43,7 +43,9 @@ traces back to an entry in the database with a source and a license.
 - **No training from scratch.** We use existing LLMs. A small fine-tune for
   the plan stage is an experiment in v0.7, not a foundation.
 - **No multimodal input.** No diagrams, photos of homework, or handwriting.
-- **No web UI.** CLI first; an optional API server is a v0.9 stretch.
+- **No web UI in v0.x.** CLI first; an optional API server is a v0.9
+  stretch. A public website comes after v1.0, once the LLM layer and the
+  symbolic algebra machine are solid (ADR-008).
 - **No claim of correctness on research-level physics.** Quantum field
   theory, general relativity beyond textbook formulas, and open research
   questions are out of scope; the classifier should route them to an honest

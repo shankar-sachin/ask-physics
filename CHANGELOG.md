@@ -23,4 +23,6 @@ LLM calls or vector search yet.
   error taxonomy, `FakeLLMClient`, working keyword retriever, Pint and SymPy
   wrappers, and seed JSON data.
 - Typer CLI: `askphysics ask`, `askphysics version`, `askphysics validate-data`.
-- Test suite and an eval question set with a stub harness.
+- Test suite (156 tests, 96% coverage) and an eval question set with a stub
+  harness.
+- ADR-008: the CLI is the interface through v1.0; a website follows after.
