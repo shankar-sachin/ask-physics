@@ -1,0 +1,10 @@
+[
+  {"name": "standard_gravity", "symbol": "g", "value": 9.80665, "unit": "m/s^2", "uncertainty": 0.0, "source": "Defined value (3rd CGPM, 1901); CODATA 2022 (NIST)"},
+  {"name": "gravitational_constant", "symbol": "G", "value": 6.6743e-11, "unit": "m^3/(kg*s^2)", "uncertainty": 1.5e-15, "source": "CODATA 2022 recommended values (NIST)"},
+  {"name": "speed_of_light", "symbol": "c", "value": 299792458.0, "unit": "m/s", "uncertainty": 0.0, "source": "Exact by SI definition; CODATA 2022 (NIST)"},
+  {"name": "boltzmann_constant", "symbol": "k_B", "value": 1.380649e-23, "unit": "J/K", "uncertainty": 0.0, "source": "Exact by SI definition (2019); CODATA 2022 (NIST)"},
+  {"name": "molar_gas_constant", "symbol": "R", "value": 8.314462618, "unit": "J/(mol*K)", "uncertainty": 0.0, "source": "Exact (N_A * k_B, truncated to 10 significant figures); CODATA 2022 (NIST)"},
+  {"name": "elementary_charge", "symbol": "e", "value": 1.602176634e-19, "unit": "C", "uncertainty": 0.0, "source": "Exact by SI definition (2019); CODATA 2022 (NIST)"},
+  {"name": "planck_constant", "symbol": "h", "value": 6.62607015e-34, "unit": "J*s", "uncertainty": 0.0, "source": "Exact by SI definition (2019); CODATA 2022 (NIST)"},
+  {"name": "standard_atmosphere", "symbol": "atm", "value": 101325.0, "unit": "Pa", "uncertainty": 0.0, "source": "Defined value (10th CGPM, 1954)"}
+]
