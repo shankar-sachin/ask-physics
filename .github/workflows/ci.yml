@@ -46,3 +46,8 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - name: Pytest
         run: pytest --cov --cov-report=term-missing
+      - name: CLI smoke test
+        run: |
+          askphysics version
+          askphysics validate-data
+          askphysics ask "How fast does a falling object hit the ground if it is dropped from 20 m?"
