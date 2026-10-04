@@ -227,3 +227,22 @@ as a prompted frontier model, cheaper.
 - Reproducible setup: pinned lockfile, `make install && make test` green on
   Linux and macOS, Python 3.11 to 3.13.
 - Published to PyPI.
+
+---
+
+## After v1.0: Website (L)
+
+**Goal:** put Ask Physics online for people who will never open a terminal
+(ADR-008).
+
+**Deliverables (to be detailed when v1.0 ships)**
+- Web front end that consumes the same `Answer` JSON the CLI prints:
+  value and unit, cited equations, assumptions, confidence, caveats.
+- Hosted API built from the v0.9 server, with caching, rate limits, and cost
+  caps sized for public traffic.
+- Rendered LaTeX for equations and a "show the math" view of the symbolic
+  steps.
+
+**Entry criteria**
+- v1.0 release criteria met, with eval thresholds holding on the hosted
+  configuration.

@@ -63,8 +63,8 @@ nothing from the package, solvers never import the LLM layer, and only
 ## One question through all six stages
 
 Question: *"How fast does a falling object hit the ground if it is dropped
-from 20 m?"* These payloads match the pydantic models. Retrieval scores are
-illustrative.
+from 20 m?"* These payloads match the pydantic models and are the real v0.1 output with
+`FakeLLMClient` (`askphysics ask --json` shows the final one).
 
 ### 1. classify
 
@@ -83,12 +83,12 @@ illustrative.
 {
   "query": "How fast does a falling object hit the ground if it is dropped from 20 m?",
   "equations": [
-    {"equation_id": "kin_v_squared", "score": 0.67},
-    {"equation_id": "kin_x_at", "score": 0.42},
-    {"equation_id": "gravitational_pe", "score": 0.25}
+    {"equation_id": "kin_v_squared", "score": 0.77},
+    {"equation_id": "kin_x_at", "score": 0.43},
+    {"equation_id": "gravitational_pe", "score": 0.17}
   ],
   "examples": [
-    {"example_id": "ex_energy_001", "score": 0.17}
+    {"example_id": "ex_energy_001", "score": 0.06}
   ]
 }
 ```
@@ -103,7 +103,7 @@ here for brevity.)
   "target": "v",
   "unknowns": ["v"],
   "known_values": [
-    {"symbol": "v0", "value": 0.0, "unit": "m/s", "origin": "given"},
+    {"symbol": "v0", "value": 0.0, "unit": "m/s", "origin": "assumption"},
     {"symbol": "a", "value": 9.80665, "unit": "m/s^2", "origin": "constant"},
     {"symbol": "d", "value": 20.0, "unit": "m", "origin": "given"}
   ],
@@ -153,14 +153,15 @@ here for brevity.)
   "value_range": null,
   "equations_used": [{"id": "kin_v_squared", "name": "Velocity-displacement relation (constant acceleration)"}],
   "assumptions": ["Released from rest (\"dropped\")", "Air resistance is negligible", "Gravitational acceleration is constant at standard g"],
-  "confidence": {"label": "high", "score": 0.82},
+  "confidence": {"label": "high", "score": 0.85},
   "caveats": ["Discarded negative root -19.8057 m/s", "Limit-case checks are not implemented yet (v0.8)."],
-  "explanation": "Using kin_v_squared (v^2 = v0^2 + 2*a*d) with the object starting at rest and accelerating at g over 20 m, the impact speed is 19.8057 m/s."
+  "explanation": "Using [kin_v_squared], the computed result is 19.8057 meter / second. This assumes: ..."
 }
 ```
 
-Confidence: `r = 0.67`, `d = 1`, `s = 1`, `n = 3` gives `a = 0.571` and
-`0.35*0.67 + 0.30 + 0.20 + 0.15*0.571 = 0.82`, which is `high`.
+Confidence: `r = 0.77` (keyword score 0.67 plus the 0.1 boost for the
+classifier's `kinematics` hint), `d = 1`, `s = 1`, `n = 3` gives `a = 0.571`
+and `0.35*0.77 + 0.30 + 0.20 + 0.15*0.571 = 0.85`, which is `high`.
 
 ## Interfaces and why each is swappable
 
