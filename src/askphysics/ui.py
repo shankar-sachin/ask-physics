@@ -65,7 +65,8 @@ def make_console(**kwargs: object) -> Console:
 def pretty_unit(unit: str) -> str:
     """``meter / second ** 2`` -> ``m/s²``; unknown strings pass through unchanged."""
     try:
-        return format(ureg.Unit(unit), "~P")
+        # Pint 0.26 switched its pretty dot from U+00B7 to U+22C5; pin the old one.
+        return format(ureg.Unit(unit), "~P").replace("\u22c5", "·")
     except Exception:  # Pint raises a zoo of error types for odd strings; show it as written
         return unit
 
