@@ -6,7 +6,7 @@
   <a href="https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml"><img src="https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.1.0-orange.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.2.0-orange.svg" alt="Version"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://mypy-lang.org/"><img src="https://www.mypy-lang.org/static/mypy_badge.svg" alt="Checked with mypy"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-pre--alpha-red.svg" alt="Status: pre-alpha"></a>
@@ -93,12 +93,12 @@ irm https://raw.githubusercontent.com/shankar-sachin/ask-physics/main/install.ps
 **Homebrew** (macOS and Linux)
 
 ```bash
-brew install shankar-sachin/ask-physics/askphysics
+brew install shankar-sachin/tap/askphysics
 ```
 
 The scripts install `askphysics` into its own isolated environment with
 [uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
-touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.1.0`.
+touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.2.0`.
 Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`).
 No API keys, no accounts: everything runs on your machine.
 
@@ -164,7 +164,7 @@ on purpose. Ask it anything else and the pipeline tells you exactly which
 stage it couldn't complete, instead of making something up. The Fermi models
 take over in v0.3.
 
-## Project status: v0.2 in progress
+## Project status: v0.2 released, v0.3 next
 
 | Area | Status |
 |------|--------|

@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
 ### Added
 
 - Fermi model code in `src/askphysics/lm/`: configs, byte-level BPE
@@ -45,7 +47,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `AnthropicClient`, the `[anthropic]` extra, and API keys. Ask Physics makes
   no external API calls.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-03
 
 The skeleton release: architecture, planning documents, and stubs. No real
 LLM calls or vector search yet.

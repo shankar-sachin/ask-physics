@@ -25,7 +25,7 @@ data (12 equations, 4 examples, 8 constants, 8 Fermi assumptions); Typer CLI;
 
 ---
 
-## v0.2.0 Fermi foundations (L)
+## v0.2.0 Fermi foundations (L), done
 
 **Goal:** every piece needed to train a Fermi model exists, works, and is
 tested on `fermi-luna-1`, without needing a GPU.
