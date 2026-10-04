@@ -311,3 +311,38 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 - Installs need network access to GitHub, PyPI, and (on Linux) PyTorch's
   index. Offline installs are out of scope until wheels ship on PyPI.
 - Installers never touch the system Python, so uninstalling is one command.
+
+## ADR-012: Ship trained weights; users never train
+
+**Status:** Accepted (v0.2.0), decided by the maintainer
+
+**Context.** The Fermi models are trained from scratch (ADR-009), which takes
+hours to a day on an M5 Pro. Asking every user to do that would make Ask
+Physics unusable. ROADMAP had weight downloads in v0.9, but the CLI needs
+them the moment v0.3 wires the models in.
+
+**Decision.**
+- The maintainer trains the models; users only download them. The `model`
+  training commands are for maintainers and contributors.
+- Weights ship as GitHub release assets, never in git: one
+  `fermi-<name>-1.safetensors` per model in bf16 (about 6 MB for tellus,
+  60 MB for solem, 240 MB for celeste), plus its config and the shared
+  tokenizer.
+- The package carries a manifest pinning each asset's URL, size, and
+  sha256. `askphysics model pull` downloads to the models directory and
+  refuses anything that doesn't match. Safetensors never run code on load.
+- The curl and irm installers run `askphysics model pull` at the end
+  (tellus and solem, about 66 MB). The Homebrew formula declares the same
+  files as checksummed resources, so a brew install works offline after.
+- celeste downloads on the first question that needs its escalation shot,
+  or up front with `model pull --all`. Most questions never need it.
+- With no weights installed, `ask` still runs (degraded, as today) and says
+  to run `askphysics model pull`.
+
+**Consequences.**
+- Moves "weight download and verification" from v0.9 to v0.3.
+- Every model release bumps the manifest; a release can't ship weights the
+  package doesn't pin.
+- A full install, torch included, is a few hundred MB. Accepted: the
+  maintainer chose to keep torch for inference rather than add a separate
+  numpy engine.

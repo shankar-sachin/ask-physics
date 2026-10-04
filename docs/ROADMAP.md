@@ -65,6 +65,9 @@ tested on `fermi-luna-1`, without needing a GPU.
 - `fermi` becomes the default provider once weights are installed; the fake
   client stays for tests.
 - Model cards with measured throughput, training curves, and eval results.
+- Ship the trained weights (ADR-012): GitHub release assets pinned by a
+  checksum manifest, `askphysics model pull`, the installers and Homebrew
+  formula fetching tellus and solem, and celeste on first escalation.
 
 **Exit criteria**
 - On a held-out set of factory-style questions (unseen templates), solem
@@ -73,6 +76,8 @@ tested on `fermi-luna-1`, without needing a GPU.
 - Zero invented equation ids or numbers (guaranteed by constraints, verified
   by tests).
 - `askphysics ask` with solem answers in under 2 seconds on an M5 Pro.
+- A fresh install on a clean machine answers with solem, with no training
+  and no manual download step.
 
 ---
 
@@ -163,7 +168,6 @@ tested on `fermi-luna-1`, without needing a GPU.
 **Goal:** something other people can run without reading the source.
 
 **Deliverables**
-- Weight download and verification (checksums) from release assets.
 - Structured logging and per-stage timings; error taxonomy mapped to
   user-facing messages.
 - CLI polish: `--json`, `--verbose`, `--model`, trace dump.
