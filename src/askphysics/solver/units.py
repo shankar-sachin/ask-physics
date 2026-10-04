@@ -7,6 +7,7 @@ different Pint registries cannot be combined, so never create another
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 import pint
@@ -17,6 +18,7 @@ ureg: pint.UnitRegistry[Any] = pint.UnitRegistry()
 Quantity = pint.Quantity[Any]  # annotation alias; use pint.Quantity for isinstance checks
 
 
+@lru_cache(maxsize=4096)
 def _parse_unit(unit: str) -> pint.Unit:
     if not unit.strip():
         raise UnitParseError("empty unit; use 'dimensionless' for pure numbers")
@@ -29,6 +31,7 @@ def _parse_unit(unit: str) -> pint.Unit:
     return parsed
 
 
+@lru_cache(maxsize=4096)
 def is_valid_unit(unit: str) -> bool:
     """Return True if ``unit`` parses in the shared registry."""
     try:

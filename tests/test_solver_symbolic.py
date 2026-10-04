@@ -119,3 +119,12 @@ def test_dimensional_consistency(store: DataStore) -> None:
         confidence_in_entry=0.0,
     )
     assert not check_dimensional_consistency(broken)
+
+
+def test_division_by_zero_is_a_solver_error(store: DataStore) -> None:
+    with pytest.raises(SolverError, match="cannot evaluate"):
+        solve_for(
+            store.equations["newton_second_law"],
+            "m",
+            {"F": quantity(10, "N"), "a": quantity(0, "m/s^2")},
+        )
