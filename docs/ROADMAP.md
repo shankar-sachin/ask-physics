@@ -168,7 +168,8 @@ tested on `fermi-luna-1`, without needing a GPU.
   user-facing messages.
 - CLI polish: `--json`, `--verbose`, `--model`, trace dump.
 - Optional API server (groundwork for the website), including the ADR-010
-  usage tiers behind config.
+  usage tiers behind config, and the API key design (Q18): key format,
+  hashed storage, per-key quotas, rotation and revocation.
 
 **Exit criteria**
 - No unhandled exception reaches the user in the eval suite.
@@ -187,16 +188,20 @@ tested on `fermi-luna-1`, without needing a GPU.
 
 ---
 
-## After v1.0: Website (L)
+## After v1.0: Website and public API (L)
 
 **Goal:** put Ask Physics online for people who will never open a terminal
-(ADR-008).
+(ADR-008), and let developers call it over HTTP.
 
 **Deliverables (detailed when v1.0 ships)**
 - Web front end consuming the same `Answer` JSON the CLI prints.
 - Hosted API built from the v0.9 server, with the ADR-010 usage tiers: start
   on solem, one celeste answer per day, tellus after five solem answers.
 - Rendered LaTeX and a "show the math" view of the symbolic steps.
+- **Ask Physics API keys:** self-serve keys for the hosted API, stored hashed
+  with a recognizable prefix (`ap_live_...`) so leaked keys are easy to find,
+  per-key quotas tied to the usage tiers, rotation, and revocation. The local
+  CLI never needs a key.
 
 **Entry criteria**
 - v1.0 release criteria met, holding on the hosted configuration.

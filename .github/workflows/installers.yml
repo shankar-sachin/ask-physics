@@ -1,0 +1,62 @@
+name: Installers
+
+# Runs the one-line installers on real machines, installing from this checkout.
+on:
+  pull_request:
+    paths: ["install.sh", "install.ps1", "pyproject.toml", ".github/workflows/installers.yml"]
+  push:
+    branches: [main]
+    paths: ["install.sh", "install.ps1", "pyproject.toml", ".github/workflows/installers.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck install.sh
+
+  unix:
+    name: install.sh (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the installer
+        env:
+          ASKPHYSICS_SOURCE: ${{ github.workspace }}
+        run: sh install.sh
+      - name: Use the installed CLI
+        run: |
+          export PATH="$(uv tool dir --bin):$PATH"
+          cd "$RUNNER_TEMP"
+          askphysics version
+          askphysics validate-data
+          askphysics ask "A ball is dropped from 20 m. How fast does it land?"
+
+  windows:
+    name: install.ps1 (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the installer
+        shell: pwsh
+        env:
+          ASKPHYSICS_SOURCE: ${{ github.workspace }}
+        run: ./install.ps1
+      - name: Use the installed CLI
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          $env:Path = "$((uv tool dir --bin).Trim());$env:Path"
+          Set-Location $env:RUNNER_TEMP
+          askphysics version
+          askphysics validate-data
+          askphysics ask "A ball is dropped from 20 m. How fast does it land?"

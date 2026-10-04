@@ -278,3 +278,34 @@ hosted website, they cap the cost.
   metric that justifies celeste's existence, or not.
 - The exact numbers (5 attempts, 1 escalation, the website limits) live in
   `Settings`, not in code.
+
+---
+
+## ADR-011: Install channels: curl, irm, and a Homebrew tap
+
+**Status:** Accepted (v0.2.0), decided by the maintainer
+
+**Context.** People should be able to try Ask Physics with one command,
+without knowing what a virtualenv is. The package depends on torch, whose
+default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
+
+**Decision.**
+- **Recommended:** `install.sh` (`curl ... | sh`) for macOS and Linux and
+  `install.ps1` (`irm ... | iex`) for Windows. Both install uv if missing and
+  run `uv tool install`, which gives `askphysics` its own isolated
+  environment with a uv-managed Python 3.12. On Linux, torch comes from
+  PyTorch's CPU-only index. The default installs the latest GitHub release;
+  `ASKPHYSICS_REF` pins a tag or branch.
+- **Also:** a Homebrew tap, `shankar-sachin/homebrew-ask-physics`, for people
+  who live in brew. Its formula builds a virtualenv in `libexec` from the
+  release tarball.
+- **Not:** WinGet (not submitting), and PyPI only at v1.0.
+- A CI workflow runs both installers on real Linux, macOS, and Windows
+  machines whenever they change.
+
+**Consequences.**
+- Each release needs the tap's formula bumped (URL and sha256); the steps
+  are in `docs/RELEASING.md`.
+- Installs need network access to GitHub, PyPI, and (on Linux) PyTorch's
+  index. Offline installs are out of scope until wheels ship on PyPI.
+- Installers never touch the system Python, so uninstalling is one command.

@@ -258,6 +258,17 @@ assumptions. v0.5 eval data will be used to fit the weights (see
 | v0.8 | Wrong answers flagged by self-verification | 50% or more of wrong answers caught |
 | v1.0 | All eval categories at threshold; no category regressed | See [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
+## 8b. Distribution and access
+
+- **Install:** one-line installers (`curl ... | sh` on macOS and Linux,
+  `irm ... | iex` on Windows) and a Homebrew tap (ADR-011). PyPI at v1.0.
+- **Local use is free and keyless.** The CLI and the Fermi models run on
+  your machine with no account and no API key, forever.
+- **Hosted use (after v1.0) gets API keys.** The website's public API issues
+  Ask Physics API keys with per-key quotas tied to the ADR-010 usage tiers,
+  hashed storage, rotation, and revocation. Design starts with the v0.9 API
+  server (open question Q18).
+
 ## 9. Risks and mitigations
 
 The full register, with likelihood, impact, and owner, is in
