@@ -1,4 +1,7 @@
-"""Terminal presentation for the CLI: answer cards, pretty math and units, training progress.
+"""Terminal presentation for the CLI: answer cards and training progress.
+
+The pretty math and unit formatting lives in ``askphysics.pretty`` so the website
+can use it without Rich.
 
 Everything here only formats; nothing computes. Numbers shown are the ones
 the symbolic algebra machine produced.
@@ -8,8 +11,6 @@ from __future__ import annotations
 
 import codecs
 import io
-import math
-import re
 from collections.abc import Mapping
 
 from rich import box
@@ -29,10 +30,8 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-from askphysics.errors import AskPhysicsError
 from askphysics.models import Answer, Equation
-from askphysics.solver.symbolic import parse_equation
-from askphysics.solver.units import ureg
+from askphysics.pretty import pretty_equation, pretty_number, pretty_symbol, pretty_unit
 
 THEME = Theme(
     {
@@ -57,7 +56,6 @@ STATUS = {
 }
 CONFIDENCE_STYLE = {"high": "ok", "medium": "warn", "low": "bad"}
 ORIGIN_STYLE = {"given": "value", "constant": "accent", "assumption": "warn"}
-_SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 
 def make_console(**kwargs: object) -> Console:
@@ -72,51 +70,6 @@ def tolerate_narrow_encodings(*streams: object) -> None:
     for stream in streams:
         if isinstance(stream, io.TextIOWrapper) and codecs.lookup(stream.encoding).name != "utf-8":
             stream.reconfigure(errors="replace")
-
-
-def pretty_unit(unit: str) -> str:
-    """``meter / second ** 2`` -> ``m/s²``; unknown strings pass through unchanged."""
-    try:
-        # Pint 0.26 switched its pretty dot from U+00B7 to U+22C5; pin the old one.
-        return format(ureg.Unit(unit), "~P").replace("\u22c5", "·")
-    except Exception:  # Pint raises a zoo of error types for odd strings; show it as written
-        return unit
-
-
-_SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
-
-
-def pretty_symbol(symbol: str) -> str:
-    """``v0`` -> ``v₀``, ``m12`` -> ``m₁₂``: trailing digits become subscripts, as in SymPy."""
-    stem = symbol.rstrip("0123456789")
-    return stem + symbol[len(stem) :].translate(_SUBSCRIPT) if stem else symbol
-
-
-def pretty_number(value: float, sig: int = 6) -> str:
-    """Plain digits for everyday magnitudes, ``4.374 × 10⁵`` style otherwise."""
-    if value == 0 or 1e-3 <= abs(value) < 1e6:
-        return f"{value:.{sig}g}"
-    exponent = math.floor(math.log10(abs(value)))
-    mantissa = value / 10**exponent
-    return f"{mantissa:.{max(sig - 2, 1)}g} × 10{str(exponent).translate(_SUPERSCRIPT)}"
-
-
-_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_POWER = re.compile(r"\*\*(\d+)")
-
-
-def pretty_equation(sympy_expr: str) -> str:
-    """One-line math in the author's term order: ``v**2 = v0**2 + 2*a*d`` -> ``v² = v₀² + 2·a·d``.
-
-    Unparseable strings are returned unchanged.
-    """
-    try:
-        parse_equation(sympy_expr)
-    except AskPhysicsError:
-        return sympy_expr
-    text = _POWER.sub(lambda m: m.group(1).translate(_SUPERSCRIPT), sympy_expr)
-    text = _IDENTIFIER.sub(lambda m: pretty_symbol(m.group()), text)
-    return text.replace("*", "·")
 
 
 def confidence_meter(score: float, width: int = 20) -> Text:

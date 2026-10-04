@@ -7,8 +7,9 @@ starts until the previous one's exit criteria are met, except where noted.
 
 The language side is the Fermi model family, built from scratch in this repo
 ([`MODELS.md`](MODELS.md), ADR-009). The math side is the symbolic algebra
-machine (SymPy + Pint). The CLI is the interface until v1.0; a website comes
-after (ADR-008).
+machine (SymPy + Pint). The CLI is the main interface; an in-browser website
+at askphysics.vercel.app runs the same package (ADR-013). The hosted API comes
+after v1.0 (ADR-008).
 
 ---
 
@@ -192,13 +193,14 @@ tested on `fermi-luna-1`, without needing a GPU.
 
 ---
 
-## After v1.0: Website and public API (L)
+## After v1.0: Hosted API (L)
 
-**Goal:** put Ask Physics online for people who will never open a terminal
-(ADR-008), and let developers call it over HTTP.
+**Goal:** let developers call Ask Physics over HTTP. (The in-browser website
+already ships, ADR-013; the hosted version can reuse its front end.)
 
 **Deliverables (detailed when v1.0 ships)**
-- Web front end consuming the same `Answer` JSON the CLI prints.
+- Point the existing web front end at the hosted API for people whose
+  devices can't run the in-browser engine.
 - Hosted API built from the v0.9 server, with the ADR-010 usage tiers: start
   on solem, one celeste answer per day, tellus after five solem answers.
 - Rendered LaTeX and a "show the math" view of the symbolic steps.

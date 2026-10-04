@@ -52,9 +52,9 @@ repo, running locally with no external APIs (ADR-009):
 - **No giant models.** Celeste stays around 120M parameters until there is
   both the data and the compute to justify more.
 - **No multimodal input.** No diagrams, photos of homework, or handwriting.
-- **No web UI in v0.x.** CLI first; an optional API server is a v0.9
-  stretch. A public website comes after v1.0, once the LLM layer and the
-  symbolic algebra machine are solid (ADR-008).
+- **No hosted service in v0.x.** The CLI is the main interface. The website
+  at askphysics.vercel.app runs entirely in the visitor's browser (ADR-013);
+  a hosted API comes after v1.0 (ADR-008).
 - **No claim of correctness on research-level physics.** Quantum field
   theory, general relativity beyond textbook formulas, and open research
   questions are out of scope; the classifier should route them to an honest
@@ -289,7 +289,8 @@ The full register, with likelihood, impact, and owner, is in
 v0.1 Skeleton -> v0.2 Fermi foundations -> v0.3 Fermi models trained and
 wired in -> v0.4 Solver expansion -> v0.5 Eval harness -> v0.6 Retrieval and
 data expansion -> v0.7 Fermi engine -> v0.8 Self-verification -> v0.9
-Hardening -> v1.0 Release -> website.
+Hardening -> v1.0 Release -> hosted API. (The in-browser website ships early,
+ADR-013.)
 
 Goals, deliverables, exit criteria, and effort for each:
 [`docs/ROADMAP.md`](docs/ROADMAP.md). The near-term backlog is in

@@ -6,6 +6,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A website at https://askphysics.vercel.app that runs the real `askphysics`
+  package in your browser (Pyodide): ask a question, get the full answer card.
+  No account, nothing runs on a server (ADR-013).
+- `askphysics.web` (question in, display-ready JSON out) and
+  `askphysics.pretty` (number, unit, and equation formatting shared by the CLI
+  and the site).
+
 ### Changed
 
 - The one-line installers now live at
