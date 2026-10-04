@@ -83,7 +83,7 @@ CELESTE = ModelConfig(
     context_length=1024, mlp_multiple_of=64,
 )  # fmt: skip
 LUNA = ModelConfig(
-    name="fermi-luna-1", vocab_size=512, d_model=64, n_layers=2, n_heads=4, context_length=256,
+    name="fermi-luna-1", vocab_size=512, d_model=64, n_layers=2, n_heads=4, context_length=1024,
 )  # fmt: skip
 
 PRESETS: dict[str, ModelConfig] = {c.name: c for c in (TELLUS, SOLEM, CELESTE, LUNA)}
