@@ -98,6 +98,8 @@ select = [
 # Physics symbols are conventionally single uppercase letters (F, G, R, T).
 "src/askphysics/solver/*.py" = ["N802", "N803", "N806"]
 "tests/*.py" = ["N802", "N803", "N806"]
+# `import torch.nn.functional as F` is the PyTorch convention.
+"src/askphysics/lm/*.py" = ["N812"]
 
 # ---------------------------------------------------------------- mypy
 [tool.mypy]
