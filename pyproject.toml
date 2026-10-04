@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "askphysics"
-version = "0.1.0"
+version = "0.2.0"
 description = "Answers physics questions, from textbook to absurd, with our own small language models and a symbolic algebra machine."
 readme = "README.md"
 license = "MIT"
