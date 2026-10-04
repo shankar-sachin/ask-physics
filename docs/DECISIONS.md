@@ -168,13 +168,38 @@ question to revisit if provider behavior changes.
 any exceptions listed here.
 
 **Decision.** `mypy --strict` on `src/` and `evals/`. Known exceptions:
-- `sympy.*` and `pint.*`: `ignore_missing_imports` and untyped-call allowances
-  where their stubs are incomplete. Values crossing those boundaries are
-  annotated at our wrapper functions (`solver/units.py`,
-  `solver/symbolic.py`).
+- `sympy.*`: `ignore_missing_imports`, because SymPy ships without complete
+  type information. Values crossing that boundary are annotated at our
+  wrapper functions in `solver/symbolic.py`. Pint ships type hints and needs
+  no exception; annotations use the `Quantity = pint.Quantity[Any]` alias
+  from `solver/units.py`.
 - `anthropic`: the optional extra is not installed in CI, so imports of it
   happen inside the client method and are covered by
   `ignore_missing_imports`.
 
-**Consequences.** Type safety stops at the wrapper boundary for SymPy and
-Pint objects; the wrappers' own signatures are fully typed.
+**Consequences.** Type safety stops at the wrapper boundary for SymPy
+objects; the wrappers' own signatures are fully typed. v0.1.0 passes with no
+other suppressions.
+
+---
+
+## ADR-008: CLI first, website after v1.0
+
+**Status:** Accepted (v0.1.0), decided by the maintainer
+
+**Context.** Ask Physics needs a user-facing surface. A website reaches more
+people, but building one now would mean designing UI around an LLM layer and
+a symbolic algebra machine that are still stubs and will change shape.
+
+**Decision.** The CLI (`askphysics ask`) is the only interface through v1.0.
+An optional API server stays in v0.9 as groundwork. A public website comes
+after v1.0, once the models and the symbolic algebra machine have passed the
+release eval thresholds.
+
+**Consequences.**
+- `Answer` and `--json` are the contract a future website will consume, so
+  they must stay stable and complete (every field a UI needs, no Rich-only
+  information).
+- Hosting, auth, rate limiting, and cost control for public traffic are
+  deferred, but the v0.9 caching and cost caps are designed with them in
+  mind.

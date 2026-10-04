@@ -112,16 +112,15 @@ will write "at 25 degrees C".
 pass temperatures as given, and the compute stage converts offset units to
 kelvin before substitution.
 
-### Q11. Is this a CLI, a library, or an installable app, and how is it distributed?
+### Q11. How is the CLI distributed?
 
-v0.1 is a Python CLI installed with `pip` (or `pipx`) that is also
-importable as a library. Unanswered: do we publish to PyPI at v0.x or only at
-v1.0? Do we want a Homebrew **formula** (CLI tools) later? A Homebrew
-**cask** is for GUI `.app` bundles and does not fit unless a desktop app
-appears, which is currently a non-goal.
+The interface question is settled: CLI now, website after v1.0 (ADR-008).
+Still open: do we publish to PyPI during v0.x or only at v1.0? Do we want a
+Homebrew **formula** (for CLI tools) later? A Homebrew **cask** is for GUI
+`.app` bundles and does not fit a CLI.
 
 **Default for now:** pip-installable from source; PyPI at v1.0 per the
-roadmap.
+roadmap. Releases are tagged only with the maintainer's approval.
 
 ### Q12. The repo description says "a simple Python LLM that runs on your device". Is local inference a goal?
 
@@ -130,6 +129,14 @@ defaults to the fake client and an optional Anthropic API extra. A local
 model (llama.cpp, Ollama, or a small Hugging Face model) would fit behind
 `LLMClient`, but would need to manage structured outputs without native
 schema enforcement, and quality for the plan stage is unproven.
+
+**Maintainer intent (2026-10-04):** "we make both the LLM and the symbolic
+algebra machine." The symbolic algebra machine is ours: the solver layer in
+`solver/` built on SymPy and Pint (not a from-scratch CAS). Still to
+confirm: does "make the LLM" mean training or fine-tuning our own model,
+which would pull the v0.7 fine-tuning milestone forward and make on-device
+a goal, or building the LLM layer (prompts, plans, validation) around a
+hosted model?
 
 **Default for now:** provider-agnostic interface; Anthropic is the first
 real provider; v0.7's fine-tuned small open model is the natural path to
