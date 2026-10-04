@@ -849,6 +849,113 @@ figcaption {{ font-family: 'JetBrains Mono', monospace; font-size: 13px; color: 
 </body></html>"""
 
 
+# --------------------------------------------------------------------- logo
+
+# The π from STIX Two Text (SIL Open Font License), in font units (1000/em,
+# y up), so the logo needs no font to render.
+PI_GLYPH = (
+    "M438 -9Q393 -9 372.5 24.0Q352 57 352 106Q352 149 359.5 199.5Q367 250 378.0 302.5Q389 "
+    "355 397 401L439 396Q436 381 431.5 343.0Q427 305 423.0 259.5Q419 214 419 175Q419 122 "
+    "432.5 91.5Q446 61 477 61Q504 61 518.0 69.5Q532 78 542 88L558 74Q545 49 528.5 30.0Q512 "
+    "11 490.5 1.0Q469 -9 438 -9ZM163 0H69L66 15Q99 73 123.5 120.5Q148 168 165.0 211.0Q182 "
+    "254 193.0 300.0Q204 346 210 401L247 398Q246 367 240.0 324.5Q234 282 225.0 234.5Q216 "
+    "187 205.0 141.5Q194 96 183.0 58.5Q172 21 163 0ZM38 336 18 346Q38 415 87.0 443.0Q136 "
+    "471 214 471H571V455L558 391H230Q179 391 147.5 390.5Q116 390 96.5 385.0Q77 380 64.0 "
+    "368.5Q51 357 38 336Z"
+)
+
+
+def _ellipse(cx: float, cy: float, rx: float, ry: float) -> str:
+    return (
+        f"M{cx - rx:.1f} {cy:.1f}a{rx:.1f} {ry:.1f} 0 1 0 {2 * rx:.1f} 0"
+        f"a{rx:.1f} {ry:.1f} 0 1 0 {-2 * rx:.1f} 0Z"
+    )
+
+
+def logo_svg() -> str:
+    """An atom whose nucleus is a speech bubble holding π: ask, then physics."""
+    c = 256.0
+    rx, ry = 214.0, 80.0
+    # Each orbit is a ring that tapers from thick to thin along its major axis.
+    ring = _ellipse(c, c, rx, ry) + _ellipse(c + 5, c, rx - 17, ry - 10)
+    tilts = (-28.0, 32.0, 92.0)  # drawn bottom to top
+    tilt = -6.0
+
+    def on_orbit(index: int, angle: float) -> tuple[float, float]:
+        t, a = np.radians(angle), np.radians(tilts[index] + tilt)
+        x, y = rx * 0.955 * np.cos(t), ry * 0.92 * np.sin(t)
+        return c + x * np.cos(a) - y * np.sin(a), c + x * np.sin(a) + y * np.cos(a)
+
+    electrons = [  # (orbit, angle on it, gradient)
+        (1, 188.0, "blue"),
+        (0, 8.0, "orange"),
+        (1, 10.0, "blue"),
+    ]
+    bubble = "M256 158a98 98 0 1 1 -58 177l-36 34 14-62a98 98 0 0 1 80-149Z"
+    scale = 0.205
+    glyph = (
+        f'<path d="{PI_GLYPH}" fill="#f5f8fd" transform="translate('
+        f'{c - 294.5 * scale:.1f} {c + 2 + 231 * scale:.1f}) scale({scale} {-scale})"/>'
+    )
+
+    def knockout(index: int) -> str:
+        """Black gaps cut into orbit ``index`` wherever something sits on top of it."""
+        cuts = [
+            f'<path d="{ring}" transform="rotate({tilts[j] + tilt} {c} {c})" stroke-width="16"/>'
+            for j in range(index + 1, len(tilts))
+        ]
+        cuts.append(f'<path d="{bubble}" stroke-width="30"/>')
+        cuts += [
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="34"/>'
+            for x, y in (on_orbit(o, a) for o, a, _ in electrons)
+        ]
+        return (
+            f'<mask id="gap{index}" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">'
+            f'<rect width="512" height="512" fill="#fff"/><g fill="#000" stroke="#000">'
+            + "".join(cuts)
+            + "</g></mask>"
+        )
+
+    orbits = "".join(
+        f'<g mask="url(#gap{i})"><path d="{ring}" fill-rule="evenodd" fill="url(#orbit)" '
+        f'transform="rotate({tilts[i] + tilt} {c} {c})"/></g>'
+        for i in range(len(tilts))
+    )
+    spheres = "".join(
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="27" fill="url(#{kind})"/>'
+        f'<ellipse cx="{x - 9:.1f}" cy="{y - 11:.1f}" rx="8" ry="5.5" fill="#fff" '
+        f'opacity="0.75" transform="rotate(-30 {x - 9:.1f} {y - 11:.1f})"/>'
+        for x, y, kind in ((*on_orbit(o, a), k) for o, a, k in electrons)
+    )
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+<title id="title">Ask Physics</title>
+<defs>
+<linearGradient id="orbit" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#173a8c"/><stop offset="0.55" stop-color="#2f74d0"/><stop offset="1" stop-color="#6cc6f4"/>
+</linearGradient>
+<radialGradient id="core" cx="40%" cy="35%" r="70%">
+<stop offset="0" stop-color="#1f3a72"/><stop offset="1" stop-color="#0c1836"/>
+</radialGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#6cc6f4"/><stop offset="1" stop-color="#2f74d0" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="blue" cx="35%" cy="30%" r="75%">
+<stop offset="0" stop-color="#8fd0ff"/><stop offset="0.45" stop-color="#2f6fd0"/><stop offset="1" stop-color="#0f2f78"/>
+</radialGradient>
+<radialGradient id="orange" cx="35%" cy="30%" r="75%">
+<stop offset="0" stop-color="#ffe6a6"/><stop offset="0.45" stop-color="#f6a72a"/><stop offset="1" stop-color="#b8620a"/>
+</radialGradient>
+{"".join(knockout(i) for i in range(len(tilts)))}
+</defs>
+{orbits}
+<path d="{bubble}" fill="url(#core)" stroke="#6cc6f4" stroke-opacity="0.35" stroke-width="3"/>
+<path d="M196 214a78 78 0 0 1 78 -48" fill="none" stroke="url(#shine)" stroke-width="7" stroke-linecap="round"/>
+{glyph}
+{spheres}
+</svg>
+"""
+
+
 def logo_page() -> str:
     return f"""<!doctype html><html><head><style>body{{margin:0;background:transparent}}
 img{{display:block;width:512px;height:512px}}</style></head><body>
@@ -883,6 +990,7 @@ def main(args: list[str]) -> None:
     jobs: list[dict[str, object]] = []
     for target in targets:
         if target == "logo":
+            (OUT / "logo.svg").write_text(logo_svg(), encoding="utf-8")
             jobs.append(
                 {"html": page("logo", logo_page()), "out": str(OUT / "logo.png"),
                  "width": 512, "height": 512, "transparent": True}

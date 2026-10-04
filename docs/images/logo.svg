@@ -1,63 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
-  <title id="title">Ask Physics</title>
-  <defs>
-    <radialGradient id="bg" cx="50%" cy="35%" r="80%">
-      <stop offset="0" stop-color="#23264a"/>
-      <stop offset="0.55" stop-color="#11122a"/>
-      <stop offset="1" stop-color="#07080f"/>
-    </radialGradient>
-    <linearGradient id="stroke" x1="150" y1="120" x2="330" y2="330" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8be9fd"/>
-      <stop offset="1" stop-color="#bd93f9"/>
-    </linearGradient>
-    <radialGradient id="planet" cx="38%" cy="32%" r="75%">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.18" stop-color="#ffd6a5"/>
-      <stop offset="0.55" stop-color="#ff9e64"/>
-      <stop offset="1" stop-color="#7a2e5c"/>
-    </radialGradient>
-    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#8be9fd" stop-opacity="0.35"/>
-      <stop offset="0.5" stop-color="#f8f8f2"/>
-      <stop offset="1" stop-color="#bd93f9" stop-opacity="0.35"/>
-    </linearGradient>
-    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
-      <stop offset="0.4" stop-color="#ff9e64" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#ff9e64" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="7" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <clipPath id="tile"><rect width="512" height="512" rx="116"/></clipPath>
-  </defs>
-
-  <g clip-path="url(#tile)">
-    <rect width="512" height="512" fill="url(#bg)"/>
-    <g fill="#ffffff">
-      <circle cx="78" cy="96" r="2" opacity="0.8"/>
-      <circle cx="420" cy="84" r="1.6" opacity="0.6"/>
-      <circle cx="446" cy="300" r="2.2" opacity="0.55"/>
-      <circle cx="70" cy="330" r="1.5" opacity="0.6"/>
-      <circle cx="118" cy="452" r="1.7" opacity="0.45"/>
-      <circle cx="404" cy="446" r="1.4" opacity="0.55"/>
-      <circle cx="318" cy="52" r="1.4" opacity="0.5"/>
-      <circle cx="196" cy="58" r="1.1" opacity="0.5"/>
-      <circle cx="470" cy="190" r="1.2" opacity="0.5"/>
-    </g>
-
-    <!-- The question mark, drawn as a trajectory. -->
-    <path d="M168 200 A90 90 0 1 1 322 262 Q257 286 257 330" fill="none" stroke="url(#stroke)"
-          stroke-width="40" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
-
-    <!-- Its dot: a ringed planet. -->
-    <circle cx="257" cy="408" r="70" fill="url(#aura)"/>
-    <g transform="rotate(-18 257 408)">
-      <path d="M187 408 A70 17 0 0 1 327 408" fill="none" stroke="url(#ring)" stroke-width="7"
-            stroke-linecap="round" opacity="0.75"/>
-      <circle cx="257" cy="408" r="36" fill="url(#planet)"/>
-      <path d="M187 408 A70 17 0 0 0 327 408" fill="none" stroke="url(#ring)" stroke-width="7"
-            stroke-linecap="round"/>
-    </g>
-  </g>
+<title id="title">Ask Physics</title>
+<defs>
+<linearGradient id="orbit" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#173a8c"/><stop offset="0.55" stop-color="#2f74d0"/><stop offset="1" stop-color="#6cc6f4"/>
+</linearGradient>
+<radialGradient id="core" cx="40%" cy="35%" r="70%">
+<stop offset="0" stop-color="#1f3a72"/><stop offset="1" stop-color="#0c1836"/>
+</radialGradient>
+<linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#6cc6f4"/><stop offset="1" stop-color="#2f74d0" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="blue" cx="35%" cy="30%" r="75%">
+<stop offset="0" stop-color="#8fd0ff"/><stop offset="0.45" stop-color="#2f6fd0"/><stop offset="1" stop-color="#0f2f78"/>
+</radialGradient>
+<radialGradient id="orange" cx="35%" cy="30%" r="75%">
+<stop offset="0" stop-color="#ffe6a6"/><stop offset="0.45" stop-color="#f6a72a"/><stop offset="1" stop-color="#b8620a"/>
+</radialGradient>
+<mask id="gap0" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/><g fill="#000" stroke="#000"><path d="M42.0 256.0a214.0 80.0 0 1 0 428.0 0a214.0 80.0 0 1 0 -428.0 0ZM64.0 256.0a197.0 70.0 0 1 0 394.0 0a197.0 70.0 0 1 0 -394.0 0Z" transform="rotate(26.0 256.0 256.0)" stroke-width="16"/><path d="M42.0 256.0a214.0 80.0 0 1 0 428.0 0a214.0 80.0 0 1 0 -428.0 0ZM64.0 256.0a197.0 70.0 0 1 0 394.0 0a197.0 70.0 0 1 0 -394.0 0Z" transform="rotate(86.0 256.0 256.0)" stroke-width="16"/><path d="M256 158a98 98 0 1 1 -58 177l-36 34 14-62a98 98 0 0 1 80-149Z" stroke-width="30"/><circle cx="78.6" cy="158.1" r="34"/><circle cx="429.5" cy="151.3" r="34"/><circle cx="431.3" cy="355.7" r="34"/></g></mask><mask id="gap1" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/><g fill="#000" stroke="#000"><path d="M42.0 256.0a214.0 80.0 0 1 0 428.0 0a214.0 80.0 0 1 0 -428.0 0ZM64.0 256.0a197.0 70.0 0 1 0 394.0 0a197.0 70.0 0 1 0 -394.0 0Z" transform="rotate(86.0 256.0 256.0)" stroke-width="16"/><path d="M256 158a98 98 0 1 1 -58 177l-36 34 14-62a98 98 0 0 1 80-149Z" stroke-width="30"/><circle cx="78.6" cy="158.1" r="34"/><circle cx="429.5" cy="151.3" r="34"/><circle cx="431.3" cy="355.7" r="34"/></g></mask><mask id="gap2" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/><g fill="#000" stroke="#000"><path d="M256 158a98 98 0 1 1 -58 177l-36 34 14-62a98 98 0 0 1 80-149Z" stroke-width="30"/><circle cx="78.6" cy="158.1" r="34"/><circle cx="429.5" cy="151.3" r="34"/><circle cx="431.3" cy="355.7" r="34"/></g></mask>
+</defs>
+<g mask="url(#gap0)"><path d="M42.0 256.0a214.0 80.0 0 1 0 428.0 0a214.0 80.0 0 1 0 -428.0 0ZM64.0 256.0a197.0 70.0 0 1 0 394.0 0a197.0 70.0 0 1 0 -394.0 0Z" fill-rule="evenodd" fill="url(#orbit)" transform="rotate(-34.0 256.0 256.0)"/></g><g mask="url(#gap1)"><path d="M42.0 256.0a214.0 80.0 0 1 0 428.0 0a214.0 80.0 0 1 0 -428.0 0ZM64.0 256.0a197.0 70.0 0 1 0 394.0 0a197.0 70.0 0 1 0 -394.0 0Z" fill-rule="evenodd" fill="url(#orbit)" transform="rotate(26.0 256.0 256.0)"/></g><g mask="url(#gap2)"><path d="M42.0 256.0a214.0 80.0 0 1 0 428.0 0a214.0 80.0 0 1 0 -428.0 0ZM64.0 256.0a197.0 70.0 0 1 0 394.0 0a197.0 70.0 0 1 0 -394.0 0Z" fill-rule="evenodd" fill="url(#orbit)" transform="rotate(86.0 256.0 256.0)"/></g>
+<path d="M256 158a98 98 0 1 1 -58 177l-36 34 14-62a98 98 0 0 1 80-149Z" fill="url(#core)" stroke="#6cc6f4" stroke-opacity="0.35" stroke-width="3"/>
+<path d="M196 214a78 78 0 0 1 78 -48" fill="none" stroke="url(#shine)" stroke-width="7" stroke-linecap="round"/>
+<path d="M438 -9Q393 -9 372.5 24.0Q352 57 352 106Q352 149 359.5 199.5Q367 250 378.0 302.5Q389 355 397 401L439 396Q436 381 431.5 343.0Q427 305 423.0 259.5Q419 214 419 175Q419 122 432.5 91.5Q446 61 477 61Q504 61 518.0 69.5Q532 78 542 88L558 74Q545 49 528.5 30.0Q512 11 490.5 1.0Q469 -9 438 -9ZM163 0H69L66 15Q99 73 123.5 120.5Q148 168 165.0 211.0Q182 254 193.0 300.0Q204 346 210 401L247 398Q246 367 240.0 324.5Q234 282 225.0 234.5Q216 187 205.0 141.5Q194 96 183.0 58.5Q172 21 163 0ZM38 336 18 346Q38 415 87.0 443.0Q136 471 214 471H571V455L558 391H230Q179 391 147.5 390.5Q116 390 96.5 385.0Q77 380 64.0 368.5Q51 357 38 336Z" fill="#f5f8fd" transform="translate(195.6 305.4) scale(0.205 -0.205)"/>
+<circle cx="78.6" cy="158.1" r="27" fill="url(#blue)"/><ellipse cx="69.6" cy="147.1" rx="8" ry="5.5" fill="#fff" opacity="0.75" transform="rotate(-30 69.6 147.1)"/><circle cx="429.5" cy="151.3" r="27" fill="url(#orange)"/><ellipse cx="420.5" cy="140.3" rx="8" ry="5.5" fill="#fff" opacity="0.75" transform="rotate(-30 420.5 140.3)"/><circle cx="431.3" cy="355.7" r="27" fill="url(#blue)"/><ellipse cx="422.3" cy="344.7" rx="8" ry="5.5" fill="#fff" opacity="0.75" transform="rotate(-30 422.3 344.7)"/>
 </svg>
