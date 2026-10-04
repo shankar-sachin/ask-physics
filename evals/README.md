@@ -11,7 +11,7 @@ harness will use it.
   impossible.
 - `harness.py`: `load_questions()` works and is tested, so a malformed eval
   file fails CI. `score_answer()` and `run_suite()` raise
-  `NotImplementedError` until v0.4.
+  `NotImplementedError` until v0.5.
 
 ## Question format
 
@@ -39,17 +39,19 @@ Validation rules enforced by `load_questions()`:
   has one.
 - `estimate_range` questions use `tolerance_decades`.
 
-## How the harness will consume this (v0.4)
+## How the harness will consume this (v0.5)
 
 1. Load and validate `questions.yaml` (works today).
-2. For each question, run `Pipeline.run(question)`. With a real LLM, each
-   question runs 3 times to measure plan variance (ADR-006).
+2. For each question, run `Pipeline.run(question)` once per model setup
+   (pulsar, quasar, magnetar, and the ADR-010 router). Plans are greedy, so
+   one run per setup is deterministic.
 3. Score each `Answer` with the category rubric from `docs/EVALS.md`:
    - **Numeric:** convert `final_value` to `unit` with Pint, then apply
      `rel_tolerance` or the decade check against `value`.
    - **Equations:** credit if `equations_used` covers any set in
      `acceptable_equation_ids`.
-   - **Assumptions:** LLM-graded checklist when `must_mention_assumptions`
+   - **Assumptions:** rubric checklist (automated checks plus a human-graded
+     sample) when `must_mention_assumptions`
      is true.
    - **Refusals:** `status == "refused"`, a stated reason, and an answerable
      redirect.
@@ -59,7 +61,7 @@ Validation rules enforced by `load_questions()`:
 ## Rules
 
 - **No leakage.** Never copy or paraphrase these questions into
-  `src/askphysics/data/`, prompts, few-shot examples, or training data.
+  `src/askphysics/data/`, the data factory, task formats, or training data.
 - **Fake LLM runs are smoke tests.** `FakeLLMClient` has no canned plans for
   these questions, by design. Scores from it say nothing about quality.
 - **Changing a reference value** needs a `rationale` update and a reviewer.

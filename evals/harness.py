@@ -1,4 +1,4 @@
-"""Eval harness (stub in v0.1; implemented in v0.4).
+"""Eval harness (stub in v0.1; implemented in v0.5).
 
 What works now: loading and validating ``questions.yaml``, so a malformed
 eval file fails CI. Scoring and running are stubs. Rubrics, tolerance rules,
@@ -80,13 +80,13 @@ def score_answer(question: EvalQuestion, answer: Answer) -> float:
     """Score one answer from 0 to 1 using the category rubric in ``docs/EVALS.md``."""
     # TODO: Dispatch on question.category. Convert answer.final_value to the expected unit
     # with Pint, apply rel_tolerance or the log10 decade check, add the equation-id and
-    # status components, and call the LLM grader for assumption quality (v0.4).
-    raise NotImplementedError("eval scoring lands in v0.4")
+    # status components, and apply the assumption-quality rubric (v0.5).
+    raise NotImplementedError("eval scoring lands in v0.5")
 
 
 def run_suite(pipeline: Pipeline, questions: list[EvalQuestion]) -> dict[str, float]:
     """Run every question through the pipeline and return the mean score per category."""
     # TODO: Run each question (3 times for real LLMs, per ADR-006), score it, write
     # evals/reports/<version>.json, and compare against the previous release using the
-    # regression thresholds in docs/EVALS.md (v0.4).
-    raise NotImplementedError("the eval runner lands in v0.4")
+    # regression thresholds in docs/EVALS.md (v0.5).
+    raise NotImplementedError("the eval runner lands in v0.5")

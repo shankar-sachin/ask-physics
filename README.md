@@ -11,10 +11,15 @@
 Ask any physics question, from a textbook problem to "how many rubber ducks
 would it take to stop a freight train?", and get an answer you can check: the
 equations it used (with ids and sources), every assumption spelled out, units
-verified end to end, and an honest confidence score. The LLM never does the
-math. It reads the question, finds the right equations, and writes the
-explanation. A symbolic algebra machine built on SymPy and Pint solves the
-equations and tracks the units.
+verified end to end, and an honest confidence score. Both halves are built here, run on your
+machine, and call no external APIs:
+
+- **The Fermi models**, our own language models trained from scratch:
+  `fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), and
+  `fermi-magnetar-1` (~120M). They read the question, pick the right
+  equations, copy the values, and write the explanation. They never do math.
+- **The symbolic algebra machine**, built on SymPy and Pint, which solves the
+  equations and checks every unit.
 
 ## How it works
 
@@ -24,7 +29,7 @@ equations and tracks the units.
                                               v
   +-----------+   +-----------+   +--------+   +-----------+   +--------------+   +---------+
   | 1 classify|-->| 2 retrieve|-->| 3 plan |-->| 4 compute |-->| 5 sanity     |-->| 6 explain|
-  |   (LLM)   |   | equation  |   | (LLM:  |   | symbolic  |   |   check      |   | (LLM:    |
+  |  (pulsar) |   | equation  |   |(quasar:|   | symbolic  |   |   check      |   |(quasar:  |
   | standard/ |   | database  |   | ids +  |   | algebra   |   | units, order |   |  prose   |
   | fermi/    |   | search    |   | values |   | machine:  |   | of magnitude |   |  only)   |
   | nonsense  |   |           |   | only)  |   | SymPy+Pint|   |              |   |          |
@@ -35,15 +40,17 @@ equations and tracks the units.
 ```
 
 The planner can only cite equations that retrieval actually found, and it
-copies numbers and units out of the question without computing anything. The
+copies numbers and units out of the question without computing anything.
+Constrained decoding makes anything else impossible, not just unlikely. If
+quasar can't produce a valid plan, magnetar gets one shot (ADR-010). The
 machine does the algebra, and Pint rejects any calculation whose units don't
 add up. Confidence comes from a documented formula, never from the LLM grading
 itself. Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quickstart
 
-Requires Python 3.11 or newer. No API key needed: the default LLM is a
-deterministic fake.
+Requires Python 3.11 or newer. No API keys, ever. Until the Fermi models are
+trained (v0.3), the default language model is a deterministic fake.
 
 ```bash
 git clone https://github.com/shankar-sachin/ask-physics.git
@@ -63,8 +70,8 @@ askphysics ask "How much does the color blue weigh?"     # refused, with a redir
 
 `FakeLLMClient` only has a canned plan for "dropped from a height" questions,
 on purpose. Ask it anything else and the pipeline tells you exactly which
-stage it couldn't complete, instead of making something up. Real LLM planning
-arrives in v0.3.
+stage it couldn't complete, instead of making something up. The Fermi models
+take over in v0.3.
 
 ## Project status: v0.1.0 skeleton
 
@@ -78,11 +85,12 @@ arrives in v0.3.
 | CLI: `ask`, `version`, `validate-data` | Works |
 | Confidence scoring (crude, documented formula) | Works |
 | Eval set (8 questions) with a validating loader | Works |
-| Real LLM (`AnthropicClient`) | Stub until v0.3 |
-| Multi-equation chaining | Stub until v0.3 |
-| Vector and hybrid retrieval | Stub until v0.2 |
-| Eval scoring and runner | Stub until v0.4 |
-| Fermi range propagation | Stub until v0.5 |
+| Fermi models: tokenizer, transformer, constrained decoding, training | Building in v0.2 |
+| Fermi models trained and answering in the CLI | v0.3 |
+| Multi-equation chaining | Stub until v0.4 |
+| Eval scoring and runner | Stub until v0.5 |
+| Vector and hybrid retrieval | Stub until v0.6 |
+| Fermi range propagation | Stub until v0.7 |
 | Limit-case checks | Stub until v0.8 |
 
 Every stub raises `NotImplementedError` with a TODO describing the intended
@@ -90,9 +98,10 @@ implementation.
 
 ## Roadmap
 
-v0.2 real retrieval, v0.3 real solver, v0.4 eval harness, v0.5 Fermi engine,
-v0.6 data expansion, v0.7 fine-tuning, v0.8 self-verification, v0.9
-hardening, v1.0 release. After v1.0 comes a website. Until then the CLI is
+v0.2 Fermi model foundations, v0.3 Fermi models trained and wired in, v0.4
+solver expansion, v0.5 eval harness, v0.6 retrieval and data expansion, v0.7
+Fermi engine, v0.8 self-verification, v0.9 hardening, v1.0 release. After
+v1.0 comes a website. Until then the CLI is
 the interface. Details, deliverables, and exit criteria are in
 [`docs/ROADMAP.md`](docs/ROADMAP.md); the near-term backlog is
 [`TODO.md`](TODO.md).
@@ -100,6 +109,7 @@ the interface. Details, deliverables, and exit criteria are in
 ## Documentation
 
 - [`PLAN.md`](PLAN.md): vision, pipeline, Fermi and refusal policies, confidence model
+- [`docs/MODELS.md`](docs/MODELS.md): the Fermi model family, its architecture, data, training, and routing
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): modules, interfaces, one question traced through every stage
 - [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md) and [`docs/DATA_SOURCING.md`](docs/DATA_SOURCING.md): what data looks like and where it comes from
 - [`docs/EVALS.md`](docs/EVALS.md): how answers are graded
@@ -123,9 +133,13 @@ Being straight about what this is right now:
 - **The equation database is tiny.** Twelve equations cover a slice of intro
   mechanics, E&M, and thermodynamics. Anything else hits a retrieval miss.
 - **Keyword retrieval is brittle.** Phrasing that shares no words with an
-  equation's tags won't find it. Vector search arrives in v0.2.
+  equation's tags won't find it. Vector search arrives in v0.6.
 - **Single equations only.** Problems that chain two or more equations
-  degrade until v0.3.
+  degrade until v0.4.
+- **The Fermi models will be small.** Trained from scratch at 3M to 120M
+  parameters, they'll understand phrasings close to their training data and
+  stumble on weird ones. When they stumble, the answer degrades. It never
+  makes shit up.
 - **Scalars only.** No vectors, no Celsius, no numerical-only solutions yet
   (see [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md)).
 - **The confidence weights are invented.** They get fit to eval data in v0.8.

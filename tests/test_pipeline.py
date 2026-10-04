@@ -77,7 +77,7 @@ def test_fermi_without_planner_degrades_honestly(pipeline: Pipeline) -> None:
     assert answer.status == "degraded"
     assert answer.category == "fermi"
     assert answer.final_value is None
-    assert "v0.5" in answer.explanation
+    assert "v0.7" in answer.explanation
 
 
 def test_retrieval_miss_degrades(pipeline: Pipeline) -> None:
