@@ -29,6 +29,9 @@ dependencies = [
     "pint>=0.24",
     "typer>=0.12",
     "rich>=13.7",
+    "torch>=2.4",
+    "safetensors>=0.4",
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

@@ -50,7 +50,7 @@ def parse_quantity(text: str) -> Quantity:
         UnitParseError: the text is not a number followed by a valid unit.
     """
     try:
-        parsed = ureg.Quantity(text)
+        parsed: Any = ureg.Quantity(text)
     except (pint.errors.UndefinedUnitError, pint.errors.DefinitionSyntaxError) as exc:
         raise UnitParseError(f"cannot parse quantity {text!r}") from exc
     except (AttributeError, TypeError, ValueError, SyntaxError) as exc:
