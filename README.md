@@ -1,12 +1,16 @@
-# Ask Physics
+<p align="center">
+  <img src="docs/images/banner.png" alt="Ask Physics: physics answers you can check" width="100%">
+</p>
 
-[![CI](https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml/badge.svg)](https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-red.svg)](docs/ROADMAP.md)
+<p align="center">
+  <a href="https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml"><img src="https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.1.0-orange.svg" alt="Version"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://mypy-lang.org/"><img src="https://www.mypy-lang.org/static/mypy_badge.svg" alt="Checked with mypy"></a>
+  <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-pre--alpha-red.svg" alt="Status: pre-alpha"></a>
+</p>
 
 Ask any physics question, from a textbook problem to "how many rubber ducks
 would it take to stop a freight train?", and get an answer you can check: the
@@ -20,6 +24,33 @@ machine, and call no external APIs:
   equations, copy the values, and write the explanation. They never do math.
 - **The symbolic algebra machine**, built on SymPy and Pint, which solves the
   equations and checks every unit.
+
+## Meet the Fermi models
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/fermi-tellus-1.jpg" alt="fermi-tellus-1: the Earth at night and day, with physics equations"></td>
+    <td width="50%"><img src="docs/images/fermi-solem-1.jpg" alt="fermi-solem-1: the Sun, with physics equations"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>fermi-tellus-1</b> · ~3.2M params<br>reads every question</td>
+    <td align="center"><b>fermi-solem-1</b> · ~29.9M params<br>plans the solution, explains the answer</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/fermi-celeste-1.jpg" alt="fermi-celeste-1: a black hole quasar with its accretion disk and jets"></td>
+    <td width="50%"><img src="docs/images/fermi-luna-1.jpg" alt="fermi-luna-1: a crescent Moon with physics equations"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>fermi-celeste-1</b> · ~119.6M params<br>the last resort when solem gets stuck</td>
+    <td align="center"><b>fermi-luna-1</b> · ~0.14M params<br>runs the test suite, never ships</td>
+  </tr>
+</table>
+
+The artwork is rendered, not drawn: `make brand` runs
+[`scripts/brand.py`](scripts/brand.py), which ray-traces the black hole
+through Schwarzschild geodesics and shades the Moon, Earth, and Sun with
+numpy. Earth imagery: NASA Blue Marble Next Generation and NOAA ETOPO1
+(public domain). More in [`docs/MODELS.md`](docs/MODELS.md).
 
 ## Screenshots
 
