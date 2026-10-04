@@ -14,7 +14,7 @@ does every piece of math. Decisions: ADR-009 (from scratch) and ADR-010
 | `fermi-tellus-1` | ~3.2M | 6 | 160 | 5 | 1024 | Classifies every question; full fallback when bigger weights are missing |
 | `fermi-solem-1` | ~29M | 8 | 512 | 8 | 1024 | Default planner and explainer |
 | `fermi-celeste-1` | ~119M | 16 | 768 | 12 | 1024 | One escalation shot when solem can't produce a valid plan |
-| `fermi-luna-1` | ~0.1M | 2 | 64 | 4 | 256 | Tests and CI only; never ships |
+| `fermi-luna-1` | ~0.1M | 2 | 64 | 4 | 1024 | Tests and CI only; never ships |
 
 All share one tokenizer (vocabulary 8,192), so data, prompts, and decoding
 constraints are identical across sizes. Parameter counts are approximate
