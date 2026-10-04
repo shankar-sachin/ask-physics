@@ -1,4 +1,4 @@
-.PHONY: help install test lint format typecheck ask validate check
+.PHONY: help install test lint format typecheck ask validate check screenshots
 
 PYTHON ?= python
 Q ?= How fast does a falling object hit the ground if it is dropped from 20 m?
@@ -30,3 +30,6 @@ validate:  ## Validate all seed data
 	askphysics validate-data
 
 check: lint typecheck test  ## Everything CI runs
+
+screenshots:  ## Regenerate docs/images from real CLI output (needs Node + Playwright)
+	$(PYTHON) scripts/screenshots.py

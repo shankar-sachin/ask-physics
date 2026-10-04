@@ -325,6 +325,7 @@ def explain(
         final_value=value,
         unit=result.unit,
         equations_used=[EquationRef(id=e.id, name=e.name) for e in equations],
+        inputs=p.known_values,
         assumptions=p.assumptions,
         confidence=confidence,
         caveats=caveats,
@@ -345,6 +346,7 @@ def refuse(question: Question, classification: Classification) -> Answer:
         category="out_of_scope",
         confidence=Confidence(label="low", score=0.0),
         explanation=explanation,
+        redirect=classification.closest_answerable,
     )
 
 

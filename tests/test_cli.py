@@ -37,7 +37,9 @@ def test_ask_renders_answer() -> None:
     assert result.exit_code == 0
     assert "19.8057" in result.output
     assert "[kin_v_squared]" in result.output  # citations must survive Rich markup
-    assert "Confidence" in result.output
+    assert "confidence" in result.output
+    assert "m/s" in result.output  # compact units, not "meter / second"
+    assert "ANSWERED" in result.output
 
 
 def test_ask_json_is_a_structured_answer() -> None:
@@ -52,7 +54,8 @@ def test_ask_json_is_a_structured_answer() -> None:
 def test_ask_refusal_renders() -> None:
     result = runner.invoke(cli.app, ["ask", "How much does the color blue weigh?"])
     assert result.exit_code == 0
-    assert "REFUSED" in result.output
+    assert "CAN'T ANSWER" in result.output
+    assert "try instead" in result.output
 
 
 def test_bad_config_exits_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:

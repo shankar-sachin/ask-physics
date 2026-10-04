@@ -21,6 +21,28 @@ machine, and call no external APIs:
 - **The symbolic algebra machine**, built on SymPy and Pint, which solves the
   equations and checks every unit.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/ask-answered.png" alt="askphysics ask: a falling-object question answered with the equation, inputs, assumptions, and confidence" width="820">
+</p>
+
+<p align="center">
+  <img src="docs/images/ask-refused.png" alt="A nonsense question refused, with a reason and an answerable alternative" width="820">
+  <img src="docs/images/ask-partial.png" alt="An absurd Fermi question that the v0.2 fake model can't plan yet, reported honestly" width="820">
+</p>
+
+<p align="center">
+  <img src="docs/images/model-train.png" alt="askphysics model train: fermi-luna-1 training with a live progress bar" width="820">
+</p>
+
+<p align="center">
+  <img src="docs/images/validate-data.png" alt="askphysics validate-data" width="400">
+  <img src="docs/images/model-info.png" alt="askphysics model info" width="400">
+</p>
+
+Every screenshot is real CLI output, regenerated with `make screenshots`.
+
 ## How it works
 
 ```
@@ -68,12 +90,22 @@ askphysics ask --json "A rock is dropped from 45 meters. How fast does it land?"
 askphysics ask "How much does the color blue weigh?"     # refused, with a redirect
 ```
 
+Train a Fermi model yourself (the tiny `fermi-luna-1` takes a minute on CPU;
+`fermi-solem-1` wants the GPU in an Apple Silicon Mac or similar):
+
+```bash
+askphysics model build-data --examples 20000 --workers 4
+askphysics model train-tokenizer --vocab-size 512
+askphysics model train --model fermi-luna-1 --steps 1000
+askphysics model info
+```
+
 `FakeLLMClient` only has a canned plan for "dropped from a height" questions,
 on purpose. Ask it anything else and the pipeline tells you exactly which
 stage it couldn't complete, instead of making something up. The Fermi models
 take over in v0.3.
 
-## Project status: v0.1.0 skeleton
+## Project status: v0.2 in progress
 
 | Area | Status |
 |------|--------|
@@ -82,10 +114,10 @@ take over in v0.3.
 | Dimensional consistency and order-of-magnitude sanity checks | Works |
 | Keyword retrieval over the equation database | Works |
 | Seed data with full validation: 12 equations, 4 examples, 8 constants, 8 Fermi assumptions | Works |
-| CLI: `ask`, `version`, `validate-data` | Works |
+| CLI: `ask`, `version`, `validate-data`, `model build-data / train-tokenizer / train / info` | Works |
 | Confidence scoring (crude, documented formula) | Works |
 | Eval set (8 questions) with a validating loader | Works |
-| Fermi models: tokenizer, transformer, constrained decoding, training | Building in v0.2 |
+| Fermi models: tokenizer, transformer, constrained decoding, data factory, training | Works |
 | Fermi models trained and answering in the CLI | v0.3 |
 | Multi-equation chaining | Stub until v0.4 |
 | Eval scoring and runner | Stub until v0.5 |
