@@ -33,7 +33,7 @@ make typecheck        # mypy
 
 No API keys, no GPU, and no trained weights are needed for development.
 Tests and the default CLI path use `FakeLLMClient`; model code is tested on
-the tiny `fermi-nano` config on CPU. Training the real Fermi models is
+the tiny `fermi-luna-1` config on CPU. Training the real Fermi models is
 covered in [`docs/MODELS.md`](docs/MODELS.md).
 
 ## Workflow

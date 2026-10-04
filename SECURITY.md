@@ -58,6 +58,6 @@ those, and include the question you asked.
 - Ask Physics needs no API keys. If a change adds a network call or a key,
   it needs an ADR first (ADR-009 rules out external LLM services).
 - Tests must run without trained weights, using `FakeLLMClient` or
-  `fermi-nano`.
+  `fermi-luna-1`.
 - Only load weights you trained or that come from this repo's release assets,
   with checksums verified (v0.9).

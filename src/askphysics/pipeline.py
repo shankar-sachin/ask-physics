@@ -81,7 +81,7 @@ def classify(question: Question, *, llm: LLMClient) -> Classification:
     Failure modes: false refusals, Fermi/standard confusion, malformed output.
     ``Pipeline.run`` falls back to ``standard`` if this raises.
     """
-    # TODO: Served by fermi-pulsar-1 through FermiClient using the classify task format,
+    # TODO: Served by fermi-tellus-1 through FermiClient using the classify task format,
     # with the format version recorded in the trace (v0.3, ADR-010).
     return llm.complete_json(
         system=CLASSIFY_SYSTEM_PROMPT,
@@ -131,7 +131,7 @@ def plan(
         LLMError: the LLM could not produce a plan.
     """
     # TODO: On PlanValidationError or a compute failure, the FermiClient router retries
-    # quasar (up to 5 attempts), then escalates once to magnetar (v0.3, ADR-010).
+    # solem (up to 5 attempts), then escalates once to celeste (v0.3, ADR-010).
     user = _payload(
         question=question.text,
         classification=classification.model_dump(),
@@ -392,8 +392,8 @@ class Pipeline:
     def from_settings(cls, settings: Settings, data: DataStore | None = None) -> Pipeline:
         """Build a pipeline with the configured LLM provider and the keyword retriever."""
         store = data or load_all()
-        # TODO: Build a FermiClient (pulsar classifies, quasar plans, one escalation to
-        # magnetar; ADR-010) when settings.llm_provider == "fermi" (v0.3).
+        # TODO: Build a FermiClient (tellus classifies, solem plans, one escalation to
+        # celeste; ADR-010) when settings.llm_provider == "fermi" (v0.3).
         llm: LLMClient = FakeLLMClient()
         retriever = KeywordRetriever(store.equations.values(), store.examples.values())
         return cls(llm=llm, retriever=retriever, data=store, settings=settings)

@@ -216,8 +216,8 @@ Pro with 48 GB of unified memory.
 
 **Decision.**
 - Three decoder-only transformers written in PyTorch in this repo:
-  `fermi-pulsar-1` (~3M params), `fermi-quasar-1` (~30M), and
-  `fermi-magnetar-1` (~120M), plus `fermi-nano` for tests. Design and
+  `fermi-tellus-1` (~3M params), `fermi-solem-1` (~30M), and
+  `fermi-celeste-1` (~120M), plus `fermi-luna-1` for tests. Design and
   training plan in `docs/MODELS.md`.
 - Our own byte-level BPE tokenizer with single-digit tokens and task tokens.
 - Training data comes from a data factory in this repo, built from the
@@ -241,7 +241,7 @@ Pro with 48 GB of unified memory.
   measure the rate.
 - Language quality now depends on our data factory. Template diversity and
   leakage control become core engineering work, not side tasks.
-- ~1B-parameter training is out of reach on a laptop; magnetar stays ~120M
+- ~1B-parameter training is out of reach on a laptop; celeste stays ~120M
   until there's both the data and the compute to justify more.
 - Supersedes ADR-006; amends ADR-001 and ADR-003. The v0.1 non-goal "no
   training from scratch" is dropped.
@@ -253,28 +253,28 @@ Pro with 48 GB of unified memory.
 **Status:** Accepted (v0.2.0), decided by the maintainer
 
 **Context.** Three model sizes trade speed for quality. The maintainer
-specified a scheme: start on quasar, get one magnetar, drop to pulsar after
-five quasar tries, or otherwise use the models in different ways. On a
+specified a scheme: start on solem, get one celeste, drop to tellus after
+five solem tries, or otherwise use the models in different ways. On a
 local machine there's no cost to meter, so quotas protect nothing. On a
 hosted website, they cap the cost.
 
 **Decision.** Both, each where it makes sense.
-- **CLI (v0.3): split and escalate.** pulsar classifies every question.
-  quasar plans and explains. If quasar's plan fails validation, or the
-  symbolic algebra machine rejects it, quasar retries up to 5 attempts in
-  total (varying context order and seed). Then magnetar gets one attempt.
-  Then the answer degrades. Missing weights are skipped, and pulsar alone
+- **CLI (v0.3): split and escalate.** tellus classifies every question.
+  solem plans and explains. If solem's plan fails validation, or the
+  symbolic algebra machine rejects it, solem retries up to 5 attempts in
+  total (varying context order and seed). Then celeste gets one attempt.
+  Then the answer degrades. Missing weights are skipped, and tellus alone
   can run every task.
-- **Website (after v1.0): usage tiers.** A visitor starts on quasar, gets one
-  magnetar answer per day, and drops to pulsar after five quasar answers in
+- **Website (after v1.0): usage tiers.** A visitor starts on solem, gets one
+  celeste answer per day, and drops to tellus after five solem answers in
   a window. Limits are server config, built with the v0.9 API server. The
   CLI never enforces them.
 - Every `Answer` records which model handled each stage.
 
 **Consequences.**
-- Worst case for a hard question is 5 quasar attempts plus 1 magnetar
+- Worst case for a hard question is 5 solem attempts plus 1 celeste
   attempt. Latency is bounded, and stays acceptable at these model sizes.
-- Escalation statistics (how often magnetar rescues quasar) become an eval
-  metric that justifies magnetar's existence, or not.
+- Escalation statistics (how often celeste rescues solem) become an eval
+  metric that justifies celeste's existence, or not.
 - The exact numbers (5 attempts, 1 escalation, the website limits) live in
   `Settings`, not in code.

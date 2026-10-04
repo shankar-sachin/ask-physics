@@ -50,6 +50,11 @@ class Tokenizer:
         self.merges: list[Pair] = [tuple(m) for m in merges]  # type: ignore[misc]
         self.special_ids = {tok: N_BYTES + i for i, tok in enumerate(SPECIAL_TOKENS)}
         first_merge_id = N_BYTES + len(SPECIAL_TOKENS)
+        for i, (a, b) in enumerate(self.merges):
+            if not (0 <= a < first_merge_id + i and 0 <= b < first_merge_id + i):
+                raise ValueError(f"merge {i} ({a}, {b}) refers to a token that doesn't exist yet")
+        if len(set(self.merges)) != len(self.merges):
+            raise ValueError("duplicate merges")
         self._ranks: dict[Pair, int] = {pair: i for i, pair in enumerate(self.merges)}
         self._merge_ids: dict[Pair, int] = {
             pair: first_merge_id + i for i, pair in enumerate(self.merges)

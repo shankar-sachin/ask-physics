@@ -36,8 +36,8 @@
 Arrows point in the direction data flows. The LLM (our own Fermi models,
 [`MODELS.md`](MODELS.md)) touches three stages and never produces the
 numbers that end up in `Answer.final_value`. From v0.3, `LLMClient` is
-implemented by `FermiClient`: pulsar classifies, quasar plans and explains,
-and magnetar gets one escalation shot (ADR-010).
+implemented by `FermiClient`: tellus classifies, solem plans and explains,
+and celeste gets one escalation shot (ADR-010).
 
 ## Module responsibilities
 
@@ -50,7 +50,7 @@ and magnetar gets one escalation shot (ADR-010).
 | `errors.py` | Exception taxonomy rooted at `AskPhysicsError` | stdlib |
 | `llm/base.py` | `LLMClient` protocol | `models` |
 | `llm/fake.py` | `FakeLLMClient`: deterministic canned responses for tests and demos | `models` |
-| `llm/fermi_client.py` (v0.3) | `FermiClient`: routes tasks across pulsar, quasar, magnetar | `lm` |
+| `llm/fermi_client.py` (v0.3) | `FermiClient`: routes tasks across tellus, solem, celeste | `lm` |
 | `lm/` (v0.2) | The Fermi models: config, tokenizer, transformer, constrained decoding, data factory, training | torch, safetensors |
 | `retrieval/base.py` | `Retriever` and `VectorStore` protocols | `models` |
 | `retrieval/keyword.py` | `KeywordRetriever`: in-memory tag and token scorer | `models` |
@@ -183,7 +183,7 @@ class LLMClient(Protocol):
 `complete_json` returns a validated pydantic instance. `FermiClient`
 guarantees that with constrained decoding against the schema, then
 validates with pydantic anyway. **Swappable because** the fake client must
-be drop-in for fast tests, and the router swaps pulsar, quasar, and magnetar
+be drop-in for fast tests, and the router swaps tellus, solem, and celeste
 behind the same two methods.
 
 ### `Retriever` (`retrieval/base.py`)
@@ -237,7 +237,7 @@ LLM go through Pint's unit parser, which does not evaluate code.
 | Source | Where | Mitigation |
 |--------|-------|------------|
 | Model decoding | classify, plan, explain | Classify and plan decode greedily, so the same input always gives the same output (ADR-009). Only explain samples, at `Settings.temperature`, and its digits are constrained. |
-| Model retraining | all model stages | Weights versioned by name (`fermi-quasar-1`) and checksum; task format version recorded in traces; evals re-run on every retrain. |
+| Model retraining | all model stages | Weights versioned by name (`fermi-solem-1`) and checksum; task format version recorded in traces; evals re-run on every retrain. |
 | Training runs | `lm/train.py` | Seeded initialization and data order. MPS kernels are not bit-exact across runs, so retrains are compared by eval scores, not weights. |
 | Retrieval ties | `KeywordRetriever` | Ties broken by equation id, so ordering is stable. |
 | Vector search (v0.6) | ANN index | Exact search at our scale; if approximate, a fixed index build seed. |

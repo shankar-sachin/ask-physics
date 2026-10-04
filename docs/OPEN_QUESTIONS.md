@@ -144,10 +144,10 @@ we hash the format templates?
 ### Q14. Is an 8,192-token vocabulary right for physics text?
 
 A bigger vocabulary shortens sequences (more context for equations) but
-costs embedding parameters, which matters a lot for pulsar: at d=160, 8k
+costs embedding parameters, which matters a lot for tellus: at d=160, 8k
 tokens is already about 1.3M of its ~3.2M parameters.
 
-**Default for now:** 8,192 shared across the family. Revisit with pulsar's
+**Default for now:** 8,192 shared across the family. Revisit with tellus's
 v0.3 eval numbers.
 
 ### Q15. What happens when retrieved context outgrows 1024 tokens?
@@ -159,21 +159,21 @@ input small, but long equations with many variables add up.
 equation's id, expression, and variable symbols and units. Longer contexts
 (2048) are a retrain away if needed.
 
-### Q16. Is there enough training data to justify magnetar?
+### Q16. Is there enough training data to justify celeste?
 
 ~120M parameters wants roughly 2.4B training tokens. A data factory built
-from 12 to 60 equations will repeat itself long before that. Magnetar may
-just memorize templates better than quasar does.
+from 12 to 60 equations will repeat itself long before that. Celeste may
+just memorize templates better than solem does.
 
-**Default for now:** train magnetar last, and keep it only if its rescue
-rate on quasar failures (ADR-010) justifies the extra weights. CC-BY text
+**Default for now:** train celeste last, and keep it only if its rescue
+rate on solem failures (ADR-010) justifies the extra weights. CC-BY text
 (v0.6) is the main path to more real tokens.
 
 ### Q17. How are the website usage tiers windowed?
 
-ADR-010 says a visitor starts on quasar, gets one magnetar answer per day,
-and drops to pulsar after five quasar answers. Five per what window, per
-visitor how (account, IP, cookie), and does the pulsar fallback reset daily?
+ADR-010 says a visitor starts on solem, gets one celeste answer per day,
+and drops to tellus after five solem answers. Five per what window, per
+visitor how (account, IP, cookie), and does the tellus fallback reset daily?
 
 **Default for now:** undecided until the website milestone; values live in
 server config so they can change without a release.

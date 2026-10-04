@@ -6,8 +6,8 @@ Guidance for Claude Code sessions working on this repo.
 
 Ask Physics answers physics questions, from textbook to absurd, through a
 six-stage pipeline: classify, retrieve, plan, compute, sanity_check, explain.
-Language comes from our own from-scratch Fermi models (pulsar ~3M, quasar
-~30M, magnetar ~120M; `docs/MODELS.md`); SymPy and Pint do all math and
+Language comes from our own from-scratch Fermi models (tellus ~3M, solem
+~30M, celeste ~120M; `docs/MODELS.md`); SymPy and Pint do all math and
 units. No external LLM APIs, ever (ADR-009). Many functions are still stubs
 that raise `NotImplementedError`.
 
@@ -47,7 +47,7 @@ commit.
    expressions come only from reviewed JSON. Never call `sympify` on
    untrusted text.
 6. **Tests never need weights or a GPU.** Use `FakeLLMClient` or
-   `fermi-nano` on CPU. Weights are safetensors, never pickle, never in git.
+   `fermi-luna-1` on CPU. Weights are safetensors, never pickle, never in git.
 
 ## Conventions
 

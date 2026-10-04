@@ -28,10 +28,10 @@ data (12 equations, 4 examples, 8 constants, 8 Fermi assumptions); Typer CLI;
 ## v0.2.0 Fermi foundations (L)
 
 **Goal:** every piece needed to train a Fermi model exists, works, and is
-tested on `fermi-nano`, without needing a GPU.
+tested on `fermi-luna-1`, without needing a GPU.
 
 **Deliverables**
-- `src/askphysics/lm/`: config presets (pulsar, quasar, magnetar, nano),
+- `src/askphysics/lm/`: config presets (tellus, solem, celeste, luna),
   byte-level BPE tokenizer with digit splitting and task tokens, the
   transformer, safetensors checkpoints, device selection.
 - Constrained decoding: schema masks, allowed equation ids, allowed numbers,
@@ -44,7 +44,7 @@ tested on `fermi-nano`, without needing a GPU.
 - `torch` and `safetensors` as dependencies; CI on CPU wheels.
 
 **Exit criteria**
-- `fermi-nano` trains for 50 steps in CI and its loss drops.
+- `fermi-luna-1` trains for 50 steps in CI and its loss drops.
 - A constrained plan decode can only emit retrieved equation ids and numbers
   from the question (property-tested).
 - Tokenizer round-trips every string in the data factory output.
@@ -56,23 +56,23 @@ tested on `fermi-nano`, without needing a GPU.
 **Goal:** the CLI answers with our own models.
 
 **Deliverables**
-- Train `fermi-pulsar-1`, `fermi-quasar-1`, and `fermi-magnetar-1` (~120M) on
+- Train `fermi-tellus-1`, `fermi-solem-1`, and `fermi-celeste-1` (~120M) on
   the maintainer's M5 Pro, with the commands and configs committed.
-- `FermiClient` implementing `LLMClient`, with the ADR-010 router: pulsar
-  classifies, quasar plans and explains, up to 5 quasar attempts, one
-  magnetar escalation, pulsar-only fallback when bigger weights are missing.
+- `FermiClient` implementing `LLMClient`, with the ADR-010 router: tellus
+  classifies, solem plans and explains, up to 5 solem attempts, one
+  celeste escalation, tellus-only fallback when bigger weights are missing.
 - `Answer` records which model handled each stage.
 - `fermi` becomes the default provider once weights are installed; the fake
   client stays for tests.
 - Model cards with measured throughput, training curves, and eval results.
 
 **Exit criteria**
-- On a held-out set of factory-style questions (unseen templates), quasar
-  produces a valid plan for 90% or more, and magnetar escalation recovers at
-  least a third of quasar's failures.
+- On a held-out set of factory-style questions (unseen templates), solem
+  produces a valid plan for 90% or more, and celeste escalation recovers at
+  least a third of solem's failures.
 - Zero invented equation ids or numbers (guaranteed by constraints, verified
   by tests).
-- `askphysics ask` with quasar answers in under 2 seconds on an M5 Pro.
+- `askphysics ask` with solem answers in under 2 seconds on an M5 Pro.
 
 ---
 
@@ -102,7 +102,7 @@ tested on `fermi-nano`, without needing a GPU.
 - Automated scoring (numeric tolerance, unit, equation ids, refusal
   correctness) plus a rubric for assumption quality, graded by humans on a
   sample (no external LLM grader).
-- Per-model results: pulsar vs quasar vs magnetar vs routed.
+- Per-model results: tellus vs solem vs celeste vs routed.
 - Reports committed to `evals/reports/`; regression policy enforced.
 
 **Exit criteria**
@@ -195,7 +195,7 @@ tested on `fermi-nano`, without needing a GPU.
 **Deliverables (detailed when v1.0 ships)**
 - Web front end consuming the same `Answer` JSON the CLI prints.
 - Hosted API built from the v0.9 server, with the ADR-010 usage tiers: start
-  on quasar, one magnetar answer per day, pulsar after five quasar answers.
+  on solem, one celeste answer per day, tellus after five solem answers.
 - Rendered LaTeX and a "show the math" view of the symbolic steps.
 
 **Entry criteria**
