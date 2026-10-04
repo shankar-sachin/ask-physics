@@ -31,20 +31,20 @@ machine, and call no external APIs:
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/fermi-tellus-1.jpg" alt="fermi-tellus-1: the Earth at night and day, with physics equations"></td>
-    <td width="50%"><img src="docs/images/fermi-solem-1.jpg" alt="fermi-solem-1: the Sun, with physics equations"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>fermi-tellus-1</b> · ~3.2M params<br>reads every question</td>
-    <td align="center"><b>fermi-solem-1</b> · ~29.9M params<br>plans the solution, explains the answer</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/images/fermi-celeste-1.jpg" alt="fermi-celeste-1: a black hole quasar with its accretion disk and jets"></td>
     <td width="50%"><img src="docs/images/fermi-luna-1.jpg" alt="fermi-luna-1: a crescent Moon with physics equations"></td>
+    <td width="50%"><img src="docs/images/fermi-tellus-1.jpg" alt="fermi-tellus-1: the Earth at night and day, with physics equations"></td>
   </tr>
   <tr>
-    <td align="center"><b>fermi-celeste-1</b> · ~119.6M params<br>the last resort when solem gets stuck</td>
     <td align="center"><b>fermi-luna-1</b> · ~0.14M params<br>runs the test suite, never ships</td>
+    <td align="center"><b>fermi-tellus-1</b> · ~3.2M params<br>reads every question</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/fermi-solem-1.jpg" alt="fermi-solem-1: the Sun, with physics equations"></td>
+    <td width="50%"><img src="docs/images/fermi-celeste-1.jpg" alt="fermi-celeste-1: a black hole quasar with its accretion disk and jets"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>fermi-solem-1</b> · ~29.9M params<br>plans the solution, explains the answer</td>
+    <td align="center"><b>fermi-celeste-1</b> · ~119.6M params<br>the last resort when solem gets stuck</td>
   </tr>
 </table>
 
