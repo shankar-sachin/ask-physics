@@ -1,0 +1,228 @@
+[
+  {
+    "id": "kin_v_at",
+    "name": "Velocity-time relation (constant acceleration)",
+    "latex": "v = v_0 + a t",
+    "sympy_expr": "v = v0 + a*t",
+    "variables": [
+      {"symbol": "v", "name": "final velocity", "unit": "m/s", "description": "Velocity after time t", "typical_range": [0.0, 1000.0]},
+      {"symbol": "v0", "name": "initial velocity", "unit": "m/s", "description": "Velocity at t = 0", "typical_range": [0.0, 1000.0]},
+      {"symbol": "a", "name": "acceleration", "unit": "m/s^2", "description": "Constant acceleration", "typical_range": [0.0, 100.0]},
+      {"symbol": "t", "name": "time", "unit": "s", "description": "Elapsed time", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Acceleration is constant", "Motion is along a straight line"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "velocity", "speed", "acceleration", "time", "accelerates", "constant acceleration"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "kin_x_at",
+    "name": "Displacement-time relation (constant acceleration)",
+    "latex": "x = v_0 t + \\frac{1}{2} a t^2",
+    "sympy_expr": "x = v0*t + a*t**2/2",
+    "variables": [
+      {"symbol": "x", "name": "displacement", "unit": "m", "description": "Displacement after time t", "typical_range": [0.0, 100000.0]},
+      {"symbol": "v0", "name": "initial velocity", "unit": "m/s", "description": "Velocity at t = 0", "typical_range": [0.0, 1000.0]},
+      {"symbol": "a", "name": "acceleration", "unit": "m/s^2", "description": "Constant acceleration", "typical_range": [0.0, 100.0]},
+      {"symbol": "t", "name": "time", "unit": "s", "description": "Elapsed time", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Acceleration is constant", "Motion is along a straight line", "Starts at x = 0"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "displacement", "distance", "time", "how long", "free fall", "falling", "drop", "height"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "kin_v_squared",
+    "name": "Velocity-displacement relation (constant acceleration)",
+    "latex": "v^2 = v_0^2 + 2 a d",
+    "sympy_expr": "v**2 = v0**2 + 2*a*d",
+    "variables": [
+      {"symbol": "v", "name": "final velocity", "unit": "m/s", "description": "Velocity after covering displacement d", "typical_range": [0.0, 1000.0]},
+      {"symbol": "v0", "name": "initial velocity", "unit": "m/s", "description": "Velocity at the start", "typical_range": [0.0, 1000.0]},
+      {"symbol": "a", "name": "acceleration", "unit": "m/s^2", "description": "Constant acceleration along the motion", "typical_range": [0.0, 100.0]},
+      {"symbol": "d", "name": "displacement", "unit": "m", "description": "Displacement along the line of motion", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Acceleration is constant", "Motion is along a straight line"],
+    "validity_conditions": ["Speeds far below the speed of light", "No drag, or drag negligible over d"],
+    "tags": ["kinematics", "free fall", "falling", "drop", "dropped", "fast", "speed", "velocity", "impact", "ground", "height", "constant acceleration"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "newton_second_law",
+    "name": "Newton's second law",
+    "latex": "F = m a",
+    "sympy_expr": "F = m*a",
+    "variables": [
+      {"symbol": "F", "name": "net force", "unit": "N", "description": "Net force on the body", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the body", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "a", "name": "acceleration", "unit": "m/s^2", "description": "Acceleration of the body", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Constant mass", "Inertial reference frame", "Magnitudes along a single line"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["dynamics", "force", "newton", "mass", "acceleration", "push", "pull"],
+    "source": "OpenStax University Physics Volume 1, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "weight",
+    "name": "Weight near a planet's surface",
+    "latex": "W = m g",
+    "sympy_expr": "W = m*g",
+    "variables": [
+      {"symbol": "W", "name": "weight", "unit": "N", "description": "Gravitational force on the body", "typical_range": [0.0, 100000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the body", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local gravitational field strength", "typical_range": [1.0, 30.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Uniform gravitational field"],
+    "validity_conditions": ["Height above the surface small compared with the planet's radius"],
+    "tags": ["dynamics", "weight", "gravity", "mass", "heavy", "weigh"],
+    "source": "OpenStax University Physics Volume 1, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "kinetic_energy",
+    "name": "Translational kinetic energy",
+    "latex": "KE = \\frac{1}{2} m v^2",
+    "sympy_expr": "KE = m*v**2/2",
+    "variables": [
+      {"symbol": "KE", "name": "kinetic energy", "unit": "J", "description": "Energy of motion", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the body", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed of the body", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Point mass or pure translation (no rotation)"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["energy", "kinetic energy", "motion", "speed", "moving", "joules"],
+    "source": "OpenStax University Physics Volume 1, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "gravitational_pe",
+    "name": "Gravitational potential energy near a surface",
+    "latex": "U = m g h",
+    "sympy_expr": "U = m*g*h",
+    "variables": [
+      {"symbol": "U", "name": "potential energy", "unit": "J", "description": "Energy relative to the reference height", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the body", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local gravitational field strength", "typical_range": [1.0, 30.0]},
+      {"symbol": "h", "name": "height", "unit": "m", "description": "Height above the reference level", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Uniform gravitational field", "Reference level at h = 0"],
+    "validity_conditions": ["h small compared with the planet's radius"],
+    "tags": ["energy", "potential energy", "gravity", "height", "lift", "falls", "shelf"],
+    "source": "OpenStax University Physics Volume 1, Chapter 8 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "momentum",
+    "name": "Linear momentum",
+    "latex": "p = m v",
+    "sympy_expr": "p = m*v",
+    "variables": [
+      {"symbol": "p", "name": "momentum", "unit": "kg*m/s", "description": "Linear momentum", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the body", "typical_range": [0.001, 100000000.0]},
+      {"symbol": "v", "name": "velocity", "unit": "m/s", "description": "Velocity of the body", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "momentum",
+    "assumptions": ["Magnitudes along a single line"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["momentum", "mass", "velocity", "moving", "hard to stop"],
+    "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "inelastic_collision",
+    "name": "Perfectly inelastic collision (momentum conservation)",
+    "latex": "m_1 v_1 + m_2 v_2 = (m_1 + m_2) v_f",
+    "sympy_expr": "m1*v1 + m2*v2 = (m1 + m2)*vf",
+    "variables": [
+      {"symbol": "m1", "name": "mass 1", "unit": "kg", "description": "Mass of the first body", "typical_range": [0.001, 100000000.0]},
+      {"symbol": "v1", "name": "velocity 1", "unit": "m/s", "description": "Velocity of the first body before the collision", "typical_range": [0.0, 1000.0]},
+      {"symbol": "m2", "name": "mass 2", "unit": "kg", "description": "Mass of the second body", "typical_range": [0.001, 100000000.0]},
+      {"symbol": "v2", "name": "velocity 2", "unit": "m/s", "description": "Velocity of the second body before the collision", "typical_range": [0.0, 1000.0]},
+      {"symbol": "vf", "name": "final velocity", "unit": "m/s", "description": "Common velocity after the bodies stick together", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "momentum",
+    "assumptions": ["Bodies stick together", "No external impulse during the collision", "Motion along a single line"],
+    "validity_conditions": ["Collision duration short compared with external force timescales"],
+    "tags": ["momentum", "collision", "inelastic", "stick together", "crash", "stop", "slow down"],
+    "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "newton_gravitation",
+    "name": "Newton's law of universal gravitation",
+    "latex": "F = \\frac{G m_1 m_2}{r^2}",
+    "sympy_expr": "F = G*m1*m2/r**2",
+    "variables": [
+      {"symbol": "F", "name": "gravitational force", "unit": "N", "description": "Attractive force between the masses", "typical_range": [1e-15, 1e+25]},
+      {"symbol": "G", "name": "gravitational constant", "unit": "m^3/(kg*s^2)", "description": "Newtonian constant of gravitation", "typical_range": null},
+      {"symbol": "m1", "name": "mass 1", "unit": "kg", "description": "First mass", "typical_range": null},
+      {"symbol": "m2", "name": "mass 2", "unit": "kg", "description": "Second mass", "typical_range": null},
+      {"symbol": "r", "name": "separation", "unit": "m", "description": "Center-to-center distance", "typical_range": null}
+    ],
+    "domain": "gravitation",
+    "assumptions": ["Point masses or spherically symmetric bodies"],
+    "validity_conditions": ["Weak fields (no general relativity)", "r larger than the bodies' radii"],
+    "tags": ["gravitation", "gravity", "attraction", "planet", "orbit", "masses", "universal"],
+    "source": "OpenStax University Physics Volume 1, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "ohms_law",
+    "name": "Ohm's law",
+    "latex": "V = I R",
+    "sympy_expr": "V = I*R",
+    "variables": [
+      {"symbol": "V", "name": "voltage", "unit": "V", "description": "Potential difference across the resistor", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current through the resistor", "typical_range": [0.0, 10000.0]},
+      {"symbol": "R", "name": "resistance", "unit": "ohm", "description": "Resistance", "typical_range": [0.0, 1000000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ohmic (linear) conductor", "Steady current"],
+    "validity_conditions": ["Constant temperature", "Not valid for diodes or other non-ohmic devices"],
+    "tags": ["electromagnetism", "circuit", "current", "voltage", "resistance", "resistor", "battery", "ohm"],
+    "source": "OpenStax University Physics Volume 2, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "ideal_gas_law",
+    "name": "Ideal gas law",
+    "latex": "P V = n R T",
+    "sympy_expr": "P*V = n*R*T",
+    "variables": [
+      {"symbol": "P", "name": "pressure", "unit": "Pa", "description": "Absolute pressure of the gas", "typical_range": [1.0, 100000000.0]},
+      {"symbol": "V", "name": "volume", "unit": "m^3", "description": "Volume of the container", "typical_range": [1e-06, 1000.0]},
+      {"symbol": "n", "name": "amount", "unit": "mol", "description": "Amount of gas", "typical_range": [1e-06, 100000.0]},
+      {"symbol": "R", "name": "molar gas constant", "unit": "J/(mol*K)", "description": "Molar gas constant", "typical_range": null},
+      {"symbol": "T", "name": "temperature", "unit": "K", "description": "Absolute temperature", "typical_range": [1.0, 10000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Ideal gas: no intermolecular forces, point particles", "Equilibrium state"],
+    "validity_conditions": ["Low pressure and high temperature relative to the gas's critical point"],
+    "tags": ["thermodynamics", "gas", "pressure", "volume", "temperature", "moles", "container", "ideal gas"],
+    "source": "OpenStax University Physics Volume 2, Chapter 2 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  }
+]

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "ex_kin_001",
+    "problem_text": "A car starts from rest and accelerates uniformly at 3 m/s^2 for 5 s. What is its final speed?",
+    "known_values": [
+      {"symbol": "v0", "value": 0.0, "unit": "m/s", "origin": "given"},
+      {"symbol": "a", "value": 3.0, "unit": "m/s^2", "origin": "given"},
+      {"symbol": "t", "value": 5.0, "unit": "s", "origin": "given"}
+    ],
+    "unknowns": ["v"],
+    "equations_used": ["kin_v_at"],
+    "solution_steps": ["Start from v = v0 + a*t.", "Substitute v0 = 0 m/s, a = 3 m/s^2, t = 5 s.", "v = 15 m/s."],
+    "final_answer": {"value": 15.0, "unit": "m/s"},
+    "difficulty": "intro",
+    "tags": ["kinematics", "acceleration", "car"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_energy_001",
+    "problem_text": "A 2 kg book falls off a 1.5 m shelf. How much gravitational potential energy does it lose on the way to the floor?",
+    "known_values": [
+      {"symbol": "m", "value": 2.0, "unit": "kg", "origin": "given"},
+      {"symbol": "g", "value": 9.80665, "unit": "m/s^2", "origin": "constant"},
+      {"symbol": "h", "value": 1.5, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["U"],
+    "equations_used": ["gravitational_pe"],
+    "solution_steps": ["Take the floor as the reference level.", "U = m*g*h = 2 kg * 9.80665 m/s^2 * 1.5 m.", "U = 29.42 J."],
+    "final_answer": {"value": 29.41995, "unit": "J"},
+    "difficulty": "intro",
+    "tags": ["energy", "potential energy", "book"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_grav_001",
+    "problem_text": "What is the gravitational force between two 1000 kg masses whose centers are 2 m apart?",
+    "known_values": [
+      {"symbol": "G", "value": 6.6743e-11, "unit": "m^3/(kg*s^2)", "origin": "constant"},
+      {"symbol": "m1", "value": 1000.0, "unit": "kg", "origin": "given"},
+      {"symbol": "m2", "value": 1000.0, "unit": "kg", "origin": "given"},
+      {"symbol": "r", "value": 2.0, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["F"],
+    "equations_used": ["newton_gravitation"],
+    "solution_steps": ["F = G*m1*m2/r^2.", "F = 6.6743e-11 * 1000 * 1000 / 2^2 N.", "F = 1.67e-5 N."],
+    "final_answer": {"value": 1.668575e-05, "unit": "N"},
+    "difficulty": "intro",
+    "tags": ["gravitation", "force", "masses"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_momentum_001",
+    "problem_text": "A 0.15 kg baseball travels at 40 m/s. What is its momentum?",
+    "known_values": [
+      {"symbol": "m", "value": 0.15, "unit": "kg", "origin": "given"},
+      {"symbol": "v", "value": 40.0, "unit": "m/s", "origin": "given"}
+    ],
+    "unknowns": ["p"],
+    "equations_used": ["momentum"],
+    "solution_steps": ["p = m*v.", "p = 0.15 kg * 40 m/s.", "p = 6 kg*m/s."],
+    "final_answer": {"value": 6.0, "unit": "kg*m/s"},
+    "difficulty": "intro",
+    "tags": ["momentum", "baseball"],
+    "source": "Project-authored",
+    "license": "MIT"
+  }
+]
