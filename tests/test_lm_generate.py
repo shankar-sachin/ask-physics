@@ -60,6 +60,8 @@ def _decoder(tokenizer: Tokenizer, seed: int) -> Decoder:
         ("v", "0", True),  # identifier, not a number
         ("speed ", "5", False),
         ("-", "2", True),  # sign ignored
+        ("meter / second ** ", "2", True),  # unit exponent, not a number
+        ("m^", "3", True),
     ],
 )
 def test_number_guard(prefix: str, piece: str, ok: bool) -> None:

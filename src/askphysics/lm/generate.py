@@ -56,7 +56,8 @@ MAX_EQUATIONS = 3
 MAX_DOMAINS = 3
 MAX_ASSUMPTIONS = 6
 
-_TRAILING_RUN = re.compile(r"(?<![A-Za-z_0-9.])(\d+(?:\.\d*)?)$")
+_TRAILING_RUN = re.compile(r"(?<![A-Za-z_0-9.^*])(?<!\*\* )(\d+(?:\.\d*)?)$")
+_TRAILING_EXPONENT = re.compile(r"(\^|\*\*\s?)\d*$")
 _TRAILING_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -102,6 +103,8 @@ def number_guard_ok(prefix: str, piece: str, allowed: Sequence[str]) -> bool:
     if piece[:1].isdigit():
         if not run and _TRAILING_IDENTIFIER.search(prefix):
             return True  # part of an identifier like v0 or m12
+        if not run and _TRAILING_EXPONENT.search(prefix):
+            return True  # a unit exponent like m^3 or second ** 2
         return any(a.startswith(run + piece) for a in stripped)
     if piece == "." and run:
         return any(a.startswith(run + ".") for a in stripped)
