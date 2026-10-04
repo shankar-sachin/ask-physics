@@ -1,8 +1,9 @@
-"""Typer CLI: ``askphysics ask``, ``askphysics version``, ``askphysics validate-data``."""
+"""Typer CLI: ``ask``, ``version``, ``validate-data``, and the ``model`` commands."""
 
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Annotated, cast
 
 import typer
@@ -108,6 +109,45 @@ def validate_data() -> None:
     for name, count in store.summary().items():
         table.add_row(name, str(count))
     console.print(table)
+
+
+model_app = typer.Typer(
+    help="Build training data for, train, and inspect the Fermi models.", no_args_is_help=True
+)
+app.add_typer(model_app, name="model")
+
+
+@model_app.command("build-data")
+def build_data(
+    out: Annotated[Path, typer.Option(help="Output directory for the JSONL shards.")] = Path(
+        "build/data"
+    ),
+    examples: Annotated[int, typer.Option(min=1, help="Number of examples to generate.")] = 10_000,
+    seed: Annotated[int, typer.Option(help="Seed; the same seed gives the same data.")] = 0,
+    workers: Annotated[int, typer.Option(min=1, help="Parallel worker processes.")] = 1,
+    blocklist: Annotated[
+        Path, typer.Option(help="Eval questions to keep out of the data (leakage policy).")
+    ] = Path("evals/questions.yaml"),
+) -> None:
+    """Generate training data from the equation database (solved by the symbolic machine)."""
+    from askphysics.lm.factory import build_dataset, load_blocklist
+
+    blocked = load_blocklist(blocklist)
+    if not blocked:
+        console.print(
+            f"[yellow]Warning:[/yellow] no eval questions found at {escape(str(blocklist))}"
+        )
+    with console.status(f"Generating {examples:,} examples with {workers} worker(s)..."):
+        manifest = build_dataset(out, examples, seed=seed, workers=workers, blocklist=blocked)
+    table = Table(
+        "Split / task", "Examples", title=f"Dataset written to {out}", title_justify="left"
+    )
+    for key, count in manifest["counts"].items():
+        table.add_row(key, f"{count:,}")
+    console.print(table)
+    console.print(
+        f"Dropped {manifest['dropped']:,} attempts (unsolvable or too close to an eval question)."
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

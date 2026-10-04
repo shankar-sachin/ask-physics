@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
 
 import pint
@@ -88,10 +89,22 @@ def free_symbol_names(sympy_expr: str) -> set[str]:
     return {str(s) for s in parse_equation(sympy_expr).free_symbols}
 
 
-def _evaluate(expr: sp.Expr, values: Mapping[str, Quantity]) -> Any:
+@lru_cache(maxsize=1024)
+def _compile(expr: sp.Expr) -> tuple[tuple[str, ...], Callable[..., Any]]:
     symbols = sorted(expr.free_symbols, key=str)
     fn = sp.lambdify(symbols, expr, modules=[_PINT_MODULE, "math"])
-    return fn(*(values[str(s)] for s in symbols))
+    return tuple(str(s) for s in symbols), fn
+
+
+def _evaluate(expr: sp.Expr, values: Mapping[str, Quantity]) -> Any:
+    names, fn = _compile(expr)
+    return fn(*(values[n] for n in names))
+
+
+@lru_cache(maxsize=1024)
+def _solutions(sympy_expr: str, unknown: str) -> tuple[sp.Expr, ...]:
+    """Symbolic roots of an equation for one unknown, cached: equations are immutable data."""
+    return tuple(sp.solve(parse_equation(sympy_expr), sp.Symbol(unknown)))
 
 
 def check_dimensional_consistency(equation: Equation) -> bool:
@@ -142,7 +155,7 @@ def solve_for(equation: Equation, unknown: str, knowns: Mapping[str, Quantity]) 
     if missing:
         raise SolverError(f"missing known values for {sorted(missing)} in {equation.id}")
 
-    solutions = sp.solve(eq, sp.Symbol(unknown))
+    solutions = _solutions(equation.sympy_expr, unknown)
     if not solutions:
         raise SolverError(f"no closed-form solution for {unknown!r} in {equation.id}")
 
@@ -152,6 +165,8 @@ def solve_for(equation: Equation, unknown: str, knowns: Mapping[str, Quantity]) 
             val = _evaluate(sol, knowns)
         except pint.errors.DimensionalityError as exc:
             raise UnitMismatchError(f"inconsistent units solving {equation.id}: {exc}") from exc
+        except (ZeroDivisionError, OverflowError, ValueError) as exc:
+            raise SolverError(f"cannot evaluate {unknown!r} in {equation.id}: {exc}") from exc
         q = val if isinstance(val, pint.Quantity) else quantity(float(val), "dimensionless")
         if isinstance(q.magnitude, complex):
             continue

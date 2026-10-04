@@ -48,8 +48,9 @@ def test_extract_numbers_and_units() -> None:
     assert extract_units(q) == ["m", "m/s^2", "J"]
 
 
-def test_extract_numbers_skips_identifiers() -> None:
+def test_extract_numbers_skips_identifiers_and_exponents() -> None:
     assert extract_numbers("m1 and v0 and x2y") == []
+    assert extract_numbers("9.8 meter / second ** 2 or m^3") == ["9.8"]
 
 
 def test_classification_round_trip() -> None:
