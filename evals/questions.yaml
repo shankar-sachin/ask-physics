@@ -1,0 +1,108 @@
+# Ask Physics eval set, v0.1 sample (8 questions).
+# Format: see evals/README.md. Rubrics and tolerance rules: docs/EVALS.md.
+# Never copy these into data/, prompts, few-shot examples, or training sets.
+
+- id: std_001
+  question: "A 1200 kg car is moving at 27 m/s. What is its kinetic energy?"
+  category: standard
+  expected_behavior: answer
+  expected_answer_shape:
+    value: 437400.0
+    unit: J
+    rel_tolerance: 0.02
+  must_mention_assumptions: false
+  acceptable_equation_ids: [[kinetic_energy]]
+  rationale: "KE = m*v^2/2 = 0.5 * 1200 * 27^2."
+
+- id: std_002
+  question: "What current flows through a 220 ohm resistor connected across a 9 V battery?"
+  category: standard
+  expected_behavior: answer
+  expected_answer_shape:
+    value: 0.0409091
+    unit: A
+    rel_tolerance: 0.02
+  must_mention_assumptions: false
+  acceptable_equation_ids: [[ohms_law]]
+  rationale: "I = V/R = 9/220. Assumes an ideal battery with no internal resistance."
+
+- id: std_003
+  question: "What is the pressure of 2 mol of an ideal gas at 300 K in a 0.05 m^3 container?"
+  category: standard
+  expected_behavior: answer
+  expected_answer_shape:
+    value: 99773.6
+    unit: Pa
+    rel_tolerance: 0.02
+  must_mention_assumptions: false
+  acceptable_equation_ids: [[ideal_gas_law]]
+  rationale: "P = nRT/V = 2 * 8.314462618 * 300 / 0.05."
+
+- id: fermi_001
+  question: "How many rubber ducks would it take to stop a freight train?"
+  category: fermi
+  expected_behavior: estimate_range
+  expected_answer_shape:
+    value: 2.4e8
+    unit: dimensionless
+    tolerance_decades: 1.0
+  must_mention_assumptions: true
+  acceptable_equation_ids: [[inelastic_collision], [momentum]]
+  rationale: >-
+    Stationary ducks stick to the train (perfectly inelastic). Perfectly inelastic
+    collisions never reach zero speed, so "stop" must be defined; halving the speed
+    needs total duck mass equal to the train mass: 6e6 kg / 0.025 kg ~ 2.4e8. A good
+    answer states that definition, the train and duck masses, and flags that the duck
+    pile would be absurdly large.
+
+- id: fermi_002
+  question: "If everyone on Earth jumped at the same time, how far would the Earth move?"
+  category: fermi
+  expected_behavior: estimate_range
+  expected_answer_shape:
+    value: 3.4e-14
+    unit: m
+    tolerance_decades: 1.0
+  must_mention_assumptions: true
+  acceptable_equation_ids: []
+  rationale: >-
+    Center of mass of the Earth-plus-people system stays fixed, so Earth moves by
+    (m_people / M_earth) * jump height = (8.2e9 * 62 kg / 5.97e24 kg) * 0.4 m ~ 3.4e-14 m,
+    and it moves back when everyone lands. A good answer says the net effect is zero.
+
+- id: fermi_003
+  question: "How many bananas worth of energy would it take to launch a person off the Earth to the Moon?"
+  category: fermi
+  expected_behavior: estimate_range
+  expected_answer_shape:
+    value: 1.0e4
+    unit: dimensionless
+    tolerance_decades: 1.0
+  must_mention_assumptions: true
+  acceptable_equation_ids: []
+  rationale: >-
+    Energy to escape Earth's gravity well, roughly G*M*m/R = 6.3e7 J/kg * 70 kg ~ 4.4e9 J,
+    divided by about 4.4e5 J per banana gives about 1e4 bananas. Assumes perfect
+    conversion efficiency; a real rocket needs orders of magnitude more, and a good
+    answer says so.
+
+- id: imp_001
+  question: "What was the temperature of the universe before the Big Bang?"
+  category: impossible
+  expected_behavior: refuse_and_redirect
+  expected_answer_shape: null
+  must_mention_assumptions: false
+  rationale: >-
+    Outside the domain where current physics makes predictions. A good redirect offers
+    an answerable early-universe question, such as the temperature when the cosmic
+    microwave background was released (about 3000 K).
+
+- id: imp_002
+  question: "How much does the color blue weigh?"
+  category: impossible
+  expected_behavior: refuse_and_redirect
+  expected_answer_shape: null
+  must_mention_assumptions: false
+  rationale: >-
+    Category error: color is a property of light, not an object. A good redirect offers
+    the momentum or radiation pressure of blue light.
