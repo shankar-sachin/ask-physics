@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+  <title id="title">Ask Physics</title>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="80%">
+      <stop offset="0" stop-color="#23264a"/>
+      <stop offset="0.55" stop-color="#11122a"/>
+      <stop offset="1" stop-color="#07080f"/>
+    </radialGradient>
+    <linearGradient id="stroke" x1="150" y1="120" x2="330" y2="330" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8be9fd"/>
+      <stop offset="1" stop-color="#bd93f9"/>
+    </linearGradient>
+    <radialGradient id="planet" cx="38%" cy="32%" r="75%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.18" stop-color="#ffd6a5"/>
+      <stop offset="0.55" stop-color="#ff9e64"/>
+      <stop offset="1" stop-color="#7a2e5c"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8be9fd" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#f8f8f2"/>
+      <stop offset="1" stop-color="#bd93f9" stop-opacity="0.35"/>
+    </linearGradient>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0.4" stop-color="#ff9e64" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ff9e64" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="tile"><rect width="512" height="512" rx="116"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <g fill="#ffffff">
+      <circle cx="78" cy="96" r="2" opacity="0.8"/>
+      <circle cx="420" cy="84" r="1.6" opacity="0.6"/>
+      <circle cx="446" cy="300" r="2.2" opacity="0.55"/>
+      <circle cx="70" cy="330" r="1.5" opacity="0.6"/>
+      <circle cx="118" cy="452" r="1.7" opacity="0.45"/>
+      <circle cx="404" cy="446" r="1.4" opacity="0.55"/>
+      <circle cx="318" cy="52" r="1.4" opacity="0.5"/>
+      <circle cx="196" cy="58" r="1.1" opacity="0.5"/>
+      <circle cx="470" cy="190" r="1.2" opacity="0.5"/>
+    </g>
+
+    <!-- The question mark, drawn as a trajectory. -->
+    <path d="M168 200 A90 90 0 1 1 322 262 Q257 286 257 330" fill="none" stroke="url(#stroke)"
+          stroke-width="40" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+    <!-- Its dot: a ringed planet. -->
+    <circle cx="257" cy="408" r="70" fill="url(#aura)"/>
+    <g transform="rotate(-18 257 408)">
+      <path d="M187 408 A70 17 0 0 1 327 408" fill="none" stroke="url(#ring)" stroke-width="7"
+            stroke-linecap="round" opacity="0.75"/>
+      <circle cx="257" cy="408" r="36" fill="url(#planet)"/>
+      <path d="M187 408 A70 17 0 0 0 327 408" fill="none" stroke="url(#ring)" stroke-width="7"
+            stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

@@ -1,4 +1,4 @@
-.PHONY: help install test lint format typecheck ask validate check screenshots
+.PHONY: help install test lint format typecheck ask validate check screenshots brand
 
 PYTHON ?= python
 Q ?= How fast does a falling object hit the ground if it is dropped from 20 m?
@@ -33,3 +33,6 @@ check: lint typecheck test  ## Everything CI runs
 
 screenshots:  ## Regenerate docs/images from real CLI output (needs Node + Playwright)
 	$(PYTHON) scripts/screenshots.py
+
+brand:  ## Render the logo, banner, and model artwork (needs Pillow, Node + Playwright)
+	$(PYTHON) scripts/brand.py
