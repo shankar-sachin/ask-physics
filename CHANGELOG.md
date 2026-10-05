@@ -8,6 +8,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `askphysics ask` answers with the Fermi models once any are installed
+  (ADR-010). tellus classifies, solem plans and explains, a rejected plan is
+  retried up to 5 times, and celeste gets one more try. Missing models are
+  skipped, so tellus alone can do everything. The answer card and
+  `Answer.models` say which model handled each stage, and
+  `Answer.plan_attempts` counts the plans tried. `--model` forces one model,
+  `--llm fake` brings back the fake client, and `ASKPHYSICS_PLAN_ATTEMPTS`,
+  `ASKPHYSICS_ESCALATIONS`, and `ASKPHYSICS_DEVICE` tune the router.
 - 12 more equations (98 → 110) with dimensionless quantities: kinetic and
   static friction, efficiency, Carnot efficiency, refractive index, the
   ideal transformer, magnification, the ideal gas law by molecule count,
@@ -57,6 +65,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The default provider is now `auto`: the Fermi models when installed, the
+  fake client otherwise. `ASKPHYSICS_MODEL` now forces one model for every
+  stage instead of naming the planner.
 - The one-line installers now live at
   `https://askphysics.vercel.app/installers/install.sh` and `install.ps1`.
 - The data factory composes questions from parts (44 frames, 12 ways to state

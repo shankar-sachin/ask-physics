@@ -71,14 +71,14 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
       room for it to help (open question Q16).
 
 ### Integration
-- [ ] `FermiClient` implementing `LLMClient` with the task formats from
+- [x] `FermiClient` implementing `LLMClient` with the task formats from
       `docs/PROMPTS.md`.
-- [ ] Router per ADR-010: tellus classifies, solem plans and explains, up
+- [x] Router per ADR-010: tellus classifies, solem plans and explains, up
       to 5 solem attempts, one celeste escalation, tellus-only fallback.
-- [ ] Record the model used per stage on `Answer`.
-- [ ] Add the `fermi` provider to `Settings`; make it the default when
+- [x] Record the model used per stage on `Answer`.
+- [x] Add the `fermi` provider to `Settings`; make it the default when
       weights are installed, with a clear message when they aren't.
-- [ ] `askphysics ask --model` to force a specific Fermi model.
+- [x] `askphysics ask --model` to force a specific Fermi model.
 
 ### Distribution (ADR-012)
 - [ ] Export bf16 safetensors per model and a manifest (URL, size, sha256).

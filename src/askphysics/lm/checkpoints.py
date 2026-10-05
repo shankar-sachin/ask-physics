@@ -14,7 +14,6 @@ Layout of a model directory::
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import asdict
 from pathlib import Path
 
@@ -24,17 +23,17 @@ from safetensors.torch import load_file, save_file
 from askphysics.errors import ConfigError
 from askphysics.lm.config import FORMAT_VERSION, ModelConfig
 from askphysics.lm.model import FermiLM
+from askphysics.lm.paths import CONFIG_FILE, TOKENIZER_FILE, WEIGHTS_FILE, default_model_dir
 from askphysics.lm.tokenizer import Tokenizer
 
-WEIGHTS_FILE = "model.safetensors"
-CONFIG_FILE = "config.json"
-TOKENIZER_FILE = "tokenizer.json"
-
-
-def default_model_dir() -> Path:
-    """Installed models root: ``$ASKPHYSICS_MODEL_DIR``, else ``~/.cache/askphysics/models``."""
-    override = os.environ.get("ASKPHYSICS_MODEL_DIR")
-    return Path(override) if override else Path.home() / ".cache" / "askphysics" / "models"
+__all__ = [
+    "CONFIG_FILE",
+    "TOKENIZER_FILE",
+    "WEIGHTS_FILE",
+    "default_model_dir",
+    "load_model",
+    "save_model",
+]
 
 
 def _config_json(config: ModelConfig) -> str:

@@ -163,10 +163,16 @@ askphysics model train --model fermi-luna-1 --steps 1000
 askphysics model info
 ```
 
-`FakeLLMClient` only has a canned plan for "dropped from a height" questions,
-on purpose. Ask it anything else and the pipeline tells you exactly which
-stage it couldn't complete, instead of making something up. The Fermi models
-take over in v0.3.
+Once a model is trained, `askphysics ask` uses it automatically: tellus
+classifies, solem plans and explains, a failed plan is retried up to 5 times,
+and celeste gets one more try (ADR-010). The answer card says which model did
+what. `--model fermi-tellus-1` forces one model for everything, and
+`--llm fake` goes back to the fake client.
+
+With no models installed, `ask` uses `FakeLLMClient`, which only has a canned
+plan for "dropped from a height" questions, on purpose. Ask it anything else
+and the pipeline tells you exactly which stage it couldn't complete, instead
+of making something up.
 
 ## Project status: v0.2 released, v0.3 next
 
@@ -181,7 +187,8 @@ take over in v0.3.
 | Confidence scoring (crude, documented formula) | Works |
 | Eval set (8 questions) with a validating loader | Works |
 | Fermi models: tokenizer, transformer, constrained decoding, data factory, training | Works |
-| Fermi models trained and answering in the CLI | v0.3 |
+| Fermi models answering in the CLI (router: tellus, solem, celeste) | Works with locally trained weights |
+| Downloadable trained weights (`model pull`) | v0.3 |
 | Multi-equation chaining | Stub until v0.4 |
 | Eval scoring and runner | Stub until v0.5 |
 | Vector and hybrid retrieval | Stub until v0.6 |

@@ -59,6 +59,8 @@ _UNIT_ALIASES = {"meter": "m", "meters": "m", "metre": "m", "metres": "m", "feet
 class FakeLLMClient:
     """Deterministic ``LLMClient``. Records every call in ``calls`` for test inspection."""
 
+    name = "fake"
+
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
 

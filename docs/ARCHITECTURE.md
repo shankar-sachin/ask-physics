@@ -50,7 +50,8 @@ and celeste gets one escalation shot (ADR-010).
 | `errors.py` | Exception taxonomy rooted at `AskPhysicsError` | stdlib |
 | `llm/base.py` | `LLMClient` protocol | `models` |
 | `llm/fake.py` | `FakeLLMClient`: deterministic canned responses for tests and demos | `models` |
-| `llm/fermi_client.py` (v0.3) | `FermiClient`: routes tasks across tellus, solem, celeste | `lm` |
+| `llm/routing.py` | Which installed model handles each stage (ADR-010), without loading weights | stdlib |
+| `llm/fermi_client.py` | `FermiClient`: one Fermi model behind `LLMClient`, using the constrained decoders; `build_roster` makes the per-stage clients | `lm`, torch |
 | `lm/` (v0.2) | The Fermi models: config, tokenizer, transformer, constrained decoding, data factory, training | torch, safetensors |
 | `normalize.py` (v0.3) | Rewrites real-world quantity spellings (commas, powers of ten, superscripts, middle dots, "per", µ, Ω) into canonical forms when a question enters the pipeline | Pint (unit check) |
 | `retrieval/base.py` | `Retriever` and `VectorStore` protocols | `models` |
@@ -183,7 +184,11 @@ class LLMClient(Protocol):
 
 `complete_json` returns a validated pydantic instance. `FermiClient`
 guarantees that with constrained decoding against the schema, then
-validates with pydantic anyway. **Swappable because** the fake client must
+validates with pydantic anyway. A `Roster` names the client for each stage:
+one classifier, one client per plan attempt, and an explainer. `Pipeline.run`
+tries the plan clients in order until Noether accepts a plan (it computes
+with the right dimensions), and records each stage's model on
+`Answer.models` and the number of plans tried on `Answer.plan_attempts`. **Swappable because** the fake client must
 be drop-in for fast tests, and the router swaps tellus, solem, and celeste
 behind the same two methods.
 

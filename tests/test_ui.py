@@ -102,3 +102,20 @@ def test_utf8_streams_stay_strict() -> None:
     stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
     tolerate_narrow_encodings(stream, object())
     assert stream.errors == "strict"
+
+
+def test_models_line_names_each_stage_and_retries() -> None:
+    from askphysics.ui import models_line
+
+    answer = Answer(
+        question="q",
+        status="degraded",
+        category="standard",
+        confidence=Confidence(label="low", score=0.0),
+        explanation="x",
+        models={"classify": "fermi-tellus-1", "plan": "fermi-celeste-1", "explain": "template"},
+        plan_attempts=6,
+    )
+    assert models_line(answer).plain == (
+        "tellus classified · celeste planned (attempt 6) · template explained"
+    )

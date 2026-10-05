@@ -13,8 +13,9 @@ the ``explanation`` prose.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore, load_all
@@ -23,8 +24,10 @@ from askphysics.errors import (
     PlanValidationError,
     RetrievalEmptyError,
 )
-from askphysics.llm.base import LLMClient
+from askphysics.llm.base import LLMClient, Roster, client_name
 from askphysics.llm.fake import FakeLLMClient
+from askphysics.llm.routing import can_route
+from askphysics.lm.paths import installed_models
 from askphysics.models import (
     Answer,
     Category,
@@ -82,8 +85,6 @@ def classify(question: Question, *, llm: LLMClient) -> Classification:
     Failure modes: false refusals, Fermi/standard confusion, malformed output.
     ``Pipeline.run`` falls back to ``standard`` if this raises.
     """
-    # TODO: Served by fermi-tellus-1 through FermiClient using the classify task format,
-    # with the format version recorded in the trace (v0.3, ADR-010).
     return llm.complete_json(
         system=CLASSIFY_SYSTEM_PROMPT,
         user=_payload(question=question.text),
@@ -121,18 +122,22 @@ def plan(
     classification: Classification,
     llm: LLMClient,
     data: DataStore,
+    attempt: int = 0,
 ) -> Plan:
     """Stage 3: ask the LLM for a structured plan, then validate it.
 
     The plan names equation ids and copies numbers with units. It never
-    contains expressions or computed values.
+    contains expressions or computed values. Plans decode greedily, so a retry
+    (``attempt`` above 0) rotates the order the retrieved equations are listed in,
+    which gives the model a different prompt (ADR-010).
 
     Raises:
         PlanValidationError: the plan fails ``validate_plan``.
         LLMError: the LLM could not produce a plan.
     """
-    # TODO: On PlanValidationError or a compute failure, the FermiClient router retries
-    # solem (up to 5 attempts), then escalates once to celeste (v0.3, ADR-010).
+    hits = list(retrieval.equations)
+    shift = attempt % len(hits) if hits else 0
+    hits = hits[shift:] + hits[:shift]
     user = _payload(
         question=question.text,
         classification=classification.model_dump(),
@@ -143,7 +148,7 @@ def plan(
                 "sympy_expr": hit.equation.sympy_expr,
                 "variables": [v.model_dump() for v in hit.equation.variables],
             }
-            for hit in retrieval.equations
+            for hit in hits
         ],
         examples=[
             {"id": hit.example.id, "problem_text": hit.example.problem_text}
@@ -303,6 +308,10 @@ def explain(
         category=classification.category,
     )
     equations = [data.equations[eid] for eid in p.equation_ids]
+    explained_by = client_name(llm)
+    # TODO: Check that every number in the explanation matches value within tolerance and
+    # fall back to the template on mismatch. The Fermi decoder already can't spell other
+    # numbers; this guards any other client (v0.3).
     try:
         explanation = llm.complete_text(
             system=EXPLAIN_SYSTEM_PROMPT,
@@ -316,8 +325,9 @@ def explain(
             ),
         )
     except AskPhysicsError:
-        # TODO: Check that every number in the LLM explanation matches value within
-        # tolerance and fall back to this template on mismatch (v0.3).
+        explanation = ""
+    if not explanation.strip():
+        explained_by = "template"
         explanation = f"Using {', '.join(p.equation_ids)}, {result.target} = {value} {result.unit}."
     return Answer(
         question=question.text,
@@ -331,6 +341,7 @@ def explain(
         confidence=confidence,
         caveats=caveats,
         explanation=explanation,
+        models={"explain": explained_by},
     )
 
 
@@ -384,22 +395,49 @@ def degraded(
 
 @dataclass
 class Pipeline:
-    """Runs the six stages with injected dependencies."""
+    """Runs the six stages with injected dependencies.
+
+    ``llm`` serves every stage unless a ``roster`` names a client per stage, which is how
+    the Fermi models are routed (ADR-010): one classifier, a list of plan attempts, and
+    an explainer.
+    """
 
     llm: LLMClient
     retriever: Retriever
     data: DataStore
     settings: Settings
+    roster: Roster | None = None
+
+    @property
+    def stages(self) -> Roster:
+        return self.roster or Roster.single(self.llm)
 
     @classmethod
     def from_settings(cls, settings: Settings, data: DataStore | None = None) -> Pipeline:
-        """Build a pipeline with the configured LLM provider and the keyword retriever."""
+        """Build a pipeline with the configured LLM provider and the keyword retriever.
+
+        ``auto`` uses the Fermi models when the router has one to use (tellus, solem,
+        celeste, or the forced ``settings.model``) and the fake client otherwise. Torch is
+        only imported when the Fermi models are used, so the website (Pyodide) never needs
+        it.
+
+        Raises:
+            ConfigError: ``fermi`` was asked for and no usable model is installed.
+        """
         store = data or load_all()
-        # TODO: Build a FermiClient (tellus classifies, solem plans, one escalation to
-        # celeste; ADR-010) when settings.llm_provider == "fermi" (v0.3).
-        llm: LLMClient = FakeLLMClient()
         retriever = KeywordRetriever(store.equations.values(), store.examples.values())
-        return cls(llm=llm, retriever=retriever, data=store, settings=settings)
+        provider = settings.llm_provider
+        if provider == "auto":
+            usable = can_route(installed_models(), settings.model)
+            provider = "fermi" if usable else "fake"
+        if provider == "fake":
+            return cls(llm=FakeLLMClient(), retriever=retriever, data=store, settings=settings)
+        from askphysics.llm.fermi_client import build_roster
+
+        roster = build_roster(settings, store)
+        return cls(
+            llm=roster.classify, retriever=retriever, data=store, settings=settings, roster=roster
+        )
 
     def run(self, text: str) -> Answer:
         """Answer one question. Expected failures become degraded answers, never exceptions.
@@ -408,10 +446,22 @@ class Pipeline:
         decoder reads), so every stage, and the answer card, see the same text.
         """
         question = Question(text=normalize_question(text))
+        stages = self.stages
         caveats: list[str] = []
+        models: dict[str, str] = {}
+
+        def finish(answer: Answer, attempts: int = 0) -> Answer:
+            return answer.model_copy(
+                update={
+                    "caveats": [*caveats, *answer.caveats],
+                    "models": {**models, **answer.models},
+                    "plan_attempts": attempts,
+                }
+            )
 
         try:
-            classification = classify(question, llm=self.llm)
+            classification = classify(question, llm=stages.classify)
+            models["classify"] = client_name(stages.classify)
         except AskPhysicsError as exc:
             classification = Classification(
                 category="standard", reasoning="Classifier unavailable; assumed standard."
@@ -419,26 +469,25 @@ class Pipeline:
             caveats.append(f"classify stage failed ({exc}); assumed a standard question")
 
         if classification.category == "out_of_scope":
-            return refuse(question, classification)
+            return finish(refuse(question, classification))
 
         try:
             retrieval = retrieve(
                 question, classification, self.settings.top_k, retriever=self.retriever
             )
         except AskPhysicsError as exc:
-            return degraded(question, classification, "retrieve", exc, caveats)
+            return finish(degraded(question, classification, "retrieve", exc))
 
-        try:
-            the_plan = plan(
-                question, retrieval, classification=classification, llm=self.llm, data=self.data
-            )
-        except AskPhysicsError as exc:
-            return degraded(question, classification, "plan", exc, caveats)
-
-        try:
-            result = compute(the_plan, data=self.data)
-        except (AskPhysicsError, NotImplementedError) as exc:
-            return degraded(question, classification, "compute", exc, caveats)
+        attempted = self._plan_and_compute(question, retrieval, classification, stages.plan)
+        if isinstance(attempted, _Failure):
+            if attempted.attempts > 1:
+                caveats.append(
+                    f"All {attempted.attempts} plan attempts failed; the last one is below."
+                )
+            failed = degraded(question, classification, attempted.stage, attempted.error)
+            return finish(failed, attempted.attempts)
+        the_plan, result, sanity, attempts, planner = attempted
+        models["plan"] = planner
 
         if classification.category == "fermi":
             try:
@@ -448,7 +497,6 @@ class Pipeline:
                     "Range propagation is not implemented yet (v0.7); point estimate only."
                 )
 
-        sanity = sanity_check(the_plan, result, data=self.data)
         answer = explain(
             question,
             the_plan,
@@ -456,9 +504,62 @@ class Pipeline:
             sanity,
             retrieval=retrieval,
             classification=classification,
-            llm=self.llm,
+            llm=stages.explain,
             data=self.data,
         )
-        if caveats:
-            answer = answer.model_copy(update={"caveats": [*caveats, *answer.caveats]})
-        return answer
+        return finish(answer, attempts)
+
+    def _plan_and_compute(
+        self,
+        question: Question,
+        retrieval: RetrievalResult,
+        classification: Classification,
+        planners: Sequence[LLMClient],
+    ) -> _Attempt | _Failure:
+        """Plan and compute, one planner per attempt, until Noether accepts a plan.
+
+        A plan is rejected when it fails validation, when compute fails, or when its
+        result has the wrong dimensions (ADR-010). If every attempt is rejected, the
+        first plan that computed at all is kept (its sanity report lowers confidence);
+        with none, the last failure becomes the degraded answer.
+        """
+        kept: _Attempt | None = None
+        failure = _Failure("plan", PlanValidationError("no plan attempts were made"), 0)
+        for attempt, planner in enumerate(planners):
+            try:
+                p = plan(
+                    question,
+                    retrieval,
+                    classification=classification,
+                    llm=planner,
+                    data=self.data,
+                    attempt=attempt,
+                )
+            except AskPhysicsError as exc:
+                failure = _Failure("plan", exc, attempt + 1)
+                continue
+            try:
+                result = compute(p, data=self.data)
+            except (AskPhysicsError, NotImplementedError) as exc:
+                failure = _Failure("compute", exc, attempt + 1)
+                continue
+            sanity = sanity_check(p, result, data=self.data)
+            done = _Attempt(p, result, sanity, attempt + 1, client_name(planner))
+            if sanity.dimensions_ok:
+                return done
+            kept = kept or done
+        return kept or failure
+
+
+class _Attempt(NamedTuple):
+    plan: Plan
+    result: ComputeResult
+    sanity: SanityReport
+    attempts: int  # plans tried, including this one
+    planner: str
+
+
+class _Failure(NamedTuple):
+    stage: str
+    error: BaseException
+    attempts: int

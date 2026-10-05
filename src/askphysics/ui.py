@@ -96,6 +96,23 @@ def _rows(rows: list[tuple[str, RenderableType]]) -> Table:
     return grid
 
 
+STAGE_VERBS = {"classify": "classified", "plan": "planned", "explain": "explained"}
+
+
+def models_line(answer: Answer) -> Text:
+    """Who did what: "tellus classified · solem planned (attempt 2) · solem explained"."""
+    parts = []
+    for stage, verb in STAGE_VERBS.items():
+        name = answer.models.get(stage)
+        if name is None:
+            continue
+        short = name.removeprefix("fermi-").removesuffix("-1")
+        if stage == "plan" and answer.plan_attempts > 1:
+            verb += f" (attempt {answer.plan_attempts})"
+        parts.append(f"{short} {verb}")
+    return Text(" · ".join(parts), style="muted")
+
+
 def answer_card(answer: Answer, equations: Mapping[str, Equation] | None = None) -> Panel:
     """The main ``ask`` output."""
     equations = equations or {}
@@ -154,6 +171,8 @@ def answer_card(answer: Answer, equations: Mapping[str, Equation] | None = None)
 
     if answer.assumptions:
         rows.append(("assumes", Text("\n".join(f"• {a}" for a in answer.assumptions))))
+    if answer.models:
+        rows.append(("models", models_line(answer)))
     if answer.caveats:
         rows.append(("caveats", Text("\n".join(f"• {c}" for c in answer.caveats), style="muted")))
 

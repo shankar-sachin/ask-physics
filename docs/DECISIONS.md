@@ -279,6 +279,22 @@ hosted website, they cap the cost.
 - The exact numbers (5 attempts, 1 escalation, the website limits) live in
   `Settings`, not in code.
 
+**Implementation (v0.3).** `llm/routing.py` picks the models from what is
+installed, without loading weights; `llm/fermi_client.py` wraps each one.
+- A plan is rejected when it fails validation, when Noether can't compute
+  it, or when the result has the wrong dimensions. If every attempt is
+  rejected, the first plan that computed at all is kept (its sanity report
+  lowers confidence); with none, the answer degrades.
+- Plans decode greedily, so a seed changes nothing. Each retry rotates the
+  order the retrieved equations are listed in, which changes the prompt.
+- The `auto` provider (the default) uses the Fermi models when tellus,
+  solem, or celeste is installed, and the fake client otherwise.
+  `fermi-luna-1` is only used when forced with `--model`. Torch is only
+  imported on the Fermi path, so the website (Pyodide) never needs it.
+- `Answer.models` maps each stage to its model (`"template"` when the
+  explanation fell back), and `Answer.plan_attempts` counts plans tried.
+  That count is the escalation statistic this ADR promises.
+
 ---
 
 ## ADR-011: Install channels: curl, irm, and a Homebrew tap

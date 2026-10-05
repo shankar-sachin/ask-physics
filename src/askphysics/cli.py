@@ -54,7 +54,11 @@ def ask(
     ] = False,
     llm: Annotated[
         str | None,
-        typer.Option(help="LLM provider: fake (default). The Fermi models arrive in v0.3."),
+        typer.Option(help="Provider: auto (Fermi models if installed, else fake), fermi, or fake."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(help="Force one Fermi model for every stage, e.g. fermi-tellus-1."),
     ] = None,
 ) -> None:
     """Answer a physics question."""
@@ -62,6 +66,8 @@ def ask(
         settings = Settings.from_env()
         if llm is not None:
             settings = replace(settings, llm_provider=cast(Provider, llm))
+        if model is not None:
+            settings = replace(settings, model=model)
         pipeline = Pipeline.from_settings(settings)
         if json_output:
             answer = pipeline.run(question)

@@ -13,8 +13,10 @@ from dataclasses import dataclass
 from typing import Literal, cast, get_args
 
 from askphysics.errors import ConfigError
+from askphysics.lm.config import PRESETS
 
-Provider = Literal["fake"]  # "fermi" joins once the Fermi models are wired in (v0.3)
+# auto: the Fermi models when any are installed, else the fake client (ADR-010).
+Provider = Literal["auto", "fake", "fermi"]
 
 ENV_PREFIX = "ASKPHYSICS_"
 
@@ -24,18 +26,25 @@ class Settings:
     """Pipeline settings.
 
     Attributes:
-        llm_provider: Which ``LLMClient`` to build. ``fake`` needs no weights.
-        model: Which Fermi model handles planning: fermi-tellus-1, fermi-solem-1,
-            or fermi-celeste-1 (ADR-009).
+        llm_provider: Which ``LLMClient`` to build. ``fake`` needs no weights, ``fermi``
+            needs installed models, and ``auto`` picks ``fermi`` when any are installed.
+        model: Force one Fermi model for every stage (``askphysics ask --model``). None
+            routes per ADR-010: tellus classifies, solem plans and explains.
         top_k: Number of equations retrieved per question.
         temperature: Sampling temperature for the explain stage. Classify and
             plan always decode greedily (ADR-009).
+        plan_attempts: Plans tried with the main planner before escalating (ADR-010).
+        escalations: Extra plan attempts by celeste after those, when it is installed.
+        device: Torch device for the Fermi models (mps, cuda, cpu); None picks the best.
     """
 
-    llm_provider: Provider = "fake"
-    model: str = "fermi-solem-1"
+    llm_provider: Provider = "auto"
+    model: str | None = None
     top_k: int = 5
     temperature: float = 0.0
+    plan_attempts: int = 5
+    escalations: int = 1
+    device: str | None = None
 
     def __post_init__(self) -> None:
         if self.llm_provider not in get_args(Provider):
@@ -44,6 +53,12 @@ class Settings:
             raise ConfigError(f"top_k must be at least 1, got {self.top_k}")
         if not 0.0 <= self.temperature <= 1.0:
             raise ConfigError(f"temperature must be between 0 and 1, got {self.temperature}")
+        if self.model is not None and self.model not in PRESETS:
+            raise ConfigError(f"unknown model {self.model!r}; choose from {', '.join(PRESETS)}")
+        if self.plan_attempts < 1:
+            raise ConfigError(f"plan_attempts must be at least 1, got {self.plan_attempts}")
+        if self.escalations < 0:
+            raise ConfigError(f"escalations can't be negative, got {self.escalations}")
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -70,4 +85,7 @@ class Settings:
             model=raw("model") or defaults.model,
             top_k=int(number("top_k", int, defaults.top_k)),
             temperature=number("temperature", float, defaults.temperature),
+            plan_attempts=int(number("plan_attempts", int, defaults.plan_attempts)),
+            escalations=int(number("escalations", int, defaults.escalations)),
+            device=raw("device") or defaults.device,
         )
