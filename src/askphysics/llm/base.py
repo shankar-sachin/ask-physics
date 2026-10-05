@@ -7,6 +7,7 @@ structured outputs, JSON mode, or parse-and-retry).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel
@@ -34,3 +35,25 @@ class LLMClient(Protocol):
             LLMError: the provider failed or refused.
         """
         ...
+
+
+@dataclass(frozen=True)
+class Roster:
+    """The client for each stage (ADR-010). ``plan`` has one client per attempt, in order.
+
+    The same client can appear several times: solem's five plan attempts are one model.
+    """
+
+    classify: LLMClient
+    plan: tuple[LLMClient, ...]
+    explain: LLMClient
+
+    @classmethod
+    def single(cls, llm: LLMClient) -> Roster:
+        """One client for everything, with one plan attempt (the fake client, tests)."""
+        return cls(classify=llm, plan=(llm,), explain=llm)
+
+
+def client_name(client: LLMClient) -> str:
+    """What an ``Answer`` records as the model behind a stage: ``fermi-solem-1``, ``fake``."""
+    return str(getattr(client, "name", type(client).__name__))

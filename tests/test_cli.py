@@ -69,3 +69,17 @@ def test_unknown_provider_exits_cleanly() -> None:
     result = runner.invoke(cli.app, ["ask", "--llm", "skynet", DEMO_QUESTION])
     assert result.exit_code == 1
     assert "unknown llm_provider" in result.output
+
+
+def test_ask_without_models_names_the_fix() -> None:
+    result = runner.invoke(cli.app, ["ask", "--llm", "fermi", DEMO_QUESTION])
+    assert result.exit_code == 1
+    assert "no Fermi models are installed" in result.output
+    result = runner.invoke(cli.app, ["ask", "--model", "gpt-5", DEMO_QUESTION])
+    assert result.exit_code == 1
+    assert "unknown model" in result.output
+
+
+def test_ask_card_shows_the_models() -> None:
+    result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
+    assert "fake classified · fake planned · fake explained" in result.output

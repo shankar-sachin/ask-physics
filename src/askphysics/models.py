@@ -259,6 +259,10 @@ class Answer(_Model):
     caveats: list[str] = Field(default_factory=list)
     explanation: str
     redirect: str | None = None
+    # Stage -> the model that handled it ("classify": "fermi-tellus-1"); ADR-010.
+    models: dict[str, str] = Field(default_factory=dict)
+    # Plans tried before this answer; above 1 means the router retried or escalated.
+    plan_attempts: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _value_has_unit(self) -> Answer:
