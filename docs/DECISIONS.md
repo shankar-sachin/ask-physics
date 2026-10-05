@@ -444,8 +444,11 @@ writes:
   eval (71.5% valid plans), whose misses wrote one speed into both v and v0
   or wrote v = 0 with "34 mph" sitting unused.
 
-- The only assumed filler is 0 ("from rest"); the data factory never
-  assumes anything else. And a variable a table constant can fill (g) is
+- The only assumed filler is 0 ("from rest"), and only for a variable whose
+  `typical_range` includes 0: a speed can start at rest, g and a mass can't
+  be zero (the fifth eval wrote g = 0). If no value is legal for a slot, the
+  decoder falls back to the loose rules and Noether degrades the answer.
+  The data factory never assumes anything else. And a variable a table constant can fill (g) is
   only the target when no open variable lacks such a fallback. Added after
   the fourth eval, where "lifting it 11 m took 11000 J, what is its mass?"
   was solved for g with an invented m = 1 kg.

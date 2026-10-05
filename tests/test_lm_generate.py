@@ -336,7 +336,20 @@ def test_a_constant_fillable_variable_is_not_the_target_when_another_is_open(
     assert target_options(pe, q, consts) == ["g"]
 
 
-def test_the_only_assumed_filler_is_zero(store: DataStore) -> None:
+def test_zero_is_only_assumed_inside_the_typical_range(store: DataStore) -> None:
+    consts = list(store.constants.values())
     pe = {v.symbol: v for v in store.equations["gravitational_pe"].variables}
-    options = known_value_options(pe["m"], "Lifting it 11 m took 11000 J.", [])
-    assert options == [ValueOption("0", "kg", "assumption")]  # never an invented 1 kg
+    q = "Lifting it 11 m took 11000 J."
+    assert known_value_options(pe["m"], q, consts) == []  # no 1 kg, no 0 kg
+    g = known_value_options(pe["g"], q, consts)
+    assert ValueOption("9.80665", "m/s^2", "constant") in g
+    assert not any(o.origin == "assumption" for o in g)  # g = 0 is not physics
+    kin = {v.symbol: v for v in store.equations["kin_v_at"].variables}
+    assert ValueOption("0", "m/s", "assumption") in known_value_options(kin["v0"], q, consts)
+
+
+def test_a_slot_with_no_legal_value_still_decodes(store: DataStore, tokenizer: Tokenizer) -> None:
+    eqs = [store.equations["gravitational_pe"]]
+    consts = list(store.constants.values())
+    plan = decode_plan(_decoder(tokenizer, 3), "How much energy is that?", "standard", eqs, consts)
+    assert plan.equation_ids == ["gravitational_pe"]

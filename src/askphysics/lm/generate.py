@@ -444,9 +444,10 @@ def known_value_options(
 
     A quantity written in the question with matching dimensions (its number and unit stay
     together), a table constant with matching dimensions, or an assumed 0 in the variable's
-    own unit ("dropped" means v0 = 0). A mass can never be filled with a speed,
-    and "570 pounds" can't turn into 570 kilograms. Noether still checks units later; this
-    only stops the model from writing values that could never be right.
+    own unit ("dropped" means v0 = 0), only where 0 is inside the variable's typical range:
+    a speed can start at rest, but g and a mass can't be zero. A mass can never be filled
+    with a speed, and "570 pounds" can't turn into 570 kilograms. Noether still checks
+    units later; this only stops the model from writing values that could never be right.
     """
     options: list[ValueOption] = []
 
@@ -460,8 +461,10 @@ def known_value_options(
     for c in constants:
         if _fits(c.unit, variable):
             add(ValueOption(format_number(c.value), c.unit, "constant"))
+    low, high = variable.typical_range or (1.0, 0.0)  # no range: assume nothing
     for number in FILLER_NUMBERS:
-        add(ValueOption(number, variable.unit, "assumption"))
+        if low <= float(number) <= high:
+            add(ValueOption(number, variable.unit, "assumption"))
     return options
 
 
@@ -583,13 +586,19 @@ def decode_plan(
     unused = question_quantities(question)
     for i, symbol in enumerate(to_fill):
         decoder.emit(("" if i == 0 else ", ") + f'{{"symbol": "{symbol}", "value": ')
-        if dimensional:
-            options = assignable_options(
+        options = (
+            assignable_options(
                 known_value_options(variables[symbol], question, constants),
                 variables[symbol],
                 unused,
                 [variables[s] for s in to_fill[i:]],
             )
+            if dimensional
+            else []
+        )
+        # Nothing fits (a mass with no mass stated and nothing to assume): fall back to the
+        # loose rules, and Noether's checks turn the plan into an honest degraded answer.
+        if options:
             value = decoder.choose(list(dict.fromkeys(o.number for o in options)), closer=", ")
             decoder.emit(', "unit": "')
             fitting = [o for o in options if o.number == value]
