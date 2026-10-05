@@ -58,6 +58,7 @@ class TrainConfig:
     log_every: int = 20
     seed: int = 0
     device: str | None = None
+    pad_multiple: int = 64  # batch widths come in a few fixed sizes (see make_batch)
 
 
 @dataclass
@@ -88,10 +89,23 @@ def tokenize_examples(
 
 
 def make_batch(
-    rows: Sequence[tuple[list[int], int]], pad_id: int, device: torch.device
+    rows: Sequence[tuple[list[int], int]],
+    pad_id: int,
+    device: torch.device,
+    *,
+    multiple: int = 1,
+    max_width: int | None = None,
 ) -> tuple[Tensor, Tensor]:
-    """Inputs and next-token labels; prompt and padding positions are ignored by the loss."""
+    """Inputs and next-token labels; prompt and padding positions are ignored by the loss.
+
+    The width is rounded up to ``multiple`` (capped at ``max_width``) so batches come in
+    a handful of shapes. On Apple GPUs (MPS) every new shape grows a per-shape cache, and
+    hundreds of distinct widths exhaust memory within a few hundred steps.
+    """
     width = max(len(ids) for ids, _ in rows) - 1
+    width = -(-width // multiple) * multiple
+    if max_width is not None:
+        width = max(min(width, max_width), max(len(ids) for ids, _ in rows) - 1)
     inputs = torch.full((len(rows), width), pad_id, dtype=torch.long)
     labels = torch.full((len(rows), width), IGNORE_INDEX, dtype=torch.long)
     for i, (ids, target_start) in enumerate(rows):
@@ -101,6 +115,14 @@ def make_batch(
         labels[i, :n] = seq[1:]
         labels[i, : target_start - 1] = IGNORE_INDEX  # only learn to write the target
     return inputs.to(device), labels.to(device)
+
+
+def _release_cached_memory(device: torch.device) -> None:
+    """Hand cached GPU buffers back to the system (MPS keeps them until asked)."""
+    if device.type == "mps":
+        torch.mps.empty_cache()
+    elif device.type == "cuda":
+        torch.cuda.empty_cache()
 
 
 def lr_at(step: int, cfg: TrainConfig) -> float:
@@ -158,7 +180,13 @@ def evaluate(
         rows = data.rows[b * cfg.batch_size : (b + 1) * cfg.batch_size]
         if not rows:
             break
-        inputs, labels = make_batch(rows, pad_id, device)
+        inputs, labels = make_batch(
+            rows,
+            pad_id,
+            device,
+            multiple=cfg.pad_multiple,
+            max_width=model.config.context_length,
+        )
         _, loss = model(inputs, labels)
         assert loss is not None
         losses.append(float(loss))
@@ -228,7 +256,13 @@ def train(
             cursor = 0
         rows = [train_set.rows[i] for i in order[cursor : cursor + cfg.batch_size]]
         cursor += cfg.batch_size
-        inputs, labels = make_batch(rows, tokenizer.pad_id, device)
+        inputs, labels = make_batch(
+            rows,
+            tokenizer.pad_id,
+            device,
+            multiple=cfg.pad_multiple,
+            max_width=config.context_length,
+        )
         for group in opt.param_groups:
             group["lr"] = lr_at(step, cfg)
         with torch.autocast(device.type, dtype=torch.bfloat16, enabled=use_autocast):
@@ -252,8 +286,10 @@ def train(
                     "val_loss": round(evaluate(model, val_set, cfg, tokenizer.pad_id, device), 4),
                 }
             )
+            _release_cached_memory(device)
         if done % cfg.checkpoint_every == 0 and done != cfg.steps:
             checkpoint(done)
+            _release_cached_memory(device)
 
     checkpoint(cfg.steps)
     summary = {"config": config.name, "train_examples": len(train_set),
