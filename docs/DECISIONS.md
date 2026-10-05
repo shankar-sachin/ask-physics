@@ -282,7 +282,10 @@ hosted website, they cap the cost.
 **Implementation (v0.3).** `llm/routing.py` picks the models from what is
 installed, without loading weights; `llm/fermi_client.py` wraps each one.
 - A plan is rejected when it fails validation, when Noether can't compute
-  it, or when the result has the wrong dimensions. If every attempt is
+  it, or when the result is impossible: the wrong dimensions, or negative
+  for a quantity that can't be (a mass, a resistance, a frequency, an
+  absolute temperature; `never_negative`). R1 = R - R2 with the givens in
+  the wrong equation gives a negative resistor, and the retry fixes it. If every attempt is
   rejected, the first plan that computed at all is kept (its sanity report
   lowers confidence); with none, the answer degrades.
 - Plans decode greedily, so a seed changes nothing. Each retry rotates the

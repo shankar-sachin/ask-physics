@@ -40,6 +40,7 @@ from askphysics.models import (
     Question,
     RetrievalResult,
     SanityReport,
+    Variable,
 )
 from askphysics.normalize import normalize_question
 from askphysics.retrieval.base import Retriever
@@ -64,6 +65,23 @@ EXPLAIN_SYSTEM_PROMPT = (
 )
 
 LIMIT_CASE_CAVEAT = "Limit-case checks are not implemented yet (v0.8)."
+# Quantities that are never negative, by name. A negative one means the plan put numbers in
+# the wrong slots: R1 = R - R2 with R2 > R, or a frequency from swapped speeds. Changes and
+# differences can be negative, and so can velocities, displacements, and lens distances.
+NEVER_NEGATIVE = (
+    "mass",
+    "resistance",
+    "capacitance",
+    "inductance",
+    "frequency",
+    "wavelength",
+    "period",
+    "radius",
+    "separation",
+    "speed",
+    "kinetic energy",
+    "temperature",
+)
 SIG_FIGS = 6
 
 
@@ -207,6 +225,16 @@ def compute(p: Plan, *, data: DataStore) -> ComputeResult:
 # --------------------------------------------------------------------------- 5. sanity_check
 
 
+def never_negative(variable: Variable) -> bool:
+    """Whether ``variable`` can't be negative: a mass or a resistance, not a change in one."""
+    name = variable.name.lower()
+    if "change" in name or "difference" in name:
+        return False
+    if "temperature" in name:
+        return variable.unit == "K"  # absolute temperature; degrees Celsius go negative
+    return any(word in name for word in NEVER_NEGATIVE)
+
+
 def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityReport:
     """Stage 5: dimension check and order-of-magnitude check.
 
@@ -230,6 +258,13 @@ def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityRe
         dimensions_ok = False
         issues.append(f"Result is in {result.unit}, expected units like {target_var.unit}")
 
+    sign_ok = not (never_negative(target_var) and result.value < 0)
+    if not sign_ok:
+        issues.append(
+            f"{result.target} = {result.value:.3g} {result.unit} is negative, but a "
+            f"{target_var.name} can't be: the givens are probably in the wrong slots"
+        )
+
     magnitude_ok: bool | None = None
     if target_var.typical_range is not None:
         low, high = target_var.typical_range
@@ -247,6 +282,7 @@ def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityRe
         magnitude_ok=magnitude_ok,
         limit_cases_checked=False,
         issues=issues,
+        sign_ok=sign_ok,
     )
 
 
@@ -268,6 +304,7 @@ def score_confidence(
     magnitude_ok: bool | None,
     n_assumptions: int,
     category: Category,
+    sign_ok: bool = True,
 ) -> Confidence:
     """The crude, documented confidence formula from ``PLAN.md`` section 7."""
     r = min(max(retrieval_score, 0.0), 1.0)
@@ -275,7 +312,7 @@ def score_confidence(
     s = {True: 1.0, None: 0.5, False: 0.0}[magnitude_ok]
     a = 1.0 / (1.0 + 0.25 * n_assumptions)
     score = 0.35 * r + 0.30 * d + 0.20 * s + 0.15 * a
-    if not dimensions_ok:
+    if not dimensions_ok or not sign_ok:
         score = min(score, 0.2)
     if category == "fermi":
         score = min(score, 0.6)
@@ -306,6 +343,7 @@ def explain(
         magnitude_ok=sanity.magnitude_ok,
         n_assumptions=len(p.assumptions),
         category=classification.category,
+        sign_ok=sanity.sign_ok,
     )
     equations = [data.equations[eid] for eid in p.equation_ids]
     explained_by = client_name(llm)
@@ -519,9 +557,10 @@ class Pipeline:
         """Plan and compute, one planner per attempt, until Noether accepts a plan.
 
         A plan is rejected when it fails validation, when compute fails, or when its
-        result has the wrong dimensions (ADR-010). If every attempt is rejected, the
-        first plan that computed at all is kept (its sanity report lowers confidence);
-        with none, the last failure becomes the degraded answer.
+        result is impossible: wrong dimensions, or negative where it can't be (ADR-010).
+        If every attempt is rejected, the first plan that computed at all is kept (its
+        sanity report lowers confidence); with none, the last failure becomes the degraded
+        answer.
         """
         kept: _Attempt | None = None
         failure = _Failure("plan", PlanValidationError("no plan attempts were made"), 0)
@@ -545,7 +584,7 @@ class Pipeline:
                 continue
             sanity = sanity_check(p, result, data=self.data)
             done = _Attempt(p, result, sanity, attempt + 1, client_name(planner))
-            if sanity.dimensions_ok:
+            if sanity.possible:
                 return done
             kept = kept or done
         return kept or failure

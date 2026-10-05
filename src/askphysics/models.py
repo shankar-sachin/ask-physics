@@ -224,10 +224,17 @@ class SanityReport(_Model):
     magnitude_ok: bool | None
     limit_cases_checked: bool = False
     issues: list[str] = Field(default_factory=list)
+    # False when the result is negative but the quantity can't be (a negative mass).
+    sign_ok: bool = True
 
     @property
     def passed(self) -> bool:
-        return self.dimensions_ok and self.magnitude_ok is not False
+        return self.dimensions_ok and self.sign_ok and self.magnitude_ok is not False
+
+    @property
+    def possible(self) -> bool:
+        """Whether the result could be physically right: dimensions and sign check out."""
+        return self.dimensions_ok and self.sign_ok
 
 
 class EquationRef(_Model):

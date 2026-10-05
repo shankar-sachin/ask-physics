@@ -8,6 +8,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `askphysics model eval` reports what `ask` would answer: the share right
+  after the router's retries, wrong but flagged, and confidently wrong
+  (wrong with every check passing), which is the number that has to stay
+  near zero. `--attempts` sets the retries.
+- A result that can't be negative (a mass, a resistance, a frequency, an
+  absolute temperature) but is fails the sanity check, caps confidence at
+  low, and makes the router try another plan.
 - `askphysics ask` answers with the Fermi models once any are installed
   (ADR-010). tellus classifies, solem plans and explains, a rejected plan is
   retried up to 5 times, and celeste gets one more try. Missing models are

@@ -21,6 +21,7 @@ from askphysics.pipeline import (
     Pipeline,
     check_limit_cases,
     compute,
+    never_negative,
     sanity_check,
     score_confidence,
     validate_plan,
@@ -237,3 +238,48 @@ def test_unchecked_magnitude_counts_half() -> None:
         category="standard",
     )
     assert checked.score - unchecked.score == pytest.approx(0.1, abs=0.01)
+
+
+# ------------------------------------------------------------------ impossible results
+
+
+@pytest.mark.parametrize(
+    ("equation", "symbol", "never"),
+    [
+        ("series_resistors", "R1", True),
+        ("newton_second_law", "m", True),
+        ("doppler_approaching", "f", True),
+        ("ideal_gas_law", "T", True),
+        ("kin_v_at", "v", False),  # velocities can point backward
+        ("thin_lens", "di", False),  # virtual images sit at negative distances
+    ],
+)
+def test_which_quantities_are_never_negative(
+    store: DataStore, equation: str, symbol: str, never: bool
+) -> None:
+    assert never_negative(store.equations[equation].variable(symbol)) is never
+
+
+def test_temperature_changes_can_be_negative(store: DataStore) -> None:
+    changes = [v for eq in store.equations.values() for v in eq.variables if v.symbol == "dT"]
+    assert changes and not any(never_negative(v) for v in changes)
+
+
+def test_a_negative_resistance_fails_the_sign_check(store: DataStore) -> None:
+    p = Plan.model_validate(
+        {
+            "equation_ids": ["series_resistors"],
+            "target": "R1",
+            "unknowns": ["R1"],
+            "known_values": [
+                {"symbol": "R", "value": 1.3, "unit": "ohm", "origin": "given"},
+                {"symbol": "R2", "value": 10.1, "unit": "ohm", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )
+    result = compute(p, data=store)
+    report = sanity_check(p, result, data=store)
+    assert not report.sign_ok and not report.possible and not report.passed
+    assert any("negative" in i for i in report.issues)

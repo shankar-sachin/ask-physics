@@ -107,6 +107,14 @@ askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a
   category and the share of plans that compute the right answer ("valid
   plan"). Failures print with what was expected; everything lands in
   `eval.json` next to the weights.
+- The eval also runs each plan through the router the way `askphysics ask`
+  does (`--attempts`, default 5: retry until Noether accepts a plan) and
+  sorts the answers three ways: right, wrong but flagged (degraded, or a
+  sanity check caught it, so the answer card says low confidence), and
+  **confidently wrong** (every check passed, the answer is still wrong).
+  Confidently wrong is the trust number: the target is at most 1 in 1,000.
+  Those cases print first, because each one is a hole a rule or more data
+  should close.
 - Send the `model info` table, `metrics.jsonl`, and the `model eval` table;
   they feed the model cards and the v0.3 exit criteria (90% valid plans on
   unseen templates).
