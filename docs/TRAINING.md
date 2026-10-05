@@ -91,6 +91,9 @@ askphysics model info             # params, size, last validation loss
   means the model is generalizing, not memorizing phrasings.
 - Watch for validation loss rising while training loss keeps falling: that's
   overfitting, and the answer is more varied data, not more steps.
+- Each evaluation logs `val_loss` plus `val_loss_classify`, `val_loss_plan`,
+  and `val_loss_explain`, so you can see which task is overfitting. The CLI
+  prints the final per-task numbers when training ends.
 - Send the `model info` table and `metrics.jsonl` from the model directory;
   they feed the model cards and the v0.3 exit criteria (90% valid plans on
   unseen templates).
