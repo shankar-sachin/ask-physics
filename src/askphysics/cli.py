@@ -225,11 +225,13 @@ def train_cmd(
     )
     console.print(head)
 
+    last_val: dict[str, Any] = {}
     with training_progress(console) as progress:
         task = progress.add_task(config.name, total=steps, loss="…", val="…", speed="")
 
         def show(entry: dict[str, Any]) -> None:
             if "val_loss" in entry:
+                last_val.update(entry)
                 progress.update(task, val=f"{entry['val_loss']:.3f}")
             else:
                 progress.update(
@@ -241,6 +243,13 @@ def train_cmd(
 
         train(config, Tokenizer.load(tokenizer), data, out_dir, cfg, resume=resume, on_log=show)
         progress.update(task, completed=steps)
+    by_task = [
+        f"{key.removeprefix('val_loss_')} {value:.3f}"
+        for key, value in last_val.items()
+        if key.startswith("val_loss_")
+    ]
+    if by_task:
+        console.print("  val loss by task: " + " · ".join(by_task), style="muted")
     console.print(f"[ok]✓[/] {config.name} saved to {safe(str(out_dir))}")
 
 

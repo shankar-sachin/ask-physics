@@ -23,6 +23,7 @@ from askphysics.lm.train import (
     tokenize_examples,
     train,
     train_tokenizer,
+    val_sample,
 )
 
 FAST = TrainConfig(
@@ -106,12 +107,37 @@ def test_luna_trains_and_loss_drops(dataset: Path, tokenizer: Tokenizer, tmp_pat
     metrics = train(LUNA, tokenizer, dataset, out, FAST)
     losses = [m["loss"] for m in metrics if "loss" in m]
     assert losses[-1] < losses[0] * 0.8
-    assert any("val_loss" in m for m in metrics)
+    evals = [m for m in metrics if "val_loss" in m]
+    assert evals
+    assert {"val_loss_classify", "val_loss_plan", "val_loss_explain"} <= evals[-1].keys()
     model, loaded_tok = load_model(out)
     assert model.num_parameters() == LUNA.num_parameters()
     assert loaded_tok.merges == tokenizer.merges
     summary = json.loads((out / "training_summary.json").read_text())
     assert summary["config"] == "fermi-luna-1"
+
+
+def test_val_sample_is_fixed_and_per_task(dataset: Path, tokenizer: Tokenizer) -> None:
+    val = tokenize_examples(read_examples(dataset / "val"), tokenizer, 1024)
+    a = val_sample(val, per_task=5, seed=1)
+    assert set(a) == {"classify", "plan", "explain"}
+    for task, sample in a.items():
+        assert 0 < len(sample) <= 5
+        assert set(sample.tasks) == {task}
+    assert {t: s.rows for t, s in a.items()} == {
+        t: s.rows for t, s in val_sample(val, per_task=5, seed=1).items()
+    }
+
+
+def test_fresh_run_starts_a_fresh_metrics_log(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    out = tmp_path / "luna"
+    out.mkdir()
+    (out / "metrics.jsonl").write_text('{"step": 850, "loss": 0.071}\n')
+    train(LUNA, tokenizer, dataset, out, TrainConfig(**{**FAST.__dict__, "steps": 10}))
+    steps = [json.loads(line)["step"] for line in (out / "metrics.jsonl").read_text().splitlines()]
+    assert steps and max(steps) == 10
 
 
 def test_resume_continues_from_the_checkpoint(
@@ -125,6 +151,8 @@ def test_resume_continues_from_the_checkpoint(
     metrics = train(LUNA, tokenizer, dataset, out, more, resume=True)
     assert min(m["step"] for m in metrics) > 10
     assert json.loads((out / STATE_FILE).read_text())["step"] == 20
+    logged = [json.loads(line)["step"] for line in (out / "metrics.jsonl").read_text().splitlines()]
+    assert min(logged) <= 10 < max(logged)  # resuming keeps the earlier log
 
 
 def test_optimizer_state_round_trips(tmp_path: Path) -> None:

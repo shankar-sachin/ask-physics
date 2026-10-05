@@ -63,9 +63,10 @@ class TrainConfig:
 
 @dataclass
 class TokenizedSet:
-    """Examples as (token ids, index of the first target token)."""
+    """Examples as (token ids, index of the first target token), with each one's task."""
 
     rows: list[tuple[list[int], int]] = field(default_factory=list)
+    tasks: list[str] = field(default_factory=list)
     skipped: int = 0
 
     def __len__(self) -> int:
@@ -85,7 +86,26 @@ def tokenize_examples(
             out.skipped += 1
             continue
         out.rows.append((ids, len(prompt)))
+        out.tasks.append(e.task)
     return out
+
+
+def val_sample(data: TokenizedSet, per_task: int, seed: int = 0) -> dict[str, TokenizedSet]:
+    """A fixed random sample of up to ``per_task`` validation rows for each task.
+
+    Shard order groups examples by worker, so the first rows of the split are not a fair
+    sample; shuffling once with a fixed seed keeps every evaluation comparable.
+    """
+    order = list(range(len(data)))
+    random.Random(seed).shuffle(order)
+    out: dict[str, TokenizedSet] = {}
+    for i in order:
+        task = data.tasks[i]
+        sample = out.setdefault(task, TokenizedSet())
+        if len(sample) < per_task:
+            sample.rows.append(data.rows[i])
+            sample.tasks.append(task)
+    return dict(sorted(out.items()))
 
 
 def make_batch(
@@ -175,7 +195,7 @@ def evaluate(
 ) -> float:
     """Mean target-token loss over the first ``eval_batches`` batches of ``data``."""
     model.eval()
-    losses = []
+    total, tokens = 0.0, 0
     for b in range(cfg.eval_batches):
         rows = data.rows[b * cfg.batch_size : (b + 1) * cfg.batch_size]
         if not rows:
@@ -189,9 +209,30 @@ def evaluate(
         )
         _, loss = model(inputs, labels)
         assert loss is not None
-        losses.append(float(loss))
+        n = int((labels != IGNORE_INDEX).sum())
+        total += float(loss) * n
+        tokens += n
     model.train()
-    return sum(losses) / len(losses) if losses else float("nan")
+    return total / tokens if tokens else float("nan")
+
+
+def evaluate_by_task(
+    model: FermiLM,
+    samples: dict[str, TokenizedSet],
+    cfg: TrainConfig,
+    pad_id: int,
+    device: torch.device,
+) -> dict[str, float]:
+    """``val_loss`` over every sample, plus ``val_loss_<task>`` for each task."""
+    out: dict[str, float] = {}
+    total, weight = 0.0, 0
+    for task, sample in samples.items():
+        loss = evaluate(model, sample, cfg, pad_id, device)
+        out[f"val_loss_{task}"] = round(loss, 4)
+        n = sum(len(ids) - start for ids, start in sample.rows)
+        total += loss * n
+        weight += n
+    return {"val_loss": round(total / weight, 4) if weight else float("nan"), **out}
 
 
 def train(
@@ -217,6 +258,7 @@ def train(
         read_examples(data_dir / "train"), tokenizer, config.context_length
     )
     val_set = tokenize_examples(read_examples(data_dir / "val"), tokenizer, config.context_length)
+    val_samples = val_sample(val_set, cfg.eval_batches * cfg.batch_size, cfg.seed)
     if not train_set.rows:
         raise ValueError(f"no training examples fit the context in {data_dir / 'train'}")
 
@@ -237,6 +279,8 @@ def train(
     cursor = (start * cfg.batch_size) % len(order)
     metrics: list[dict[str, Any]] = []
     out_dir.mkdir(parents=True, exist_ok=True)
+    if start == 0:
+        (out_dir / METRICS_FILE).unlink(missing_ok=True)  # a fresh run starts a fresh log
     tokens_seen, t0 = 0, time.perf_counter()
 
     def log(entry: dict[str, Any]) -> None:
@@ -279,13 +323,9 @@ def train(
             elapsed = time.perf_counter() - t0
             log({"step": done, "loss": round(float(loss.detach()), 4), "lr": lr_at(step, cfg),
                  "target_tokens_per_s": round(tokens_seen / elapsed, 1)})  # fmt: skip
-        if val_set.rows and (done % cfg.eval_every == 0 or done == cfg.steps):
-            log(
-                {
-                    "step": done,
-                    "val_loss": round(evaluate(model, val_set, cfg, tokenizer.pad_id, device), 4),
-                }
-            )
+        if val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
+            scores = evaluate_by_task(model, val_samples, cfg, tokenizer.pad_id, device)
+            log({"step": done, **scores})
             _release_cached_memory(device)
         if done % cfg.checkpoint_every == 0 and done != cfg.steps:
             checkpoint(done)
