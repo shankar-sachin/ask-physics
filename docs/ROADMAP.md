@@ -67,6 +67,10 @@ tested on `fermi-luna-1`, without needing a GPU.
 - Ship the trained weights (ADR-012): GitHub release assets pinned by a
   checksum manifest, `askphysics model pull`, the installers and Homebrew
   formula fetching tellus and solem, and celeste on first escalation.
+- The equation database grows from 12 to about 100 single-equation laws
+  across mechanics, rotation, gravitation, fluids, waves, thermodynamics,
+  electromagnetism, optics, and modern physics (pulled forward from v0.4),
+  each validated, solvable for every variable, and covered by the factory.
 - Real-phrasing data from OpenStax *Physics* (CC BY 4.0, ADR-016): an eval
   of real questions with project-written gold plans, plus its questions and
   prose in training.
@@ -92,8 +96,7 @@ tested on `fermi-luna-1`, without needing a GPU.
 **Deliverables**
 - Multi-equation chaining: dependency order over the plan's unknowns.
 - Offset units (Celsius, Fahrenheit) converted before substitution.
-- About 60 equations across mechanics, energy, E&M, and thermodynamics;
-  15+ worked examples.
+- 15+ worked examples (the equation expansion moved to v0.3).
 - Factory regenerated from the bigger database; models retrained.
 - **The Ask Physics Wiki**, one source with two homes:
   - Pages live in this repo under `docs/wiki/`: guides, FAQ, glossary, the

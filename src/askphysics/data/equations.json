@@ -224,5 +224,793 @@
     "source": "OpenStax University Physics Volume 2, Chapter 2 (reference; entry written by the project)",
     "license": "MIT",
     "confidence_in_entry": 0.99
+  },
+  {
+    "id": "avg_speed",
+    "name": "Average speed",
+    "latex": "v = \\frac{d}{t}",
+    "sympy_expr": "v = d/t",
+    "variables": [
+      {"symbol": "v", "name": "average speed", "unit": "m/s", "description": "Distance covered per unit time", "typical_range": [0.0, 1000.0]},
+      {"symbol": "d", "name": "distance", "unit": "m", "description": "Total distance traveled", "typical_range": [0.0, 100000.0]},
+      {"symbol": "t", "name": "time", "unit": "s", "description": "Time taken", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Speed is averaged over the whole trip"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "average speed", "speed", "distance", "time", "how fast", "how long", "trip"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "kin_x_avg_velocity",
+    "name": "Displacement from average velocity (constant acceleration)",
+    "latex": "x = \\frac{(v_0 + v) t}{2}",
+    "sympy_expr": "x = (v0 + v)*t/2",
+    "variables": [
+      {"symbol": "x", "name": "displacement", "unit": "m", "description": "Displacement during time t", "typical_range": [0.0, 100000.0]},
+      {"symbol": "v0", "name": "initial velocity", "unit": "m/s", "description": "Velocity at the start", "typical_range": [0.0, 1000.0]},
+      {"symbol": "v", "name": "final velocity", "unit": "m/s", "description": "Velocity at the end", "typical_range": [0.0, 1000.0]},
+      {"symbol": "t", "name": "time", "unit": "s", "description": "Elapsed time", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Acceleration is constant", "Motion is along a straight line"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "displacement", "distance", "average velocity", "braking", "stopping distance"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "vertical_launch_height",
+    "name": "Maximum height of a vertical launch",
+    "latex": "h = \\frac{v_0^2}{2 g}",
+    "sympy_expr": "h = v0**2/(2*g)",
+    "variables": [
+      {"symbol": "h", "name": "maximum height", "unit": "m", "description": "Peak height above the launch point", "typical_range": [0.0, 100000.0]},
+      {"symbol": "v0", "name": "launch speed", "unit": "m/s", "description": "Speed straight up at launch", "typical_range": [0.0, 1000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local acceleration due to gravity", "typical_range": [1.0, 30.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Launched straight up", "Air resistance is negligible", "Uniform gravitational field"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "thrown up", "straight up", "maximum height", "how high", "peak", "launch"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "vertical_launch_time",
+    "name": "Time to reach the peak of a vertical launch",
+    "latex": "t = \\frac{v_0}{g}",
+    "sympy_expr": "t = v0/g",
+    "variables": [
+      {"symbol": "t", "name": "time to peak", "unit": "s", "description": "Time from launch to the highest point", "typical_range": [0.0, 100000.0]},
+      {"symbol": "v0", "name": "launch speed", "unit": "m/s", "description": "Speed straight up at launch", "typical_range": [0.0, 1000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local acceleration due to gravity", "typical_range": [1.0, 30.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Launched straight up", "Air resistance is negligible", "Uniform gravitational field"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "thrown up", "straight up", "time to peak", "how long", "top", "hang time"],
+    "source": "OpenStax University Physics Volume 1, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "centripetal_acceleration",
+    "name": "Centripetal acceleration",
+    "latex": "a_c = \\frac{v^2}{r}",
+    "sympy_expr": "a = v**2/r",
+    "variables": [
+      {"symbol": "a", "name": "centripetal acceleration", "unit": "m/s^2", "description": "Acceleration toward the center of the circle", "typical_range": [0.0, 1000.0]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed along the circle", "typical_range": [0.0, 1000.0]},
+      {"symbol": "r", "name": "radius", "unit": "m", "description": "Radius of the circular path", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Uniform circular motion"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinematics", "circular motion", "centripetal", "curve", "turn", "radius", "loop", "orbit"],
+    "source": "OpenStax University Physics Volume 1, Chapter 4 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "tangential_speed",
+    "name": "Speed from angular velocity",
+    "latex": "v = \\omega r",
+    "sympy_expr": "v = omega*r",
+    "variables": [
+      {"symbol": "v", "name": "tangential speed", "unit": "m/s", "description": "Linear speed of a point on the rotating object", "typical_range": [0.0, 1000.0]},
+      {"symbol": "omega", "name": "angular velocity", "unit": "rad/s", "description": "Rate of rotation", "typical_range": [0.0, 10000.0]},
+      {"symbol": "r", "name": "radius", "unit": "m", "description": "Distance from the rotation axis", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Rigid rotation about a fixed axis"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["rotation", "angular velocity", "spinning", "wheel", "rim", "tangential speed", "radians per second"],
+    "source": "OpenStax University Physics Volume 1, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "period_frequency",
+    "name": "Period and frequency",
+    "latex": "T = \\frac{1}{f}",
+    "sympy_expr": "T = 1/f",
+    "variables": [
+      {"symbol": "T", "name": "period", "unit": "s", "description": "Time for one full cycle", "typical_range": [1e-09, 1000000000.0]},
+      {"symbol": "f", "name": "frequency", "unit": "Hz", "description": "Cycles per second", "typical_range": [1e-09, 1000000000000.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Motion repeats regularly"],
+    "validity_conditions": [],
+    "tags": ["period", "frequency", "cycles", "hertz", "oscillation", "per second", "repeat"],
+    "source": "OpenStax University Physics Volume 1, Chapter 15 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "angular_frequency",
+    "name": "Angular frequency",
+    "latex": "\\omega = 2 \\pi f",
+    "sympy_expr": "omega = 2*pi*f",
+    "variables": [
+      {"symbol": "omega", "name": "angular frequency", "unit": "rad/s", "description": "Rate of change of phase", "typical_range": [0.0, 10000000000000.0]},
+      {"symbol": "f", "name": "frequency", "unit": "Hz", "description": "Cycles per second", "typical_range": [0.0, 1000000000000.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Motion repeats regularly"],
+    "validity_conditions": [],
+    "tags": ["angular frequency", "frequency", "radians per second", "oscillation", "rotation rate"],
+    "source": "OpenStax University Physics Volume 1, Chapter 15 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "circular_speed_period",
+    "name": "Speed in uniform circular motion from the period",
+    "latex": "v = \\frac{2 \\pi r}{T}",
+    "sympy_expr": "v = 2*pi*r/T",
+    "variables": [
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed along the circle", "typical_range": [0.0, 1000.0]},
+      {"symbol": "r", "name": "radius", "unit": "m", "description": "Radius of the circle", "typical_range": [0.0, 100000.0]},
+      {"symbol": "T", "name": "period", "unit": "s", "description": "Time for one revolution", "typical_range": [1e-06, 1000000000.0]}
+    ],
+    "domain": "kinematics",
+    "assumptions": ["Uniform circular motion"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["circular motion", "period", "revolution", "orbit", "lap", "radius", "speed", "carousel"],
+    "source": "OpenStax University Physics Volume 1, Chapter 4 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "centripetal_force",
+    "name": "Centripetal force",
+    "latex": "F_c = \\frac{m v^2}{r}",
+    "sympy_expr": "F = m*v**2/r",
+    "variables": [
+      {"symbol": "F", "name": "centripetal force", "unit": "N", "description": "Net inward force needed for the circular path", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the moving object", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed along the circle", "typical_range": [0.0, 1000.0]},
+      {"symbol": "r", "name": "radius", "unit": "m", "description": "Radius of the circular path", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Uniform circular motion"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["dynamics", "circular motion", "centripetal force", "curve", "turn", "string", "swing", "orbit"],
+    "source": "OpenStax University Physics Volume 1, Chapter 6 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "hookes_law",
+    "name": "Hooke's law",
+    "latex": "F = k x",
+    "sympy_expr": "F = k*x",
+    "variables": [
+      {"symbol": "F", "name": "spring force", "unit": "N", "description": "Magnitude of the restoring force", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "k", "name": "spring constant", "unit": "N/m", "description": "Stiffness of the spring", "typical_range": [0.1, 10000000.0]},
+      {"symbol": "x", "name": "extension", "unit": "m", "description": "Stretch or compression from the natural length", "typical_range": [0.0, 100.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Ideal spring within its elastic limit"],
+    "validity_conditions": ["Small deformations only"],
+    "tags": ["spring", "hooke", "stretch", "compress", "spring constant", "elastic", "stiffness"],
+    "source": "OpenStax University Physics Volume 1, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "impulse",
+    "name": "Impulse",
+    "latex": "J = F t",
+    "sympy_expr": "J = F*t",
+    "variables": [
+      {"symbol": "J", "name": "impulse", "unit": "N*s", "description": "Change in momentum delivered by the force", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "F", "name": "average force", "unit": "N", "description": "Average force during the contact", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "t", "name": "contact time", "unit": "s", "description": "Duration of the force", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "momentum",
+    "assumptions": ["Force is averaged over the contact time"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["impulse", "collision", "hit", "kick", "contact time", "average force", "impact"],
+    "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "impulse_momentum",
+    "name": "Impulse-momentum theorem",
+    "latex": "F t = m v - m v_0",
+    "sympy_expr": "F*t = m*v - m*v0",
+    "variables": [
+      {"symbol": "F", "name": "average force", "unit": "N", "description": "Average net force during the interval", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "t", "name": "contact time", "unit": "s", "description": "Duration of the force", "typical_range": [0.0, 1000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the object", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "v", "name": "final velocity", "unit": "m/s", "description": "Velocity after the force acts", "typical_range": [0.0, 1000.0]},
+      {"symbol": "v0", "name": "initial velocity", "unit": "m/s", "description": "Velocity before the force acts", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "momentum",
+    "assumptions": ["Constant mass", "Motion along a single line"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["impulse", "momentum change", "collision", "force", "speed up", "slow down", "impact", "catch"],
+    "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "torque",
+    "name": "Torque from a perpendicular force",
+    "latex": "\\tau = r F",
+    "sympy_expr": "tau = r*F",
+    "variables": [
+      {"symbol": "tau", "name": "torque", "unit": "N*m", "description": "Turning effect of the force", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "r", "name": "lever arm", "unit": "m", "description": "Distance from the axis to where the force acts", "typical_range": [0.0, 1000.0]},
+      {"symbol": "F", "name": "force", "unit": "N", "description": "Force applied perpendicular to the lever arm", "typical_range": [0.0, 10000000.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Force is perpendicular to the lever arm"],
+    "validity_conditions": [],
+    "tags": ["torque", "wrench", "lever", "turning", "rotation", "door", "moment", "lever arm"],
+    "source": "OpenStax University Physics Volume 1, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "newton_second_rotation",
+    "name": "Newton's second law for rotation",
+    "latex": "\\tau = I \\alpha",
+    "sympy_expr": "tau = I*alpha",
+    "variables": [
+      {"symbol": "tau", "name": "net torque", "unit": "N*m", "description": "Net torque about the axis", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "I", "name": "moment of inertia", "unit": "kg*m^2", "description": "Rotational inertia about the axis", "typical_range": [1e-06, 1000000000.0]},
+      {"symbol": "alpha", "name": "angular acceleration", "unit": "rad/s^2", "description": "Rate of change of angular velocity", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Rigid body rotating about a fixed axis"],
+    "validity_conditions": [],
+    "tags": ["rotation", "torque", "angular acceleration", "moment of inertia", "spin up", "flywheel"],
+    "source": "OpenStax University Physics Volume 1, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "moment_of_inertia_point",
+    "name": "Moment of inertia of a point mass",
+    "latex": "I = m r^2",
+    "sympy_expr": "I = m*r**2",
+    "variables": [
+      {"symbol": "I", "name": "moment of inertia", "unit": "kg*m^2", "description": "Rotational inertia about the axis", "typical_range": [1e-06, 1000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the particle", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "r", "name": "radius", "unit": "m", "description": "Distance from the axis", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "dynamics",
+    "assumptions": ["Point mass (size small compared with r)"],
+    "validity_conditions": [],
+    "tags": ["moment of inertia", "rotational inertia", "point mass", "rotation", "radius"],
+    "source": "OpenStax University Physics Volume 1, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "work_constant_force",
+    "name": "Work done by a constant force",
+    "latex": "W = F d",
+    "sympy_expr": "W = F*d",
+    "variables": [
+      {"symbol": "W", "name": "work", "unit": "J", "description": "Energy transferred by the force", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "F", "name": "force", "unit": "N", "description": "Constant force along the displacement", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "d", "name": "distance", "unit": "m", "description": "Distance moved along the force", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Force is constant and parallel to the displacement"],
+    "validity_conditions": [],
+    "tags": ["work", "energy", "push", "pull", "force", "distance", "joules", "lift"],
+    "source": "OpenStax University Physics Volume 1, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "power_work_time",
+    "name": "Average power",
+    "latex": "P = \\frac{W}{t}",
+    "sympy_expr": "P = W/t",
+    "variables": [
+      {"symbol": "P", "name": "power", "unit": "W", "description": "Rate of doing work", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "W", "name": "work", "unit": "J", "description": "Work done or energy transferred", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "t", "name": "time", "unit": "s", "description": "Time taken", "typical_range": [0.0, 100000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Power is averaged over the time interval"],
+    "validity_conditions": [],
+    "tags": ["power", "watts", "work", "energy", "rate", "how long", "motor", "horsepower"],
+    "source": "OpenStax University Physics Volume 1, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "power_force_velocity",
+    "name": "Power from force and speed",
+    "latex": "P = F v",
+    "sympy_expr": "P = F*v",
+    "variables": [
+      {"symbol": "P", "name": "power", "unit": "W", "description": "Rate of doing work", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "F", "name": "force", "unit": "N", "description": "Force along the direction of motion", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed of the object", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Force is parallel to the velocity"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["power", "watts", "force", "speed", "engine", "towing", "drag"],
+    "source": "OpenStax University Physics Volume 1, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "spring_potential_energy",
+    "name": "Elastic potential energy of a spring",
+    "latex": "U = \\frac{1}{2} k x^2",
+    "sympy_expr": "U = k*x**2/2",
+    "variables": [
+      {"symbol": "U", "name": "elastic potential energy", "unit": "J", "description": "Energy stored in the spring", "typical_range": [0.0, 100000000.0]},
+      {"symbol": "k", "name": "spring constant", "unit": "N/m", "description": "Stiffness of the spring", "typical_range": [0.1, 10000000.0]},
+      {"symbol": "x", "name": "extension", "unit": "m", "description": "Stretch or compression from the natural length", "typical_range": [0.0, 100.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Ideal spring within its elastic limit"],
+    "validity_conditions": ["Small deformations only"],
+    "tags": ["spring", "elastic potential energy", "stored energy", "compress", "stretch", "launcher"],
+    "source": "OpenStax University Physics Volume 1, Chapter 8 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "rotational_kinetic_energy",
+    "name": "Rotational kinetic energy",
+    "latex": "K = \\frac{1}{2} I \\omega^2",
+    "sympy_expr": "K = I*omega**2/2",
+    "variables": [
+      {"symbol": "K", "name": "rotational kinetic energy", "unit": "J", "description": "Kinetic energy of the rotation", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "I", "name": "moment of inertia", "unit": "kg*m^2", "description": "Rotational inertia about the axis", "typical_range": [1e-06, 1000000000.0]},
+      {"symbol": "omega", "name": "angular velocity", "unit": "rad/s", "description": "Rate of rotation", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Rigid body rotating about a fixed axis"],
+    "validity_conditions": [],
+    "tags": ["rotation", "rotational kinetic energy", "flywheel", "spinning", "energy", "angular velocity"],
+    "source": "OpenStax University Physics Volume 1, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "work_energy_theorem",
+    "name": "Work-energy theorem",
+    "latex": "W = \\frac{1}{2} m v^2 - \\frac{1}{2} m v_0^2",
+    "sympy_expr": "W = m*v**2/2 - m*v0**2/2",
+    "variables": [
+      {"symbol": "W", "name": "net work", "unit": "J", "description": "Net work done on the object", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the object", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "v", "name": "final speed", "unit": "m/s", "description": "Speed after the work is done", "typical_range": [0.0, 1000.0]},
+      {"symbol": "v0", "name": "initial speed", "unit": "m/s", "description": "Speed before the work is done", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Point mass or pure translation"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["work", "energy", "kinetic energy", "speed up", "net work", "work-energy"],
+    "source": "OpenStax University Physics Volume 1, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "kinetic_energy_momentum",
+    "name": "Kinetic energy from momentum",
+    "latex": "K = \\frac{p^2}{2 m}",
+    "sympy_expr": "KE = p**2/(2*m)",
+    "variables": [
+      {"symbol": "KE", "name": "kinetic energy", "unit": "J", "description": "Energy of motion", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "p", "name": "momentum", "unit": "kg*m/s", "description": "Linear momentum", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the object", "typical_range": [0.001, 10000000.0]}
+    ],
+    "domain": "energy",
+    "assumptions": ["Point mass or pure translation"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinetic energy", "momentum", "energy", "mass"],
+    "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "angular_momentum",
+    "name": "Angular momentum of a rigid body",
+    "latex": "L = I \\omega",
+    "sympy_expr": "L = I*omega",
+    "variables": [
+      {"symbol": "L", "name": "angular momentum", "unit": "kg*m^2/s", "description": "Rotational momentum about the axis", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "I", "name": "moment of inertia", "unit": "kg*m^2", "description": "Rotational inertia about the axis", "typical_range": [1e-06, 1000000000.0]},
+      {"symbol": "omega", "name": "angular velocity", "unit": "rad/s", "description": "Rate of rotation", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "momentum",
+    "assumptions": ["Rigid body rotating about a fixed axis"],
+    "validity_conditions": [],
+    "tags": ["angular momentum", "rotation", "spin", "moment of inertia", "skater", "conservation"],
+    "source": "OpenStax University Physics Volume 1, Chapter 11 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "recoil",
+    "name": "Recoil from rest (momentum conservation)",
+    "latex": "m_1 v_1 = m_2 v_2",
+    "sympy_expr": "m1*v1 = m2*v2",
+    "variables": [
+      {"symbol": "m1", "name": "mass 1", "unit": "kg", "description": "Mass of the first piece", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "v1", "name": "velocity 1", "unit": "m/s", "description": "Speed of the first piece after separating", "typical_range": [0.0, 1000.0]},
+      {"symbol": "m2", "name": "mass 2", "unit": "kg", "description": "Mass of the second piece", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "v2", "name": "velocity 2", "unit": "m/s", "description": "Speed of the second piece after separating", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "momentum",
+    "assumptions": ["System starts at rest", "No external impulse", "Pieces move apart along one line"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["recoil", "explosion", "gun", "push apart", "momentum conservation", "skaters push off", "cannon"],
+    "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "surface_gravity",
+    "name": "Gravitational acceleration near a body",
+    "latex": "g = \\frac{G M}{r^2}",
+    "sympy_expr": "g = G*M/r**2",
+    "variables": [
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Acceleration due to gravity at distance r", "typical_range": [1e-12, 10000000000000.0]},
+      {"symbol": "G", "name": "gravitational constant", "unit": "m^3/(kg*s^2)", "description": "Newton's constant of gravitation", "typical_range": null},
+      {"symbol": "M", "name": "central mass", "unit": "kg", "description": "Mass of the central body", "typical_range": [1.0, 1e+32]},
+      {"symbol": "r", "name": "distance from center", "unit": "m", "description": "Distance from the body's center", "typical_range": [1.0, 10000000000000.0]}
+    ],
+    "domain": "gravitation",
+    "assumptions": ["Spherically symmetric body", "Outside the body"],
+    "validity_conditions": [],
+    "tags": ["gravitation", "surface gravity", "planet", "moon", "gravity", "free-fall acceleration"],
+    "source": "OpenStax University Physics Volume 1, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "orbital_speed",
+    "name": "Speed of a circular orbit",
+    "latex": "v = \\sqrt{\\frac{G M}{r}}",
+    "sympy_expr": "v = sqrt(G*M/r)",
+    "variables": [
+      {"symbol": "v", "name": "orbital speed", "unit": "m/s", "description": "Speed of the orbiting body", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "G", "name": "gravitational constant", "unit": "m^3/(kg*s^2)", "description": "Newton's constant of gravitation", "typical_range": null},
+      {"symbol": "M", "name": "central mass", "unit": "kg", "description": "Mass of the central body", "typical_range": [1.0, 1e+32]},
+      {"symbol": "r", "name": "orbital radius", "unit": "m", "description": "Distance from the central body's center", "typical_range": [1.0, 10000000000000.0]}
+    ],
+    "domain": "gravitation",
+    "assumptions": ["Circular orbit", "Orbiting body much lighter than the central body"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["orbit", "orbital speed", "satellite", "moon", "planet", "space station"],
+    "source": "OpenStax University Physics Volume 1, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "escape_velocity",
+    "name": "Escape speed",
+    "latex": "v_{esc} = \\sqrt{\\frac{2 G M}{r}}",
+    "sympy_expr": "v = sqrt(2*G*M/r)",
+    "variables": [
+      {"symbol": "v", "name": "escape speed", "unit": "m/s", "description": "Minimum launch speed to escape to infinity", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "G", "name": "gravitational constant", "unit": "m^3/(kg*s^2)", "description": "Newton's constant of gravitation", "typical_range": null},
+      {"symbol": "M", "name": "central mass", "unit": "kg", "description": "Mass of the central body", "typical_range": [1.0, 1e+32]},
+      {"symbol": "r", "name": "distance from center", "unit": "m", "description": "Launch distance from the body's center", "typical_range": [1.0, 10000000000000.0]}
+    ],
+    "domain": "gravitation",
+    "assumptions": ["No air resistance", "Non-rotating spherical body"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["escape velocity", "escape speed", "rocket", "launch", "planet", "black hole"],
+    "source": "OpenStax University Physics Volume 1, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "kepler_third_law",
+    "name": "Kepler's third law (circular orbit)",
+    "latex": "T^2 = \\frac{4 \\pi^2 r^3}{G M}",
+    "sympy_expr": "T**2 = 4*pi**2*r**3/(G*M)",
+    "variables": [
+      {"symbol": "T", "name": "orbital period", "unit": "s", "description": "Time for one orbit", "typical_range": [1.0, 1000000000000.0]},
+      {"symbol": "r", "name": "orbital radius", "unit": "m", "description": "Radius of the orbit", "typical_range": [1.0, 100000000000000.0]},
+      {"symbol": "G", "name": "gravitational constant", "unit": "m^3/(kg*s^2)", "description": "Newton's constant of gravitation", "typical_range": null},
+      {"symbol": "M", "name": "central mass", "unit": "kg", "description": "Mass of the central body", "typical_range": [1.0, 1e+32]}
+    ],
+    "domain": "gravitation",
+    "assumptions": ["Circular orbit", "Orbiting body much lighter than the central body"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kepler", "orbital period", "orbit", "year", "satellite", "planet", "how long to orbit"],
+    "source": "OpenStax University Physics Volume 1, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "gravitational_pe_universal",
+    "name": "Gravitational potential energy (magnitude, any distance)",
+    "latex": "|U| = \\frac{G M m}{r}",
+    "sympy_expr": "U = G*M*m/r",
+    "variables": [
+      {"symbol": "U", "name": "gravitational potential energy magnitude", "unit": "J", "description": "Magnitude of the (negative) potential energy", "typical_range": [0.0, 1e+40]},
+      {"symbol": "G", "name": "gravitational constant", "unit": "m^3/(kg*s^2)", "description": "Newton's constant of gravitation", "typical_range": null},
+      {"symbol": "M", "name": "central mass", "unit": "kg", "description": "Mass of the central body", "typical_range": [1.0, 1e+32]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the second body", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "r", "name": "separation", "unit": "m", "description": "Center-to-center distance", "typical_range": [1.0, 100000000000000.0]}
+    ],
+    "domain": "gravitation",
+    "assumptions": ["Point masses or spherically symmetric bodies", "Zero of energy at infinite separation"],
+    "validity_conditions": [],
+    "tags": ["gravitational potential energy", "binding energy", "orbit", "planet", "satellite"],
+    "source": "OpenStax University Physics Volume 1, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "density",
+    "name": "Density",
+    "latex": "\\rho = \\frac{m}{V}",
+    "sympy_expr": "rho = m/V",
+    "variables": [
+      {"symbol": "rho", "name": "density", "unit": "kg/m^3", "description": "Mass per unit volume", "typical_range": [0.01, 30000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the object", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "V", "name": "volume", "unit": "m^3", "description": "Volume of the object", "typical_range": [1e-09, 1000000000.0]}
+    ],
+    "domain": "fluids",
+    "assumptions": ["Uniform material"],
+    "validity_conditions": [],
+    "tags": ["density", "mass", "volume", "how heavy", "material", "kg per cubic meter"],
+    "source": "OpenStax University Physics Volume 1, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "pressure",
+    "name": "Pressure",
+    "latex": "P = \\frac{F}{A}",
+    "sympy_expr": "P = F/A",
+    "variables": [
+      {"symbol": "P", "name": "pressure", "unit": "Pa", "description": "Force per unit area", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "F", "name": "force", "unit": "N", "description": "Force perpendicular to the surface", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "A", "name": "area", "unit": "m^2", "description": "Area the force acts on", "typical_range": [1e-09, 1000000000.0]}
+    ],
+    "domain": "fluids",
+    "assumptions": ["Force spread evenly over the area"],
+    "validity_conditions": [],
+    "tags": ["pressure", "force", "area", "pascals", "stand", "heel", "press"],
+    "source": "OpenStax University Physics Volume 1, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "hydrostatic_pressure",
+    "name": "Pressure at depth (gauge)",
+    "latex": "P = \\rho g h",
+    "sympy_expr": "P = rho*g*h",
+    "variables": [
+      {"symbol": "P", "name": "gauge pressure", "unit": "Pa", "description": "Pressure above the surface pressure", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "rho", "name": "fluid density", "unit": "kg/m^3", "description": "Density of the fluid", "typical_range": [0.01, 30000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local acceleration due to gravity", "typical_range": [1.0, 30.0]},
+      {"symbol": "h", "name": "depth", "unit": "m", "description": "Depth below the surface", "typical_range": [0.0, 20000.0]}
+    ],
+    "domain": "fluids",
+    "assumptions": ["Incompressible fluid at rest", "Uniform gravitational field"],
+    "validity_conditions": [],
+    "tags": ["pressure", "depth", "underwater", "diver", "ocean", "fluid", "dam", "submarine"],
+    "source": "OpenStax University Physics Volume 1, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "buoyant_force",
+    "name": "Buoyant force (Archimedes' principle)",
+    "latex": "F_b = \\rho V g",
+    "sympy_expr": "Fb = rho*V*g",
+    "variables": [
+      {"symbol": "Fb", "name": "buoyant force", "unit": "N", "description": "Upward force from the displaced fluid", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "rho", "name": "fluid density", "unit": "kg/m^3", "description": "Density of the fluid", "typical_range": [0.01, 30000.0]},
+      {"symbol": "V", "name": "displaced volume", "unit": "m^3", "description": "Volume of fluid displaced", "typical_range": [1e-09, 10000000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local acceleration due to gravity", "typical_range": [1.0, 30.0]}
+    ],
+    "domain": "fluids",
+    "assumptions": ["Fluid at rest", "Uniform gravitational field"],
+    "validity_conditions": [],
+    "tags": ["buoyancy", "buoyant force", "archimedes", "float", "sink", "submerged", "boat"],
+    "source": "OpenStax University Physics Volume 1, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "continuity_equation",
+    "name": "Continuity equation",
+    "latex": "A_1 v_1 = A_2 v_2",
+    "sympy_expr": "A1*v1 = A2*v2",
+    "variables": [
+      {"symbol": "A1", "name": "area 1", "unit": "m^2", "description": "Cross-sectional area at the first point", "typical_range": [1e-09, 1000000.0]},
+      {"symbol": "v1", "name": "flow speed 1", "unit": "m/s", "description": "Flow speed at the first point", "typical_range": [0.0, 1000.0]},
+      {"symbol": "A2", "name": "area 2", "unit": "m^2", "description": "Cross-sectional area at the second point", "typical_range": [1e-09, 1000000.0]},
+      {"symbol": "v2", "name": "flow speed 2", "unit": "m/s", "description": "Flow speed at the second point", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "fluids",
+    "assumptions": ["Incompressible fluid", "Steady flow"],
+    "validity_conditions": [],
+    "tags": ["continuity", "pipe", "nozzle", "hose", "flow speed", "narrow", "cross-section"],
+    "source": "OpenStax University Physics Volume 1, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "volume_flow_rate",
+    "name": "Volume flow rate",
+    "latex": "Q = A v",
+    "sympy_expr": "Q = A*v",
+    "variables": [
+      {"symbol": "Q", "name": "flow rate", "unit": "m^3/s", "description": "Volume of fluid passing per second", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "A", "name": "area", "unit": "m^2", "description": "Cross-sectional area of the flow", "typical_range": [1e-09, 1000000.0]},
+      {"symbol": "v", "name": "flow speed", "unit": "m/s", "description": "Average flow speed", "typical_range": [0.0, 1000.0]}
+    ],
+    "domain": "fluids",
+    "assumptions": ["Incompressible fluid", "Uniform flow speed across the section"],
+    "validity_conditions": [],
+    "tags": ["flow rate", "pipe", "hose", "liters per second", "volume per second", "river"],
+    "source": "OpenStax University Physics Volume 1, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "spring_mass_period",
+    "name": "Period of a mass on a spring",
+    "latex": "T = 2 \\pi \\sqrt{\\frac{m}{k}}",
+    "sympy_expr": "T = 2*pi*sqrt(m/k)",
+    "variables": [
+      {"symbol": "T", "name": "period", "unit": "s", "description": "Time for one full oscillation", "typical_range": [1e-06, 1000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Oscillating mass", "typical_range": [0.001, 10000000.0]},
+      {"symbol": "k", "name": "spring constant", "unit": "N/m", "description": "Stiffness of the spring", "typical_range": [0.1, 10000000.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Ideal spring", "No friction or damping"],
+    "validity_conditions": ["Small oscillations within the elastic limit"],
+    "tags": ["oscillation", "spring", "period", "bounce", "mass on a spring", "simple harmonic motion"],
+    "source": "OpenStax University Physics Volume 1, Chapter 15 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "pendulum_period",
+    "name": "Period of a simple pendulum",
+    "latex": "T = 2 \\pi \\sqrt{\\frac{L}{g}}",
+    "sympy_expr": "T = 2*pi*sqrt(L/g)",
+    "variables": [
+      {"symbol": "T", "name": "period", "unit": "s", "description": "Time for one full swing back and forth", "typical_range": [0.001, 100000.0]},
+      {"symbol": "L", "name": "pendulum length", "unit": "m", "description": "Length from pivot to the bob's center", "typical_range": [0.001, 10000.0]},
+      {"symbol": "g", "name": "gravitational acceleration", "unit": "m/s^2", "description": "Local acceleration due to gravity", "typical_range": [1.0, 30.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Small swing angle", "Massless string, point bob", "No friction"],
+    "validity_conditions": ["Angles under about 15 degrees"],
+    "tags": ["pendulum", "period", "swing", "clock", "oscillation", "string length"],
+    "source": "OpenStax University Physics Volume 1, Chapter 15 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "wave_speed",
+    "name": "Wave speed",
+    "latex": "v = f \\lambda",
+    "sympy_expr": "v = f*lam",
+    "variables": [
+      {"symbol": "v", "name": "wave speed", "unit": "m/s", "description": "Speed the wave travels", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "f", "name": "frequency", "unit": "Hz", "description": "Wave frequency", "typical_range": [0.0, 1e+20]},
+      {"symbol": "lam", "name": "wavelength", "unit": "m", "description": "Distance between crests", "typical_range": [1e-15, 100000000.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Periodic wave"],
+    "validity_conditions": [],
+    "tags": ["wave", "wavelength", "frequency", "wave speed", "sound", "ocean wave", "radio"],
+    "source": "OpenStax University Physics Volume 1, Chapter 16 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "string_wave_speed",
+    "name": "Wave speed on a string",
+    "latex": "v = \\sqrt{\\frac{F_T}{\\mu}}",
+    "sympy_expr": "v = sqrt(FT/mu)",
+    "variables": [
+      {"symbol": "v", "name": "wave speed", "unit": "m/s", "description": "Speed of waves along the string", "typical_range": [0.0, 10000.0]},
+      {"symbol": "FT", "name": "tension", "unit": "N", "description": "Tension in the string", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "mu", "name": "linear density", "unit": "kg/m", "description": "Mass per unit length of the string", "typical_range": [1e-06, 100.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Perfectly flexible string", "Small amplitude"],
+    "validity_conditions": [],
+    "tags": ["string", "guitar", "tension", "wave speed", "linear density", "violin", "rope"],
+    "source": "OpenStax University Physics Volume 1, Chapter 16 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "string_fundamental",
+    "name": "Fundamental frequency of a string fixed at both ends",
+    "latex": "f_1 = \\frac{v}{2 L}",
+    "sympy_expr": "f = v/(2*L)",
+    "variables": [
+      {"symbol": "f", "name": "fundamental frequency", "unit": "Hz", "description": "Lowest standing-wave frequency", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "v", "name": "wave speed", "unit": "m/s", "description": "Speed of waves along the string", "typical_range": [0.0, 10000.0]},
+      {"symbol": "L", "name": "string length", "unit": "m", "description": "Length between the fixed ends", "typical_range": [0.001, 1000.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Both ends fixed", "Fundamental mode"],
+    "validity_conditions": [],
+    "tags": ["standing wave", "harmonic", "fundamental", "guitar string", "pitch", "note", "frequency"],
+    "source": "OpenStax University Physics Volume 1, Chapter 16 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "sound_intensity",
+    "name": "Intensity of a point source",
+    "latex": "I = \\frac{P}{4 \\pi r^2}",
+    "sympy_expr": "I = P/(4*pi*r**2)",
+    "variables": [
+      {"symbol": "I", "name": "intensity", "unit": "W/m^2", "description": "Power per unit area", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "P", "name": "source power", "unit": "W", "description": "Power emitted by the source", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "r", "name": "distance", "unit": "m", "description": "Distance from the source", "typical_range": [0.01, 10000000.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Source radiates equally in all directions", "No absorption or reflection"],
+    "validity_conditions": [],
+    "tags": ["intensity", "sound", "loudness", "speaker", "inverse square", "light bulb", "distance"],
+    "source": "OpenStax University Physics Volume 1, Chapter 17 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "doppler_approaching",
+    "name": "Doppler effect (source approaching a still observer)",
+    "latex": "f = f_s \\frac{v}{v - v_s}",
+    "sympy_expr": "f = fs*v/(v - vs)",
+    "variables": [
+      {"symbol": "f", "name": "observed frequency", "unit": "Hz", "description": "Frequency the observer hears", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "fs", "name": "source frequency", "unit": "Hz", "description": "Frequency the source emits", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "v", "name": "speed of sound", "unit": "m/s", "description": "Speed of sound in the medium", "typical_range": [100.0, 2000.0]},
+      {"symbol": "vs", "name": "source speed", "unit": "m/s", "description": "Speed of the source toward the observer", "typical_range": [0.0, 300.0]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Observer at rest", "Source moves straight toward the observer", "Still air"],
+    "validity_conditions": ["Source slower than sound"],
+    "tags": ["doppler", "siren", "ambulance", "pitch", "approaching", "train horn", "frequency shift"],
+    "source": "OpenStax University Physics Volume 1, Chapter 17 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.97
   }
 ]

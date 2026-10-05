@@ -1,15 +1,15 @@
 import pytest
 
 from askphysics.data.loader import DataStore
-from askphysics.errors import SolverError, UnitMismatchError
-from askphysics.models import Equation, Variable
+from askphysics.errors import AskPhysicsError, SolverError, UnitMismatchError
+from askphysics.models import Constant, Equation, Variable
 from askphysics.solver.symbolic import (
     check_dimensional_consistency,
     free_symbol_names,
     parse_equation,
     solve_for,
 )
-from askphysics.solver.units import quantity
+from askphysics.solver.units import check_dimensions, quantity
 
 
 def test_parse_equation_and_symbols() -> None:
@@ -128,3 +128,46 @@ def test_division_by_zero_is_a_solver_error(store: DataStore) -> None:
             "m",
             {"F": quantity(10, "N"), "a": quantity(0, "m/s^2")},
         )
+
+
+def test_every_equation_solves_for_every_variable(store: DataStore) -> None:
+    """Noether can solve each database equation for each of its non-constant variables."""
+    import math
+    import random
+
+    rng = random.Random(0)
+    constants = list(store.constants.values())
+
+    def table_constant(v: Variable) -> Constant | None:
+        if "constant" not in v.name:
+            return None
+        return next((c for c in constants if check_dimensions(quantity(1.0, c.unit), v.unit)), None)
+
+    def sample(v: Variable) -> float:
+        low, high = v.typical_range or (1.0, 100.0)
+        low = max(low, high * 1e-6, 1e-30)
+        return math.exp(rng.uniform(math.log(low), math.log(high)))
+
+    unsolvable = []
+    for eq in store.equations.values():
+        for target in eq.variables:
+            if table_constant(target) is not None:
+                continue
+            for _ in range(60):
+                knowns = {}
+                for v in eq.variables:
+                    if v.symbol == target.symbol:
+                        continue
+                    c = table_constant(v)
+                    knowns[v.symbol] = (
+                        quantity(c.value, c.unit) if c else quantity(sample(v), v.unit)
+                    )
+                try:
+                    value = float(solve_for(eq, target.symbol, knowns).value.magnitude)
+                except AskPhysicsError:
+                    continue
+                if math.isfinite(value) and value > 0:
+                    break
+            else:
+                unsolvable.append(f"{eq.id}:{target.symbol}")
+    assert not unsolvable

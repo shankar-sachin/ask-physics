@@ -41,7 +41,7 @@ Validation runs in two layers:
 | `latex` | str | yes | Display form only, never parsed |
 | `sympy_expr` | str | yes | Exactly one `=`; both sides parse with the restricted parser |
 | `variables` | list[Variable] | yes | One entry per free symbol in `sympy_expr` |
-| `domain` | str | yes | One of `kinematics`, `dynamics`, `energy`, `momentum`, `gravitation`, `electromagnetism`, `thermodynamics` |
+| `domain` | str | yes | One of `kinematics`, `dynamics`, `energy`, `momentum`, `gravitation`, `electromagnetism`, `thermodynamics`, `fluids`, `waves`, `optics`, `modern` |
 | `assumptions` | list[str] | yes | Physical idealizations baked into the formula |
 | `validity_conditions` | list[str] | yes | When the formula stops applying |
 | `tags` | list[str] | yes | Retrieval keywords; at least one |

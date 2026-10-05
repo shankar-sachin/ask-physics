@@ -59,6 +59,10 @@ DOMAINS = (
     "gravitation",
     "electromagnetism",
     "thermodynamics",
+    "fluids",
+    "waves",
+    "optics",
+    "modern",
 )
 ORIGINS = ("given", "constant", "assumption")
 
