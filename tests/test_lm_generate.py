@@ -29,6 +29,7 @@ from askphysics.lm.generate import (
     decode_explanation,
     decode_plan,
     encode_task,
+    equation_options,
     known_value_options,
     number_guard_ok,
     target_options,
@@ -264,6 +265,7 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
         consts = relevant_constants(eqs, [store.constants[c["name"]] for c in payload["constants"]])
         variables = {v.symbol: v for v in store.equations[gold.equation_ids[0]].variables}
         q = payload["question"]
+        assert gold.equation_ids[0] in equation_options(eqs, q), q
         assert gold.target in target_options(list(variables.values()), q, consts), q
         gold_by_symbol = {k.symbol: k for k in gold.known_values}
         order = [s for s in variables if s not in gold.unknowns]
@@ -364,3 +366,16 @@ def test_dimensionless_values_are_bare_numbers(store: DataStore) -> None:
     assert not any(o.number == "40" for o in mu)  # a number with a unit is never dimensionless
     q = "Sliding friction is 14 N under a 40 N normal force. What is the coefficient?"
     assert target_options(list(friction.values()), q, []) == ["mu"]
+
+
+def test_equations_need_room_for_every_stated_quantity(store: DataStore) -> None:
+    eqs = [store.equations["kinetic_energy"], store.equations["kinetic_energy_momentum"]]
+    q = "Something zipping along at 4.1 m/s carries 620 J of kinetic energy. What is its mass?"
+    assert equation_options(eqs, q) == ["kinetic_energy"]
+    # Two stated speeds don't fit KE = mv^2/2, which has one; nothing has room, so all stay.
+    assert equation_options(eqs, "From 3 m/s to 5 m/s with 10 J?") == [
+        "kinetic_energy",
+        "kinetic_energy_momentum",
+    ]
+    # Bare numbers are labels as often as values, so they never rule an equation out.
+    assert "kinetic_energy" in equation_options(eqs, "Ball 2 moves at 4 m/s with 8 J.")

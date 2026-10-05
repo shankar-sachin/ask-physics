@@ -457,6 +457,15 @@ writes:
   fill a friction coefficient, an efficiency, or a count; a number with a
   unit never can. Added with the dimensionless equations (v0.3).
 
+The first equation is constrained the same way (`equation_options`): it
+must have room for every quantity the question writes with a unit, meaning
+each one fits some variable and no dimensions are stated more often than
+the equation has variables of those dimensions. Without this, "a thing at
+4.1 m/s carries 620 J, what is its mass?" could pick KE = p²/2m, leave
+the speed unused, and assume p = 0. Bare numbers don't count, since "the
+resistance 2" is a label. If no retrieved equation has room, every one
+stays on offer.
+
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable
 would have it forced into the plan; the data factory never writes one, and

@@ -35,6 +35,7 @@ from askphysics.lm.formats import (
     plan_numbers,
     plan_prompt,
     plan_units,
+    question_quantities,
     relevant_constants,
     stated_quantities,
 )
@@ -521,6 +522,34 @@ def target_options(
     return [v.symbol for v in picked] or [v.symbol for v in free] or [v.symbol for v in variables]
 
 
+def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
+    """Ids a standard plan may start with: equations with room for every stated quantity.
+
+    Each quantity the question writes with a unit must fit a variable, and no dimensions may
+    be stated more often than the equation has variables of those dimensions. "A 620 J thing
+    moving at 4.1 m/s, what is its mass?" rules out KE = p^2/2m, which has nowhere to put the
+    speed (the model would otherwise assume p = 0). Bare numbers are left out because "the
+    resistance 2" is a label, not a value. Falls back to every id if nothing has room.
+    """
+    stated = question_quantities(question)
+
+    def same_dimensions(a: str, b: str) -> bool:
+        try:
+            return check_dimensions(quantity(1.0, a), b)
+        except AskPhysicsError:
+            return False
+
+    def has_room(eq: Equation) -> bool:
+        for _, unit in stated:
+            slots = sum(1 for v in eq.variables if _fits(unit, v))
+            same = sum(1 for _, other in stated if same_dimensions(other, unit))
+            if slots < same:
+                return False
+        return True
+
+    return [eq.id for eq in equations if has_room(eq)] or [eq.id for eq in equations]
+
+
 def decode_plan(
     decoder: Decoder,
     question: str,
@@ -547,7 +576,8 @@ def decode_plan(
 
     decoder.start(plan_prompt(question, category, equations, constants, fermi_used))
     decoder.emit('{"equation_ids": [')
-    chosen = [decoder.choose([f'"{i}"' for i in by_id], closer="]").strip('"')]
+    first = equation_options(equations, question) if dimensional else list(by_id)
+    chosen = [decoder.choose([f'"{i}"' for i in first], closer="]").strip('"')]
     while len(chosen) < min(MAX_EQUATIONS, len(by_id)):
         remaining = [i for i in by_id if i not in chosen]
         picked = decoder.choose(["]"] + [f', "{i}"' for i in remaining])
