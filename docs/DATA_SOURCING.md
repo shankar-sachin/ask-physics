@@ -97,7 +97,7 @@ the project, with a textbook cited as the `source` for verification, are
   No external model generates data (ADR-009).
 - **Cleaning effort:** low per item, but needs a pipeline: render a problem
   from templates and sampled values, solve it with `solve_for`, keep only
-  items the symbolic algebra machine solves with consistent units, then
+  items Noether solves with consistent units, then
   human spot-check 10% of each batch.
 - **Recommendation:** **v0.2 for Fermi model training data; v0.6 for worked
   examples in the database, after the solver handles chains (v0.4).**

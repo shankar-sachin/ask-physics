@@ -28,7 +28,7 @@ the LLM.
 
 **Constrained decoding.** Masking tokens during generation so a Fermi model can only emit schema-valid JSON, retrieved equation ids, numbers present in its input, and valid units. Makes hallucinated equations and invented numbers impossible by construction.
 
-**Data factory.** The code that generates Fermi model training data from the equation database and templates, with every standard example verified by the symbolic algebra machine.
+**Data factory.** The code that generates Fermi model training data from the equation database and templates, with every standard example verified by Noether.
 
 **Degraded answer.** An answer where a stage failed but the pipeline still
 returns something useful: what it tried, where it failed, and why.
@@ -69,6 +69,8 @@ an origin (`given`, `constant`, or `assumption`).
 **Limit-case test.** Checking that a formula behaves sensibly at extremes
 (as mass goes to 0, the force goes to 0). Planned for v0.8.
 
+**Noether.** Our math engine, named for Emmy Noether, who tied symmetries to conservation laws. Built on SymPy (rearranges and solves equations) and Pint (carries and checks units); we wrote the safe parser, unit-aware solving, sanity checks, and Fermi engine around them (`src/askphysics/solver/`). Does all the math; the models never do. Formerly called the symbolic algebra machine.
+
 **Order of magnitude.** The power of ten nearest a value. Fermi answers are
 graded on this (`|log10(a) - log10(e)| <= 1`).
 
@@ -96,8 +98,6 @@ question. Keyword-based in v0.1.
 
 **Sanity check.** Stage 5: dimension check, order-of-magnitude check against
 typical ranges, and (from v0.8) limit cases.
-
-**Symbolic algebra machine.** The compute layer: SymPy rearranges and solves equations, Pint carries and checks units. Does all the math.
 
 **SymPy.** The Python symbolic math library. Rearranges equations and
 evaluates solutions.

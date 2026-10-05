@@ -187,11 +187,11 @@ by ADR-013: an in-browser website ships early; the hosted API still waits.
 
 **Context.** Ask Physics needs a user-facing surface. A website reaches more
 people, but building one now would mean designing UI around an LLM layer and
-a symbolic algebra machine that are still stubs and will change shape.
+Noether that are still stubs and will change shape.
 
 **Decision.** The CLI (`askphysics ask`) is the only interface through v1.0.
 An optional API server stays in v0.9 as groundwork. A public website comes
-after v1.0, once the models and the symbolic algebra machine have passed the
+after v1.0, once the models and Noether have passed the
 release eval thresholds.
 
 **Consequences.**
@@ -222,7 +222,7 @@ Pro with 48 GB of unified memory.
   training plan in `docs/MODELS.md`.
 - Our own byte-level BPE tokenizer with single-digit tokens and task tokens.
 - Training data comes from a data factory in this repo, built from the
-  equation database and verified by the symbolic algebra machine. No
+  equation database and verified by Noether. No
   pretrained weights, no external models generating data.
 - **Constrained decoding** enforces the golden rules structurally: only
   retrieved equation ids, only numbers present in the input or tables, only
@@ -261,8 +261,7 @@ hosted website, they cap the cost.
 
 **Decision.** Both, each where it makes sense.
 - **CLI (v0.3): split and escalate.** tellus classifies every question.
-  solem plans and explains. If solem's plan fails validation, or the
-  symbolic algebra machine rejects it, solem retries up to 5 attempts in
+  solem plans and explains. If solem's plan fails validation, or Noether rejects it, solem retries up to 5 attempts in
   total (varying context order and seed). Then celeste gets one attempt.
   Then the answer degrades. Missing weights are skipped, and tellus alone
   can run every task.
@@ -389,3 +388,25 @@ program, not a mock-up.
 - Accounts stay unnecessary while all compute is on the visitor's device.
   They arrive with the hosted API after v1.0 (Q18), the first thing that
   costs us money per question.
+
+---
+
+## ADR-014: The math engine is called Noether
+
+**Status:** Accepted (v0.2.0), decided by the maintainer
+
+**Context.** "The symbolic algebra machine" was a mouthful, and it hid what
+we built: SymPy and Pint are libraries, but the restricted parser,
+unit-aware solving, root selection, sanity checks, and Fermi engine around
+them are ours.
+
+**Decision.** The math layer (`src/askphysics/solver/`) is named **Noether**,
+for Emmy Noether, whose theorem ties symmetries to conservation laws. The
+models read the question; Noether does the math. We keep building on SymPy
+and Pint rather than writing our own computer algebra: correctness is the
+project's core promise, and decades of SymPy users find bugs a homemade
+engine would ship.
+
+**Consequences.** Docs, the README, and the website say Noether. Module
+names stay as they are (`askphysics.solver`); the name is branding, not a
+code move.

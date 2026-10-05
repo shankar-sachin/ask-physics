@@ -3,7 +3,7 @@
 Ask Physics runs on its own language models, written and trained from
 scratch in this repo. No pretrained weights, no external APIs. They do the
 language work: classify the question, pick equations and copy values into a
-plan, and explain the result. The symbolic algebra machine (SymPy + Pint)
+plan, and explain the result. Noether (SymPy + Pint)
 does every piece of math. Decisions: ADR-009 (from scratch) and ADR-010
 (routing) in [`DECISIONS.md`](DECISIONS.md).
 
@@ -113,8 +113,7 @@ model:
 
 1. **Standard questions** from the equation database: for each equation and
    target symbol, sample values inside each variable's `typical_range`,
-   render through phrasing templates, and pair with the gold `Plan`. The
-   symbolic algebra machine solves every example; anything it can't solve is
+   render through phrasing templates, and pair with the gold `Plan`. Noether solves every example; anything it can't solve is
    dropped.
 2. **Fermi questions** from the assumptions table ("how many X to Y").
 3. **Out-of-scope questions** from category-error, unknowable, and non-physics

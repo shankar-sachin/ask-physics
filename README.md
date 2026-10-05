@@ -24,7 +24,7 @@ machine, and call no external APIs:
   `fermi-tellus-1` (~3M params), `fermi-solem-1` (~30M), and
   `fermi-celeste-1` (~120M). They read the question, pick the right
   equations, copy the values, and write the explanation. They never do math.
-- **The symbolic algebra machine**, built on SymPy and Pint, which solves the
+- **Noether**, our math engine (named for Emmy Noether), built on SymPy and Pint, which solves the
   equations and checks every unit.
 
 ## Meet the Fermi models
@@ -173,7 +173,7 @@ take over in v0.3.
 | Area | Status |
 |------|--------|
 | Six-stage pipeline with graceful degradation | Works |
-| Symbolic algebra machine: single-equation solve with units (SymPy + Pint) | Works |
+| Noether: single-equation solve with units (SymPy + Pint) | Works |
 | Dimensional consistency and order-of-magnitude sanity checks | Works |
 | Keyword retrieval over the equation database | Works |
 | Seed data with full validation: 12 equations, 4 examples, 8 constants, 8 Fermi assumptions | Works |

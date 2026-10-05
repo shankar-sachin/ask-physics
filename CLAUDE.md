@@ -7,8 +7,8 @@ Guidance for Claude Code sessions working on this repo.
 Ask Physics answers physics questions, from textbook to absurd, through a
 six-stage pipeline: classify, retrieve, plan, compute, sanity_check, explain.
 Language comes from our own from-scratch Fermi models (tellus ~3M, solem
-~30M, celeste ~120M; `docs/MODELS.md`); SymPy and Pint do all math and
-units. No external LLM APIs, ever (ADR-009). Many functions are still stubs
+~30M, celeste ~120M; `docs/MODELS.md`); Noether (our math engine on
+SymPy and Pint, `src/askphysics/solver/`) does all math and units. No external LLM APIs, ever (ADR-009). Many functions are still stubs
 that raise `NotImplementedError`.
 
 Read [`PLAN.md`](PLAN.md) first, then the relevant file in [`docs/`](docs/):
