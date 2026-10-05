@@ -30,6 +30,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   out-of-scope templates, and more varied explanations. 20,000 examples now
   hold about 16,800 distinct question shapes, up from 3,000, so models stop
   memorizing phrasings. Rebuild the dataset and tokenizer before training.
+- Every unknown is asked for about equally often: "find v0" went from 1 in
+  13 kinematics questions to 1 in 4, with new scenarios for starting speeds,
+  roofs, and cliffs. New look-alike questions pair "How much energy is in a
+  rumor?" style category errors with real Fermi questions about batteries
+  and lightning, so classification has to read the object, not the opening
+  words. Rebuild the dataset.
 - Training reports validation loss for each task (classify, plan, explain) as
   well as overall, on a fixed random sample of the validation split.
 

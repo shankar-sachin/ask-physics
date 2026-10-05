@@ -1,5 +1,6 @@
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -273,3 +274,23 @@ def test_load_blocklist(tmp_path: Path) -> None:
     path.write_text('- id: a\n  question: "Is this blocked?"\n  category: standard\n')
     assert load_blocklist(path) == ["Is this blocked?"]
     assert load_blocklist(tmp_path / "missing.yaml") == []
+
+
+def test_targets_are_balanced(store: DataStore) -> None:
+    factory = DataFactory(store, seed=9)
+    counts: dict[str, Counter[str]] = {}
+    for _ in range(1500):
+        p = factory.standard_problem()
+        if p is not None:
+            counts.setdefault(p.equation.id, Counter())[p.plan.target] += 1
+    kin = counts["kin_v_at"]
+    total = sum(kin.values())
+    assert set(kin) == {"v", "v0", "a", "t"}
+    assert min(kin.values()) / total > 0.15, kin  # "find v0" is not a rarity
+
+
+def test_out_of_scope_look_alikes_mirror_physics_phrasing() -> None:
+    oos = {t.text.split(" {")[0] for t, _, _ in tpl.OUT_OF_SCOPE}
+    fermi = {t.text.split(" {")[0] for t in tpl.FERMI}
+    assert "How much energy is stored in a" in fermi
+    assert {"How much does", "How much force does", "What is the momentum of"} <= oos
