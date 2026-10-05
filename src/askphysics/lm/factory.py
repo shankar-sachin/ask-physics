@@ -173,7 +173,8 @@ class DataFactory:
             number += ".0"
         spellings = tpl.UNIT_SPELLINGS.get(shown_unit)
         if spellings and not adjective and self.rng.random() < 0.3:
-            return number, self.rng.choice(spellings), f"{number} {self.rng.choice(spellings)}"
+            spelled = self.rng.choice(spellings)
+            return number, spelled, f"{number} {spelled}"
         gap = "" if self.rng.random() < 0.1 else " "
         return number, shown_unit, f"{number}{gap}{shown_unit}"
 

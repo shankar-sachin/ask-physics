@@ -24,6 +24,7 @@ from askphysics.lm.formats import (
     format_number,
     plan_numbers,
     plan_units,
+    question_quantities,
 )
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Plan
@@ -85,6 +86,16 @@ def test_plan_targets_are_decodable_and_correct(store: DataStore, examples: list
         eq = store.equations[plan.equation_ids[0]]
         knowns = {k.symbol: quantity(k.value, k.unit) for k in plan.known_values}
         assert solve_for(eq, plan.target, knowns).value.magnitude > 0
+
+
+def test_given_values_are_written_in_the_question(examples: list[Example]) -> None:
+    for e in (x for x in examples if x.task == "plan"):
+        question = _payload(e.prompt, PLAN)["question"]
+        written = set(question_quantities(question))
+        plan = Plan.model_validate(json.loads(e.target[: -len(END)]))
+        for k in plan.known_values:
+            if k.origin == "given":
+                assert (format_number(k.value), k.unit) in written, (question, k)
 
 
 def test_classify_targets(examples: list[Example]) -> None:

@@ -24,7 +24,9 @@ token sequences.
    `equation_ids` list with the reason in `strategy`.
 3. **No invented numbers.** Constrained decoding only allows numbers that
    appear in the question, the constants table, or the Fermi assumptions
-   table. The model cannot compute a new number even if it wanted to.
+   table. The model cannot compute a new number even if it wanted to. In
+   standard plans a number also keeps the unit written after it and must
+   fit its variable's dimensions (ADR-015): a speed can't fill a momentum.
 4. **No arithmetic.** The model copies; Noether computes.
 5. **No expressions.** Plans contain ids and numbers, never formulas.
 6. **Greedy where it matters.** Classify and plan always decode greedily, so

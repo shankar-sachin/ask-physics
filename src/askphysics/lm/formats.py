@@ -62,6 +62,20 @@ def extract_units(text: str) -> list[str]:
     return out
 
 
+def question_quantities(text: str) -> list[tuple[str, str]]:
+    """Every number written with a unit in ``text``: (canonical number, unit as written).
+
+    In order of appearance, repeats kept, so "5 kg and 5 kg" counts two masses.
+    """
+    out: list[tuple[str, str]] = []
+    for match in _UNIT_AFTER_NUMBER.finditer(text):
+        unit = match.group(1)
+        if is_valid_unit(unit):
+            number = match.group()[: match.start(1) - match.start()].strip()
+            out.append((format_number(float(number)), unit))
+    return out
+
+
 def _unique(items: Iterable[str]) -> list[str]:
     seen: list[str] = []
     for item in items:

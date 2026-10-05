@@ -25,20 +25,31 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from askphysics.errors import LLMError
+from askphysics.errors import AskPhysicsError, LLMError
 from askphysics.lm.formats import (
+    STRUCTURAL_NUMBERS,
     classify_prompt,
     explain_numbers,
     explain_prompt,
     extract_numbers,
+    format_number,
     plan_numbers,
     plan_prompt,
     plan_units,
+    question_quantities,
     relevant_constants,
 )
 from askphysics.lm.model import FermiLM, KVCache
 from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer, pretokenize
-from askphysics.models import Classification, Constant, Equation, FermiAssumption, Plan
+from askphysics.models import (
+    Classification,
+    Constant,
+    Equation,
+    FermiAssumption,
+    Plan,
+    Variable,
+)
+from askphysics.solver.units import check_dimensions, quantity
 
 CATEGORIES = ("standard", "fermi", "out_of_scope")
 DOMAINS = (
@@ -395,6 +406,79 @@ def decode_classification(decoder: Decoder, question: str) -> Classification:
     )
 
 
+def _fits(unit: str, variable: Variable) -> bool:
+    """Whether a quantity in ``unit`` can fill ``variable`` (same dimensions)."""
+    try:
+        return check_dimensions(quantity(1.0, unit), variable.unit)
+    except AskPhysicsError:
+        return False
+
+
+def _table_constant(variable: Variable, constants: Sequence[Constant]) -> Constant | None:
+    """The table constant a variable stands for (``G``, ``R``), as the data factory decides."""
+    if "constant" not in variable.name:
+        return None
+    return next((c for c in constants if _fits(c.unit, variable)), None)
+
+
+@dataclass(frozen=True)
+class ValueOption:
+    """A legal (number, unit, origin) for one known value in a plan."""
+
+    number: str
+    unit: str
+    origin: str
+
+
+def known_value_options(
+    variable: Variable, question: str, constants: Sequence[Constant]
+) -> list[ValueOption]:
+    """What a standard plan may write for ``variable``.
+
+    A quantity written in the question with matching dimensions (its number and unit stay
+    together), a table constant with matching dimensions, or a structural 0 or 1 in the
+    variable's own unit ("dropped" means v0 = 0). A mass can never be filled with a speed,
+    and "570 pounds" can't turn into 570 kilograms. Noether still checks units later; this
+    only stops the model from writing values that could never be right.
+    """
+    options: list[ValueOption] = []
+
+    def add(option: ValueOption) -> None:
+        if option not in options:
+            options.append(option)
+
+    for number, unit in question_quantities(question):
+        if _fits(unit, variable):
+            add(ValueOption(number, unit, "given"))
+    for c in constants:
+        if _fits(c.unit, variable):
+            add(ValueOption(format_number(c.value), c.unit, "constant"))
+    for number in STRUCTURAL_NUMBERS:
+        add(ValueOption(number, variable.unit, "assumption"))
+    return options
+
+
+def target_options(
+    variables: Sequence[Variable], question: str, constants: Sequence[Constant]
+) -> list[str]:
+    """Symbols a standard plan may solve for: ones the question doesn't already give.
+
+    A variable is a candidate when the question states fewer quantities of its dimensions
+    than the equations have variables of those dimensions. "Given a force, two masses,
+    find..." leaves only the distance. Table constants are never targets. Falls back to
+    every non-constant symbol if the count rules them all out.
+    """
+    free = [v for v in variables if _table_constant(v, constants) is None]
+    given = question_quantities(question)
+    out = []
+    for v in free:
+        slots = sum(1 for other in free if _fits(other.unit, v))
+        stated = sum(1 for _, unit in given if _fits(unit, v))
+        if stated < slots:
+            out.append(v.symbol)
+    return out or [v.symbol for v in free] or [v.symbol for v in variables]
+
+
 def decode_plan(
     decoder: Decoder,
     question: str,
@@ -403,7 +487,12 @@ def decode_plan(
     constants: Sequence[Constant],
     fermi: Sequence[FermiAssumption] = (),
 ) -> Plan:
-    """Write a plan that can only cite ``equations`` and numbers present in the input."""
+    """Write a plan that can only cite ``equations`` and numbers present in the input.
+
+    Standard plans are also dimension-checked as they are written: the target must be a
+    variable the question leaves open, and each known value must be a quantity whose units
+    fit its variable (``target_options``, ``known_value_options``).
+    """
     if not equations:
         raise LLMError("no retrieved equations to plan with")
     fermi_used = fermi if category == "fermi" else ()
@@ -411,6 +500,7 @@ def decode_plan(
     numbers = plan_numbers(question, constants, fermi_used)
     units = plan_units(question, equations, constants, fermi_used)
     by_id = {eq.id: eq for eq in equations}
+    dimensional = category == "standard"
 
     decoder.start(plan_prompt(question, category, equations, constants, fermi_used))
     decoder.emit('{"equation_ids": [')
@@ -424,12 +514,17 @@ def decode_plan(
     else:
         decoder.emit("]")
 
-    symbols: list[str] = []
+    variables: dict[str, Variable] = {}
     for eid in chosen:
-        symbols += [v.symbol for v in by_id[eid].variables if v.symbol not in symbols]
+        for v in by_id[eid].variables:
+            variables.setdefault(v.symbol, v)
+    symbols = list(variables)
 
     decoder.emit(', "target": "')
-    target = decoder.choose(symbols, closer='"')
+    targets = (
+        target_options(list(variables.values()), question, constants) if dimensional else symbols
+    )
+    target = decoder.choose(targets, closer='"')
     decoder.emit(f'", "unknowns": ["{target}"')
     unknowns = [target]
     while True:
@@ -446,11 +541,20 @@ def decode_plan(
     knowns = []
     for i, symbol in enumerate(s for s in symbols if s not in unknowns):
         decoder.emit(("" if i == 0 else ", ") + f'{{"symbol": "{symbol}", "value": ')
-        value = decoder.choose(numbers, closer=", ")
-        decoder.emit(', "unit": "')
-        unit = decoder.choose(units, closer='"')
+        if dimensional:
+            options = known_value_options(variables[symbol], question, constants)
+            value = decoder.choose(list(dict.fromkeys(o.number for o in options)), closer=", ")
+            decoder.emit(', "unit": "')
+            fitting = [o for o in options if o.number == value]
+            unit = decoder.choose(list(dict.fromkeys(o.unit for o in fitting)), closer='"')
+            origins = [o.origin for o in fitting if o.unit == unit]
+        else:
+            value = decoder.choose(numbers, closer=", ")
+            decoder.emit(', "unit": "')
+            unit = decoder.choose(units, closer='"')
+            origins = list(ORIGINS)
         decoder.emit('", "origin": "')
-        origin = decoder.choose(ORIGINS, closer='"')
+        origin = decoder.choose(list(dict.fromkeys(origins)), closer='"')
         decoder.emit('"}')
         knowns.append({"symbol": symbol, "value": float(value), "unit": unit, "origin": origin})
     decoder.emit('], "assumptions": [')
@@ -503,9 +607,12 @@ def decode_explanation(
 
 __all__ = [
     "Decoder",
+    "ValueOption",
     "decode_classification",
     "decode_explanation",
     "decode_plan",
     "encode_task",
+    "known_value_options",
     "number_guard_ok",
+    "target_options",
 ]
