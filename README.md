@@ -244,5 +244,6 @@ Being straight about what this is right now:
 
 ## License
 
-[MIT](LICENSE). Data entries carry their own `source` and `license` fields;
+[MIT](LICENSE). Third-party software, fonts, and imagery keep their own
+licenses: see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). Data entries carry their own `source` and `license` fields;
 see [`docs/DATA_SOURCING.md`](docs/DATA_SOURCING.md).
