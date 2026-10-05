@@ -367,6 +367,37 @@ SCENARIOS: tuple[Scenario, ...] = (
         (_REST, _GRAVITY),
         _DROP,
     ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "start_speed_01",
+            "After speeding up at {a} over {d}, a {vehicle} is doing {v}. "
+            "How fast was it going at the start?",
+        ),
+        "v0",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "roof_drop_01",
+            "A {object} tumbles off a roof {d} high. How fast is it going when it hits the ground?",
+        ),
+        "v",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "cliff_height_01",
+            "A {object} dropped from the top of a cliff lands at {v}. How tall is the cliff?",
+        ),
+        "d",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
     # kin_v_at
     Scenario(
         "kin_v_at",
@@ -454,6 +485,27 @@ SCENARIOS: tuple[Scenario, ...] = (
         (_GRAVITY,),
         ("Air resistance is negligible",),
     ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "start_speed_02",
+            "A {vehicle} accelerating at {a} is doing {v} after {t}. What was its starting speed?",
+        ),
+        "v0",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "start_speed_03_h",
+            "What speed did a {vehicle} start at if it reaches {v} "
+            "after {t} of accelerating at {a}?",
+        ),
+        "v0",
+        (),
+        ("Acceleration stays constant",),
+    ),
     # kin_x_at
     Scenario(
         "kin_x_at",
@@ -499,6 +551,16 @@ SCENARIOS: tuple[Scenario, ...] = (
         "x",
         (("a", "0", "m/s^2", "assumption"),),
         ("Speed stays constant",),
+    ),
+    Scenario(
+        "kin_x_at",
+        Template(
+            "start_speed_04",
+            "A {vehicle} accelerating at {a} covers {x} in {t}. What was its initial speed?",
+        ),
+        "v0",
+        (),
+        ("Acceleration stays constant",),
     ),
     Scenario(
         "kin_x_at",
@@ -948,6 +1010,9 @@ FERMI: tuple[Template, ...] = (
     Template("fermi_22", "How many {people} holding hands would stretch across a {long}?"),
     Template("fermi_23", "Order of magnitude: how many {small} fit in a {container}?"),
     Template("fermi_24", "How many {small} does the average person go through in a year?"),
+    # Look-alikes of the out-of-scope energy questions, about real things.
+    Template("fermi_25", "How much energy is stored in a {energetic}?"),
+    Template("fermi_26", "How much energy is released by a {energetic}?"),
 )
 FERMI_SLOTS: dict[str, tuple[str, ...]] = {
     "small": (
@@ -965,6 +1030,10 @@ FERMI_SLOTS: dict[str, tuple[str, ...]] = {
         "cow", "minivan",
     ),
     "huge": ("cruise ship", "jumbo jet", "aircraft carrier", "space shuttle", "train"),
+    "energetic": (
+        "car battery", "candy bar", "lightning bolt", "gallon of gasoline", "thunderstorm",
+        "AA battery", "campfire", "hurricane",
+    ),
     "long": ("football field", "city block", "suspension bridge", "runway", "marathon course"),
     "area": ("football field", "parking lot", "basketball court", "city park", "tennis court"),
     "people": ("people", "students", "adults", "kids"),
@@ -1106,6 +1175,32 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
         Template("oos_friction_01", "What is the friction coefficient of {abstract}?"),
         "Category error: {abstract} has no surface, so it has no friction.",
         "What is the friction coefficient of rubber on dry concrete?",
+    ),
+    # Look-alikes: phrased like real physics questions, about things that aren't physical.
+    (
+        Template("oos_weigh_02", "How much does {abstract} weigh?"),
+        "Category error: {abstract} is an idea and has no weight.",
+        "How much does a typical paperback book weigh?",
+    ),
+    (
+        Template("oos_force_01", "How much force does {emotion} exert?"),
+        "Category error: {emotion} is a feeling and pushes on nothing.",
+        "How much force does it take to push a shopping cart?",
+    ),
+    (
+        Template("oos_energy_02", "How much energy does {abstract} contain?"),
+        "Category error: {abstract} is not a physical system, so it stores no energy.",
+        "How much energy does a candy bar contain?",
+    ),
+    (
+        Template("oos_momentum_01", "What is the momentum of {abstract}?"),
+        "Category error: {abstract} has no mass and does not move.",
+        "What is the momentum of a thrown baseball?",
+    ),
+    (
+        Template("oos_power_01", "How much power does {emotion} use?"),
+        "Category error: {emotion} is a feeling, not a device that draws power.",
+        "How much power does a laptop use?",
     ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {

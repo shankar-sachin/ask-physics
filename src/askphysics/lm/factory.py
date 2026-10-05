@@ -39,13 +39,14 @@ from askphysics.lm.formats import (
     serialize_plan,
 )
 from askphysics.lm.tokenizer import END
-from askphysics.models import Classification, Constant, Equation, KnownValue, Plan
+from askphysics.models import Classification, Constant, Equation, KnownValue, Plan, Variable
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.symbolic import solve_for
 from askphysics.solver.units import check_dimensions, quantity
 
 Task = Literal["classify", "plan", "explain"]
 LEAK_THRESHOLD = 0.7
+RETRIES_PER_TARGET = 6
 _WORDS = re.compile(r"[a-z]+")
 
 
@@ -217,12 +218,29 @@ class DataFactory:
     # ------------------------------------------------------------------ standard problems
 
     def standard_problem(self) -> StandardProblem | None:
-        """One solved standard problem, or None if this attempt failed a check."""
-        if self.rng.random() < 0.45:
-            return self._scenario_problem()
+        """One solved standard problem, or None if this attempt failed a check.
+
+        The equation and then the target are drawn uniformly, so every unknown is asked
+        for about equally often ("find v0" as often as "find v"). A worded scenario for
+        that equation and target is used when one exists, otherwise a generic question.
+        """
         eq = self.rng.choice(list(self.store.equations.values()))
         targets = [v for v in eq.variables if self._constant_for(v.name, v.unit) is None]
         target = self.rng.choice(targets)
+        # Some targets fail often (a random v0 = v - a*t is frequently negative), so retry
+        # the same equation and target rather than letting easy targets crowd them out.
+        for _ in range(RETRIES_PER_TARGET):
+            problem = self._problem_for(eq, target)
+            if problem is not None:
+                return problem
+        return None
+
+    def _problem_for(self, eq: Equation, target: Variable) -> StandardProblem | None:
+        scenarios = [
+            sc for sc in tpl.SCENARIOS if sc.equation == eq.id and sc.target == target.symbol
+        ]
+        if scenarios and self.rng.random() < 0.6:
+            return self._scenario_problem(self.rng.choice(scenarios))
         frame = self.rng.choice(tpl.GENERIC)
         pattern = self.rng.choice(tpl.KNOWN_PATTERNS)
         mixed = self.rng.random() < 0.25
@@ -274,8 +292,8 @@ class DataFactory:
             list(eq.assumptions),
         )
 
-    def _scenario_problem(self) -> StandardProblem | None:
-        sc = self.rng.choice(tpl.SCENARIOS)
+    def _scenario_problem(self, sc: tpl.Scenario | None = None) -> StandardProblem | None:
+        sc = sc or self.rng.choice(tpl.SCENARIOS)
         eq = self.store.equations[sc.equation]
         forced = {f[0]: f for f in sc.forced}
         objects = self.rng.sample(tpl.OBJECTS, 2)
