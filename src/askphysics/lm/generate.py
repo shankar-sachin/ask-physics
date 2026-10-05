@@ -458,6 +458,32 @@ def known_value_options(
     return options
 
 
+def assignable_options(
+    options: Sequence[ValueOption],
+    variable: Variable,
+    unused: Sequence[tuple[str, str]],
+    pending: Sequence[Variable],
+) -> list[ValueOption]:
+    """Narrow ``known_value_options`` to what is still free as a plan is written.
+
+    Each quantity in the question fills at most one variable, so ``unused`` holds the
+    (number, unit) pairs not yet taken. A table constant or a structural 0 or 1 is only
+    allowed when the variables still to fill (``pending``, including ``variable``) outnumber
+    the unused quantities that fit them; otherwise a stated value would go unused, and a
+    question never states a value for nothing. Falls back to ``options`` if nothing is left.
+    """
+    fitting = [q for q in unused if _fits(q[1], variable)]
+    slots = sum(1 for v in pending if _fits(v.unit, variable))
+    fillers_ok = slots > len(fitting)
+    narrowed = [
+        o
+        for o in options
+        if (o.origin == "given" and (o.number, o.unit) in fitting)
+        or (o.origin != "given" and fillers_ok)
+    ]
+    return narrowed or list(options)
+
+
 def target_options(
     variables: Sequence[Variable], question: str, constants: Sequence[Constant]
 ) -> list[str]:
@@ -490,8 +516,9 @@ def decode_plan(
     """Write a plan that can only cite ``equations`` and numbers present in the input.
 
     Standard plans are also dimension-checked as they are written: the target must be a
-    variable the question leaves open, and each known value must be a quantity whose units
-    fit its variable (``target_options``, ``known_value_options``).
+    variable the question leaves open, each known value must be a quantity whose units fit
+    its variable, and each stated quantity is used once before any constant or 0 fills a
+    slot (``target_options``, ``known_value_options``, ``assignable_options``).
     """
     if not equations:
         raise LLMError("no retrieved equations to plan with")
@@ -539,10 +566,17 @@ def decode_plan(
 
     decoder.emit(', "known_values": [')
     knowns = []
-    for i, symbol in enumerate(s for s in symbols if s not in unknowns):
+    to_fill = [s for s in symbols if s not in unknowns]
+    unused = question_quantities(question)
+    for i, symbol in enumerate(to_fill):
         decoder.emit(("" if i == 0 else ", ") + f'{{"symbol": "{symbol}", "value": ')
         if dimensional:
-            options = known_value_options(variables[symbol], question, constants)
+            options = assignable_options(
+                known_value_options(variables[symbol], question, constants),
+                variables[symbol],
+                unused,
+                [variables[s] for s in to_fill[i:]],
+            )
             value = decoder.choose(list(dict.fromkeys(o.number for o in options)), closer=", ")
             decoder.emit(', "unit": "')
             fitting = [o for o in options if o.number == value]
@@ -555,6 +589,8 @@ def decode_plan(
             origins = list(ORIGINS)
         decoder.emit('", "origin": "')
         origin = decoder.choose(list(dict.fromkeys(origins)), closer='"')
+        if origin == "given" and (value, unit) in unused:
+            unused.remove((value, unit))
         decoder.emit('"}')
         knowns.append({"symbol": symbol, "value": float(value), "unit": unit, "origin": origin})
     decoder.emit('], "assumptions": [')
@@ -608,6 +644,7 @@ def decode_explanation(
 __all__ = [
     "Decoder",
     "ValueOption",
+    "assignable_options",
     "decode_classification",
     "decode_explanation",
     "decode_plan",

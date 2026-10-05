@@ -23,6 +23,7 @@ from askphysics.lm.formats import (
 from askphysics.lm.generate import (
     Decoder,
     ValueOption,
+    assignable_options,
     decode_classification,
     decode_explanation,
     decode_plan,
@@ -106,6 +107,9 @@ def test_random_weights_still_produce_valid_plans(
     variables = {v.symbol: v for e in eqs if e.id in plan.equation_ids for v in e.variables}
     for k in plan.known_values:  # every value fits its variable's dimensions
         assert check_dimensions(quantity(1.0, k.unit), variables[k.symbol].unit), k
+    given = [(format_number(k.value), k.unit) for k in plan.known_values if k.origin == "given"]
+    stated = question_quantities(QUESTION)
+    assert all(given.count(g) <= stated.count(g) for g in given)  # no quantity used twice
     assert {k.symbol for k in plan.known_values} | set(plan.unknowns) == symbols
     for text in [*plan.assumptions, plan.strategy]:
         assert set(extract_numbers(text)) <= set(plan_numbers(QUESTION, consts))
@@ -260,11 +264,59 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
         variables = {v.symbol: v for v in store.equations[gold.equation_ids[0]].variables}
         q = payload["question"]
         assert gold.target in target_options(list(variables.values()), q, consts), q
-        for k in gold.known_values:
-            options = known_value_options(variables[k.symbol], q, consts)
-            assert any(
-                (o.number, o.unit, o.origin) == (format_number(k.value), k.unit, k.origin)
-                for o in options
-            ), (q, k)
+        gold_by_symbol = {k.symbol: k for k in gold.known_values}
+        order = [s for s in variables if s not in gold.unknowns]
+        unused = question_quantities(q)
+        for i, symbol in enumerate(order):  # in the order the decoder writes them
+            k = gold_by_symbol[symbol]
+            options = assignable_options(
+                known_value_options(variables[symbol], q, consts),
+                variables[symbol],
+                unused,
+                [variables[x] for x in order[i:]],
+            )
+            key = (format_number(k.value), k.unit, k.origin)
+            assert any((o.number, o.unit, o.origin) == key for o in options), (q, k)
+            if k.origin == "given":
+                unused.remove(key[:2])
         checked += 1
     assert checked > 400
+
+
+def test_each_stated_quantity_fills_one_slot(store: DataStore) -> None:
+    eq = store.equations["kin_v_at"]
+    by_symbol = {v.symbol: v for v in eq.variables}
+    q = "end speed: 20.9 mph. Initial velocity: 12 km/h. Time: 0.706 minutes. Work out a."
+    pending = [by_symbol[s] for s in ("v", "v0", "t")]
+    unused = question_quantities(q)
+    v = assignable_options(
+        known_value_options(by_symbol["v"], q, []), by_symbol["v"], unused, pending
+    )
+    assert {(o.number, o.unit) for o in v} == {("20.9", "mph"), ("12", "km/h")}  # no 0 yet
+    unused.remove(("20.9", "mph"))
+    v0 = assignable_options(
+        known_value_options(by_symbol["v0"], q, []), by_symbol["v0"], unused, pending[1:]
+    )
+    assert v0 == [ValueOption("12", "km/h", "given")]  # not 20.9 again, and not 0
+
+
+def test_fillers_only_when_nothing_stated_is_left(store: DataStore) -> None:
+    consts = list(store.constants.values())
+    momentum = {v.symbol: v for v in store.equations["momentum"].variables}
+    q = "An object moving at 34 mph has 0.147kg*m/s of momentum. What's its mass?"
+    unused = question_quantities(q)
+    p_opts = known_value_options(momentum["p"], q, consts)
+    p = assignable_options(p_opts, momentum["p"], unused, [momentum["p"], momentum["v"]])
+    assert p == [ValueOption("0.147", "kg*m/s", "given")]
+    v_opts = known_value_options(momentum["v"], q, consts)
+    v = assignable_options(v_opts, momentum["v"], unused, [momentum["v"]])
+    assert v == [ValueOption("34", "mph", "given")]  # 0 m/s and c are off the table
+    # From rest: no speed is stated, so v0 may be the structural 0.
+    kin = {v.symbol: v for v in store.equations["kin_v_at"].variables}
+    q = "A car starts from rest and accelerates at 3 m/s^2 for 4 s. Final speed?"
+    unused = question_quantities(q)
+    pending = [kin["v0"], kin["a"], kin["t"]]
+    v0 = assignable_options(known_value_options(kin["v0"], q, consts), kin["v0"], unused, pending)
+    assert ValueOption("0", "m/s", "assumption") in v0
+    a = assignable_options(known_value_options(kin["a"], q, consts), kin["a"], unused, pending[1:])
+    assert a == [ValueOption("3", "m/s^2", "given")]  # not standard gravity

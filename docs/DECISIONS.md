@@ -438,8 +438,16 @@ writes:
   dimensions have fewer stated quantities than the chosen equations have
   variables. Table constants are never targets. If the count rules out
   everything, every non-constant variable stays open.
+- Each stated quantity fills at most one variable, and a table constant or
+  structural 0 or 1 may only fill a slot when the variables still to fill
+  outnumber the unused quantities that fit them. Added after the second
+  eval (71.5% valid plans), whose misses wrote one speed into both v and v0
+  or wrote v = 0 with "34 mph" sitting unused.
 
-Fermi plans keep the looser rules until the Fermi engine (v0.7).
+Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
+that states an irrelevant quantity with the same dimensions as a variable
+would have it forced into the plan; the data factory never writes one, and
+real questions rarely do. Revisit with the v0.5 evals.
 
 **Consequences.** This is the decoder doing bookkeeping on units, not
 arithmetic: the model still picks among legal options, and Noether still
