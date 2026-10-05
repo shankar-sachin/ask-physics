@@ -410,3 +410,41 @@ engine would ship.
 **Consequences.** Docs, the README, and the website say Noether. Module
 names stay as they are (`askphysics.solver`); the name is branding, not a
 code move.
+
+---
+
+## ADR-015: Dimension-aware constrained decoding for plans
+
+**Status:** Accepted (v0.3), decided by the maintainer
+
+**Context.** The first `askphysics model eval` of fermi-tellus-1 found the
+right category 99% of the time and the right equation 93% of the time, but
+only 48% of plans computed the right answer. The misses were mostly values
+with the wrong dimensions: in "moving at 69 m/s has 4.6 kg*m/s of momentum"
+it set p = 69 and v = 4.6; it turned "570 pounds" into 570 kilograms; asked
+for a distance, it solved for a mass and made 87.4 kg a distance. The
+decoder allowed all of this, because a value only had to be some number in
+the question and a unit only had to be some unit.
+
+**Decision.** For standard plans the decoder enforces dimensions as it
+writes:
+
+- A known value is chosen from (number, unit, origin) options: quantities
+  written in the question whose units fit the variable, with the unit that
+  follows the number kept attached (origin `given`); table constants that
+  fit (`constant`); or a structural 0 or 1 in the variable's unit
+  (`assumption`).
+- The target is chosen from variables the question leaves open: those whose
+  dimensions have fewer stated quantities than the chosen equations have
+  variables. Table constants are never targets. If the count rules out
+  everything, every non-constant variable stays open.
+
+Fermi plans keep the looser rules until the Fermi engine (v0.7).
+
+**Consequences.** This is the decoder doing bookkeeping on units, not
+arithmetic: the model still picks among legal options, and Noether still
+solves and checks everything afterwards. The training format is unchanged,
+so no retraining is needed, and every gold plan from the data factory fits
+the constraints (a test checks this). What remains for the model is
+genuine reading: which of two masses is the first, and whether a speed is
+the initial or the final one.

@@ -80,6 +80,12 @@ failures are impossible by construction rather than caught afterwards:
 - **Numbers:** a `value` can only be a number that appears in the question,
   the constants table, or the Fermi assumptions table.
 - **Units:** only strings that parse in the shared Pint registry.
+- **Dimensions (standard plans, ADR-015):** a known value must be a quantity
+  from the question (its number and the unit written after it, together), a
+  table constant, or a structural 0 or 1, and its units must fit the
+  variable. The target must be a variable the question leaves open: fewer
+  quantities of its dimensions are given than the equations have variables
+  of those dimensions.
 - **Explain:** digits in prose may only spell numbers present in the
   computed result or the plan.
 

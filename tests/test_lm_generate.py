@@ -6,27 +6,35 @@ import torch
 from askphysics.data.loader import DataStore
 from askphysics.errors import LLMError
 from askphysics.lm.config import LUNA, ModelConfig
+from askphysics.lm.factory import DataFactory
 from askphysics.lm.formats import (
     classify_prompt,
     explain_numbers,
     extract_numbers,
+    format_number,
     plan_numbers,
     plan_prompt,
     plan_units,
+    question_quantities,
     relevant_constants,
     serialize_classification,
     serialize_plan,
 )
 from askphysics.lm.generate import (
     Decoder,
+    ValueOption,
     decode_classification,
     decode_explanation,
     decode_plan,
     encode_task,
+    known_value_options,
     number_guard_ok,
+    target_options,
 )
 from askphysics.lm.model import FermiLM
 from askphysics.lm.tokenizer import END, PLAN, Tokenizer
+from askphysics.models import Plan
+from askphysics.solver.units import check_dimensions, quantity
 
 QUESTION = "How fast does a ball dropped from 20 m hit the ground?"
 
@@ -95,6 +103,9 @@ def test_random_weights_still_produce_valid_plans(
     assert all(k.unit in units for k in plan.known_values)
     symbols = {v.symbol for e in eqs if e.id in plan.equation_ids for v in e.variables}
     assert plan.target in symbols
+    variables = {v.symbol: v for e in eqs if e.id in plan.equation_ids for v in e.variables}
+    for k in plan.known_values:  # every value fits its variable's dimensions
+        assert check_dimensions(quantity(1.0, k.unit), variables[k.symbol].unit), k
     assert {k.symbol for k in plan.known_values} | set(plan.unknowns) == symbols
     for text in [*plan.assumptions, plan.strategy]:
         assert set(extract_numbers(text)) <= set(plan_numbers(QUESTION, consts))
@@ -179,3 +190,81 @@ def test_choose_tells_prefix_options_apart(tokenizer: Tokenizer) -> None:
     picked = decoder.choose(["1", "12", "120"], closer=", ")
     assert picked in {"1", "12", "120"}
     assert not decoder.text.endswith(",")
+
+
+# ------------------------------------------------------------------ dimension-aware plans
+
+
+def test_question_quantities_keep_number_and_unit_together() -> None:
+    q = "An object moving at 69.0 m/s has 4.6 kg*m/s of momentum, and 5 kg and 5 kg more."
+    assert question_quantities(q) == [
+        ("69", "m/s"),
+        ("4.6", "kg*m/s"),
+        ("5", "kg"),
+        ("5", "kg"),
+    ]
+
+
+def test_values_must_fit_their_variable(store: DataStore) -> None:
+    eq = store.equations["momentum"]
+    q = "An object moving at 69.0 m/s has 4.6 kg*m/s of momentum. What's its mass?"
+    by_symbol = {v.symbol: v for v in eq.variables}
+    p = known_value_options(by_symbol["p"], q, [])
+    v = known_value_options(by_symbol["v"], q, [])
+    assert ValueOption("4.6", "kg*m/s", "given") in p
+    assert not any(o.number == "69" for o in p)
+    assert ValueOption("69", "m/s", "given") in v
+    assert not any(o.number == "4.6" for o in v)
+    assert ValueOption("0", "m/s", "assumption") in v  # "dropped" still means v0 = 0
+
+
+def test_units_stay_with_their_number(store: DataStore) -> None:
+    eq = store.equations["newton_gravitation"]
+    consts = list(store.constants.values())
+    q = "Gravitational pull: 0.0019 kN. The first mass is 11 kilograms. Second: 570 pounds."
+    m2 = next(v for v in eq.variables if v.symbol == "m2")
+    options = known_value_options(m2, q, consts)
+    assert ValueOption("570", "pounds", "given") in options
+    assert ValueOption("570", "kilograms", "given") not in options
+    g = next(v for v in eq.variables if v.symbol == "G")
+    assert known_value_options(g, q, consts)[0].origin == "constant"
+
+
+def test_target_is_what_the_question_leaves_open(store: DataStore) -> None:
+    consts = list(store.constants.values())
+    grav = store.equations["newton_gravitation"].variables
+    q = "The pull is 0.012 kN, the second mass 1100 kg and the first 87.4kg. Distance?"
+    assert target_options(grav, q, consts) == ["r"]
+    momentum = store.equations["momentum"].variables
+    q = "An object moving at 69.0 m/s has 4.6 kg*m/s of momentum. What's its mass?"
+    assert target_options(momentum, q, consts) == ["m"]
+    # From rest, nothing pins down which speed is unknown, so both stay open.
+    kin = store.equations["kin_v_at"].variables
+    q = "A car starts from rest and accelerates at 3 m/s^2 for 4 s. Final speed?"
+    assert set(target_options(kin, q, consts)) == {"v", "v0"}
+    # The gas constant is a table constant, never a target.
+    gas = store.equations["ideal_gas_law"].variables
+    assert "R" not in target_options(gas, "Some gas.", consts)
+
+
+def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
+    factory = DataFactory(store, seed=4)
+    checked = 0
+    for e in factory.examples(1500):
+        if e.task != "plan":
+            continue
+        payload = json.loads(e.prompt[len(PLAN) :])
+        gold = Plan.model_validate_json(e.target[: -len(END)])
+        eqs = [store.equations[x["id"]] for x in payload["equations"]]
+        consts = relevant_constants(eqs, [store.constants[c["name"]] for c in payload["constants"]])
+        variables = {v.symbol: v for v in store.equations[gold.equation_ids[0]].variables}
+        q = payload["question"]
+        assert gold.target in target_options(list(variables.values()), q, consts), q
+        for k in gold.known_values:
+            options = known_value_options(variables[k.symbol], q, consts)
+            assert any(
+                (o.number, o.unit, o.origin) == (format_number(k.value), k.unit, k.origin)
+                for o in options
+            ), (q, k)
+        checked += 1
+    assert checked > 400
