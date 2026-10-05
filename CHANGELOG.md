@@ -76,6 +76,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The plan decoder no longer picks an equation that has nowhere to put a
+  quantity the question states. tellus answered "a thing at 4.1 m/s carries
+  620 J, what is its mass?" with KE = p²/2m and an assumed p = 0.
 - A number in e-notation with no unit after it ("6.3e+20,") was split into
   6.3 and the unit "e" (Pint's elementary charge).
 - Quantities with negative exponents in their unit ("5 s^-1", "230 m^-1",
