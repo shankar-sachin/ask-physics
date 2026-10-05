@@ -41,6 +41,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Our docs said OpenStax *University Physics* is CC BY 4.0; it is CC BY-NC-SA
+  4.0. Equation entries only cite it as a reference and copy no text, so
+  nothing changes in the data. Real-phrasing data will come from OpenStax
+  *Physics* (2020), which is CC BY 4.0 (ADR-016).
 - Plans can no longer put a value with the wrong dimensions into a variable
   (a speed as a momentum), change the unit written after a number (570
   pounds into 570 kilograms), solve for something the question already

@@ -43,21 +43,35 @@ the project, with a textbook cited as the `source` for verification, are
 
 ### 2. Open textbooks (OpenStax)
 
-- **What we get:** OpenStax *University Physics* volumes 1 to 3 and *College
-  Physics* cover the whole intro curriculum, with chapter-end problems and
-  worked examples.
-- **License risk:** low to medium. OpenStax books are `CC-BY-4.0`:
-  redistribution is fine with attribution. Watch for individual figures or
-  sections with different terms, and note that the OpenStax name and logo
-  are trademarks and cannot be used to imply endorsement.
+- **What we get:** OpenStax publishes several physics books, and **their
+  licenses differ** (checked against each book's own `LICENSE` file and
+  collection metadata in the `openstax/osbooks-*` repositories, October 2026):
+
+  | Book | License | Can we train on it or ship its text? |
+  |------|---------|------|
+  | *Physics* (high school, 2020) | `CC-BY-4.0` | Yes, with attribution (ADR-016) |
+  | *University Physics* volumes 1 to 3 | `CC-BY-NC-SA-4.0` | No: non-commercial and share-alike conflict with MIT |
+  | *College Physics* | `CC-BY-NC-SA-4.0` | No, same reason |
+
+  Earlier versions of this document said every OpenStax book was
+  `CC-BY-4.0`. That was wrong for *University Physics* and *College
+  Physics*.
+- **License risk:** low for *Physics* text, with attribution to OpenStax and
+  its contributors. Some *Physics* artwork was provided through separate
+  permissions, so we use **text only**: no figures, no captions. The
+  OpenStax name and logo are trademarks and are never used to imply
+  endorsement. Citing *University Physics* as a reference for a fact (an
+  equation, a definition) is fine; copying or training on its text is not.
 - **Cleaning effort:** medium. Problems are in HTML or CNXML with MathML.
   Converting to our schema means extracting known values and units by hand
   or with the data factory's extraction helpers plus verification. Answers are only given for some
   problems.
-- **Recommendation:** **Primary source for worked examples in v0.6.** Use as
-  a verification reference (the `source` field) for hand-curated equations
-  from day one. Every imported example records the book, chapter, and
-  example number, and is `CC-BY-4.0`.
+- **Recommendation:** ***Physics* (2020) is the source for real-phrasing
+  questions and prose (ADR-016).** Any OpenStax book may be cited as a
+  verification reference (the `source` field) for hand-curated equations,
+  because the entries are written by the project and equations are facts.
+  Every imported question records the book, chapter, and exercise, keeps its
+  `CC-BY-4.0` license, and lives apart from our MIT data.
 
 ### 3. Wikipedia and Wikidata
 

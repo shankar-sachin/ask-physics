@@ -97,7 +97,8 @@ and the black hole are computed from scratch, with no third-party imagery.
 
 Every entry in `src/askphysics/data/` is written by the project and released
 under MIT (each entry records its own `source` and `license`). Entries cite
-published references: OpenStax University Physics (CC BY 4.0) for equations,
+published references: OpenStax University Physics for equations (cited as a
+reference only; its text is CC BY-NC-SA 4.0 and none of it is copied),
 CODATA 2022 and the SI (NIST) for constants, and public sources such as USDA
 FoodData Central and UN World Population Prospects for Fermi assumptions. No
 text is copied from these references; equations and physical constants are
