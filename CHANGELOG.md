@@ -21,6 +21,17 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The one-line installers now live at
   `https://askphysics.vercel.app/installers/install.sh` and `install.ps1`.
+- Training reports validation loss for each task (classify, plan, explain) as
+  well as overall, on a fixed random sample of the validation split.
+
+### Fixed
+
+- Training on Apple GPUs no longer runs out of memory after a few hundred
+  steps.
+- Validation loss was measured on the first rows of the first shard only; it
+  now uses a shuffled sample, so runs are comparable.
+- A fresh training run starts a fresh `metrics.jsonl` instead of appending to
+  the last run's log (`--resume` still appends).
 
 ## [0.2.0] - 2026-10-04
 
