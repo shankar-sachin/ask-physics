@@ -21,6 +21,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The one-line installers now live at
   `https://askphysics.vercel.app/installers/install.sh` and `install.ps1`.
+- The data factory composes questions from parts (44 frames, 12 ways to state
+  a value, variable synonyms, spelled-out and converted units, openers,
+  sign-offs, casual punctuation) and has 63 worded scenarios, 24 Fermi and 24
+  out-of-scope templates, and more varied explanations. 20,000 examples now
+  hold about 16,800 distinct question shapes, up from 3,000, so models stop
+  memorizing phrasings. Rebuild the dataset and tokenizer before training.
 
 ## [0.2.0] - 2026-10-04
 

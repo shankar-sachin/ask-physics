@@ -44,6 +44,9 @@ askphysics model train-tokenizer --data build/data --out build/tokenizer.json --
   with a small vocabulary; a full-size tokenizer makes them shorter)*.
 - The text is template-generated, so the tokenizer may stop short of 8,192
   merges. That's fine; record the size it reaches.
+- Rebuild both whenever the factory's templates change. A tokenizer trained
+  on old data can't spell the new phrasings efficiently, and the old val split
+  measures the old held-out templates.
 
 ## 4. Measure throughput
 
