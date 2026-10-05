@@ -52,8 +52,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pounds into 570 kilograms), solve for something the question already
   gives, use one stated quantity twice, or fill a slot with 0 while a stated
   value goes unused (ADR-015). They also can no longer invent a 1 as a
-  filler ("m = 1 kg"), or solve for g when the question asks for a mass and
-  g can come from the constants table.
+  filler ("m = 1 kg"), assume 0 for something that can't be zero (g = 0),
+  or solve for g when the question asks for a mass and g can come from the
+  constants table.
 - The data factory sometimes wrote a spelled-out unit one way in the
   question and another in the plan ("115 ohms" but `ohm`), and dropped
   examples that spelled meters as metres. Rebuild the dataset.
