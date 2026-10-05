@@ -129,7 +129,7 @@ def build_data(
         Path, typer.Option(help="Eval questions to keep out of the data (leakage policy).")
     ] = Path("evals/questions.yaml"),
 ) -> None:
-    """Generate training data from the equation database (solved by the symbolic machine)."""
+    """Generate training data from the equation database (solved by Noether)."""
     from askphysics.lm.factory import build_dataset, load_blocklist
 
     blocked = load_blocklist(blocklist)

@@ -4,7 +4,7 @@ The pretty math and unit formatting lives in ``askphysics.pretty`` so the websit
 can use it without Rich.
 
 Everything here only formats; nothing computes. Numbers shown are the ones
-the symbolic algebra machine produced.
+Noether produced.
 """
 
 from __future__ import annotations

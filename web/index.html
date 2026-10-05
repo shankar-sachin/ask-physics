@@ -36,8 +36,7 @@
       <h1>Physics answers<br><span class="grad">you can check.</span></h1>
       <p class="lede">
         Ask anything from a textbook problem to <em>"how many rubber ducks would it take to stop a
-        freight train?"</em> Our own small language models read the question; a symbolic algebra
-        machine does every bit of the math. You get the equations, every input and assumption,
+        freight train?"</em> Our own small language models read the question; Noether does every bit of the math. You get the equations, every input and assumption,
         units checked end to end, and an honest confidence score.
       </p>
       <div class="cta">
@@ -74,12 +73,12 @@
 
     <section id="how" class="how">
       <h2>How it works</h2>
-      <p class="sub">Six stages. The language models never do arithmetic: every number comes from SymPy and Pint.</p>
+      <p class="sub">Six stages. The language models never do arithmetic: every number comes from Noether (SymPy + Pint).</p>
       <ol class="stages">
         <li><b>Classify</b><span>Standard, Fermi estimate, or not physics at all.</span></li>
         <li><b>Retrieve</b><span>Find candidate equations in a reviewed database.</span></li>
         <li><b>Plan</b><span>Pick equations by id and copy the values. No free-form math.</span></li>
-        <li><b>Compute</b><span>SymPy solves, Pint carries units through every step.</span></li>
+        <li><b>Compute</b><span>Noether, our math engine, solves with SymPy and carries units through every step with Pint.</span></li>
         <li><b>Sanity check</b><span>Dimensions and orders of magnitude, before you see it.</span></li>
         <li><b>Explain</b><span>Plain words, every assumption listed, confidence scored.</span></li>
       </ol>

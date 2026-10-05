@@ -1,7 +1,7 @@
 """The data factory: training examples for the Fermi models, generated from our own data.
 
 No external model writes anything here (ADR-009). Standard problems are built
-from the equation database and **solved by the symbolic algebra machine**
+from the equation database and **solved by Noether** (SymPy + Pint)
 before they're kept; anything it can't solve is dropped. Every plan is
 checked against the same allowed numbers and units the constrained decoder
 uses, so training targets are always outputs the decoder could produce.

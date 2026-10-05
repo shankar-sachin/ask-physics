@@ -6,8 +6,7 @@ Effort is rough: **S** is a few sittings, **M** is a week or two of evenings,
 starts until the previous one's exit criteria are met, except where noted.
 
 The language side is the Fermi model family, built from scratch in this repo
-([`MODELS.md`](MODELS.md), ADR-009). The math side is the symbolic algebra
-machine (SymPy + Pint). The CLI is the main interface; an in-browser website
+([`MODELS.md`](MODELS.md), ADR-009). The math side is Noether (SymPy + Pint). The CLI is the main interface; an in-browser website
 at askphysics.vercel.app runs the same package (ADR-013). The hosted API comes
 after v1.0 (ADR-008).
 
@@ -38,8 +37,7 @@ tested on `fermi-luna-1`, without needing a GPU.
 - Constrained decoding: schema masks, allowed equation ids, allowed numbers,
   valid units.
 - Data factory: standard, Fermi, out-of-scope, and explanation examples from
-  the database, every standard example verified by the symbolic algebra
-  machine.
+  the database, every standard example verified by Noether.
 - Training loop with seeded runs, bf16 autocast, checkpoints, and resumption.
 - CLI: `askphysics model build-data`, `train-tokenizer`, `train`, `info`.
 - `torch` and `safetensors` as dependencies; CI on CPU wheels.
@@ -84,7 +82,7 @@ tested on `fermi-luna-1`, without needing a GPU.
 
 ## v0.4.0 Solver expansion (M)
 
-**Goal:** the symbolic algebra machine handles real intro problems.
+**Goal:** Noether handles real intro problems.
 
 **Deliverables**
 - Multi-equation chaining: dependency order over the plan's unknowns.

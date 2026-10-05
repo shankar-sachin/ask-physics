@@ -25,7 +25,7 @@ token sequences.
 3. **No invented numbers.** Constrained decoding only allows numbers that
    appear in the question, the constants table, or the Fermi assumptions
    table. The model cannot compute a new number even if it wanted to.
-4. **No arithmetic.** The model copies; the symbolic algebra machine computes.
+4. **No arithmetic.** The model copies; Noether computes.
 5. **No expressions.** Plans contain ids and numbers, never formulas.
 6. **Greedy where it matters.** Classify and plan always decode greedily, so
    the same input always gives the same output. Only explain may sample.
