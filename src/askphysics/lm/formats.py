@@ -46,6 +46,8 @@ def extract_numbers(text: str) -> list[str]:
     """Numbers written in ``text``, canonically formatted, in order of appearance."""
     out: list[str] = []
     for match in _NUMBER.finditer(text):
+        if not math.isfinite(float(match.group())):
+            continue  # "1e999" overflows; it can't be copied into a plan anyway
         formatted = format_number(float(match.group()))
         if formatted not in out:
             out.append(formatted)
@@ -70,8 +72,8 @@ def question_quantities(text: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for match in _UNIT_AFTER_NUMBER.finditer(text):
         unit = match.group(1)
-        if is_valid_unit(unit):
-            number = match.group()[: match.start(1) - match.start()].strip()
+        number = match.group()[: match.start(1) - match.start()].strip()
+        if is_valid_unit(unit) and math.isfinite(float(number)):
             out.append((format_number(float(number)), unit))
     return out
 
