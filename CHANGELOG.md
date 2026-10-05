@@ -87,6 +87,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The plan decoder reads what a question states outright. A symbol written
+  next to a value ("fs is 758 Hz", "di = 1.8 m") locks that value to it, and
+  the words after "what is" or "find" pick the unknown and the equation
+  ("What is its mass?" can't be answered with W = Fd). tellus had swapped
+  labelled values and solved for the wrong unknown.
 - No more word salad from the models. Plans pick assumptions from each
   equation's reviewed list instead of writing their own ("The mass or
   spherically symmetric bodies"), free text can't loop ("roughly roughly

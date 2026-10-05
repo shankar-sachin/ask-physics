@@ -301,3 +301,23 @@ def test_looping_prose_falls_back_to_the_template(
     answer = p.run(DEMO_QUESTION)
     assert answer.explanation.startswith("Using kin_v_squared")
     assert answer.models["explain"] == "template"
+
+
+def test_the_slope_question_refusal_is_cleaned_up() -> None:
+    # tellus's actual output for "how do you find the slope of a curve?" before this fix.
+    garbled = Classification(
+        category="out_of_scope",
+        reasoning=(
+            "Category error: a dream is an experience, not an object with mass"
+            + " taste" * 11
+            + " and solve for the normal temperature gives"
+        ),
+        closest_answerable=(
+            "How much the same interval.constant today. laptop use in uniform typical serving "
+            "of a single line.constant today" + " today" * 8 + ".constant height height "
+            "height height from rest; air resistance is negligible;;; air resistance"
+        ),
+    )
+    answer = refuse(Question(text="how do you find the slope of a curve?"), garbled)
+    assert answer.explanation == f"This can't be answered as asked. {FALLBACK_REFUSAL}"
+    assert answer.redirect is None

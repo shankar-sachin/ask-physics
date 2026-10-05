@@ -18,6 +18,7 @@ what the models are trained on.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -42,6 +43,7 @@ from askphysics.lm.formats import (
     stated_quantities,
 )
 from askphysics.lm.model import FermiLM, KVCache
+from askphysics.lm.reading import asked_symbols, asked_variables, symbol_locks
 from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer, pretokenize
 from askphysics.models import (
     Classification,
@@ -555,7 +557,48 @@ def target_options(
     # asks for m, and g comes from the table.
     without_fallback = [v for v in out if not any(_fits(c.unit, v) for c in constants)]
     picked = without_fallback or out
+    # A symbol the question labels with a value ("fs is 758 Hz") is given, not wanted, and
+    # a variable the ask names ("what is its mass?") is the one wanted. Either rule only
+    # narrows: if it would rule everything out, it is ignored.
+    locks = quantity_locks(question, variables)
+    picked = [v for v in picked if v.symbol not in locks] or picked
+    asked = asked_symbols(question, picked)
+    picked = [v for v in picked if v.symbol in asked] or picked
     return [v.symbol for v in picked] or [v.symbol for v in free] or [v.symbol for v in variables]
+
+
+def quantity_locks(question: str, variables: Sequence[Variable]) -> dict[str, tuple[str, str]]:
+    """Symbol -> the (number, unit) the question labels it with, when the units fit."""
+    by_symbol = {v.symbol: v for v in variables}
+    return {s: q for s, q in symbol_locks(question, variables).items() if _fits(q[1], by_symbol[s])}
+
+
+def locked_options(
+    options: Sequence[ValueOption],
+    symbol: str,
+    locks: Mapping[str, tuple[str, str]],
+    unused: Sequence[tuple[str, str]],
+    pending: Sequence[str],
+) -> list[ValueOption]:
+    """Narrow a variable's options to agree with the question's labels.
+
+    A labelled symbol ("di is 1.8 m") may only take its own quantity, and other variables
+    may not take a quantity a label reserves for a symbol still to be written (``pending``),
+    unless the question states it more than once. Falls back to ``options`` if nothing is
+    left, so a wrong label can never leave a variable without a value.
+    """
+    if symbol in locks:
+        narrowed = [
+            o for o in options if o.origin == "given" and (o.number, o.unit) == locks[symbol]
+        ]
+        return narrowed or list(options)
+    reserved = Counter(locks[s] for s in pending if s in locks and s != symbol)
+    narrowed = [
+        o
+        for o in options
+        if o.origin != "given" or unused.count((o.number, o.unit)) > reserved[(o.number, o.unit)]
+    ]
+    return narrowed or list(options)
 
 
 def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
@@ -583,7 +626,12 @@ def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
                 return False
         return True
 
-    return [eq.id for eq in equations if has_room(eq)] or [eq.id for eq in equations]
+    roomy = [eq for eq in equations if has_room(eq)] or list(equations)
+    # Prefer equations with the variable the ask names: "what is its mass?" rules out
+    # W = Fd. Names compete across equations, so "time to reach the top" beats "time".
+    asked = asked_variables(question, [v for eq in roomy for v in eq.variables])
+    named = [eq for eq in roomy if any(v in asked for v in eq.variables)]
+    return [eq.id for eq in named or roomy]
 
 
 def decode_plan(
@@ -650,14 +698,21 @@ def decode_plan(
     knowns = []
     to_fill = [s for s in symbols if s not in unknowns]
     unused = stated_quantities(question)
+    locks = quantity_locks(question, list(variables.values())) if dimensional else {}
     for i, symbol in enumerate(to_fill):
         decoder.emit(("" if i == 0 else ", ") + f'{{"symbol": "{symbol}", "value": ')
         options = (
-            assignable_options(
-                known_value_options(variables[symbol], question, constants),
-                variables[symbol],
+            locked_options(
+                assignable_options(
+                    known_value_options(variables[symbol], question, constants),
+                    variables[symbol],
+                    unused,
+                    [variables[s] for s in to_fill[i:]],
+                ),
+                symbol,
+                locks,
                 unused,
-                [variables[s] for s in to_fill[i:]],
+                to_fill[i:],
             )
             if dimensional
             else []
@@ -776,8 +831,11 @@ __all__ = [
     "decode_explanation",
     "decode_plan",
     "encode_task",
+    "equation_options",
     "known_value_options",
+    "locked_options",
     "number_guard_ok",
+    "quantity_locks",
     "repeats",
     "target_options",
 ]
