@@ -1012,5 +1012,802 @@
     "source": "OpenStax University Physics Volume 1, Chapter 17 (reference; entry written by the project)",
     "license": "MIT",
     "confidence_in_entry": 0.97
+  },
+  {
+    "id": "specific_heat",
+    "name": "Heat for a temperature change",
+    "latex": "Q = m c \\Delta T",
+    "sympy_expr": "Q = m*c*dT",
+    "variables": [
+      {"symbol": "Q", "name": "heat", "unit": "J", "description": "Heat added to the object", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass of the object", "typical_range": [0.001, 1000000.0]},
+      {"symbol": "c", "name": "specific heat", "unit": "J/(kg*K)", "description": "Heat per kilogram per kelvin", "typical_range": [100.0, 15000.0]},
+      {"symbol": "dT", "name": "temperature change", "unit": "K", "description": "Rise in temperature", "typical_range": [0.0, 2000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["No phase change", "Specific heat constant over the range"],
+    "validity_conditions": [],
+    "tags": ["heat", "specific heat", "temperature change", "warm up", "heat up", "calorimetry", "water"],
+    "source": "OpenStax University Physics Volume 2, Chapter 1 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "latent_heat",
+    "name": "Heat for a phase change",
+    "latex": "Q = m L",
+    "sympy_expr": "Q = m*L",
+    "variables": [
+      {"symbol": "Q", "name": "heat", "unit": "J", "description": "Heat absorbed during the phase change", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Mass that changes phase", "typical_range": [0.001, 1000000.0]},
+      {"symbol": "L", "name": "latent heat", "unit": "J/kg", "description": "Heat per kilogram for the phase change", "typical_range": [10000.0, 3000000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Temperature stays at the transition point"],
+    "validity_conditions": [],
+    "tags": ["latent heat", "melt", "boil", "freeze", "evaporate", "phase change", "ice", "steam"],
+    "source": "OpenStax University Physics Volume 2, Chapter 1 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "linear_expansion",
+    "name": "Linear thermal expansion",
+    "latex": "\\Delta L = \\alpha L_0 \\Delta T",
+    "sympy_expr": "dL = alpha*L0*dT",
+    "variables": [
+      {"symbol": "dL", "name": "change in length", "unit": "m", "description": "Increase in length", "typical_range": [0.0, 100.0]},
+      {"symbol": "alpha", "name": "expansion coefficient", "unit": "1/K", "description": "Fractional length change per kelvin", "typical_range": [1e-07, 0.001]},
+      {"symbol": "L0", "name": "original length", "unit": "m", "description": "Length before heating", "typical_range": [0.001, 100000.0]},
+      {"symbol": "dT", "name": "temperature change", "unit": "K", "description": "Rise in temperature", "typical_range": [0.0, 2000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Small temperature change", "Coefficient constant over the range"],
+    "validity_conditions": [],
+    "tags": ["thermal expansion", "expand", "bridge", "rail", "heat", "length change", "steel"],
+    "source": "OpenStax University Physics Volume 2, Chapter 1 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "heat_conduction",
+    "name": "Rate of heat conduction",
+    "latex": "P = \\frac{k A \\Delta T}{d}",
+    "sympy_expr": "P = k*A*dT/d",
+    "variables": [
+      {"symbol": "P", "name": "heat flow rate", "unit": "W", "description": "Heat conducted per second", "typical_range": [0.0, 100000000.0]},
+      {"symbol": "k", "name": "thermal conductivity", "unit": "W/(m*K)", "description": "How well the material conducts heat", "typical_range": [0.01, 500.0]},
+      {"symbol": "A", "name": "area", "unit": "m^2", "description": "Area of the slab face", "typical_range": [1e-06, 100000.0]},
+      {"symbol": "dT", "name": "temperature difference", "unit": "K", "description": "Temperature difference across the slab", "typical_range": [0.0, 2000.0]},
+      {"symbol": "d", "name": "thickness", "unit": "m", "description": "Thickness of the slab", "typical_range": [1e-05, 10.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Steady state", "Uniform slab"],
+    "validity_conditions": [],
+    "tags": ["conduction", "heat flow", "insulation", "wall", "window", "thermal conductivity"],
+    "source": "OpenStax University Physics Volume 2, Chapter 1 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "stefan_boltzmann",
+    "name": "Power radiated by a black body",
+    "latex": "P = \\sigma A T^4",
+    "sympy_expr": "P = sigma*A*T**4",
+    "variables": [
+      {"symbol": "P", "name": "radiated power", "unit": "W", "description": "Thermal radiation emitted", "typical_range": [0.0, 1e+30]},
+      {"symbol": "sigma", "name": "Stefan-Boltzmann constant", "unit": "W/(m^2*K^4)", "description": "Radiation constant", "typical_range": null},
+      {"symbol": "A", "name": "surface area", "unit": "m^2", "description": "Radiating surface area", "typical_range": [1e-06, 1e+20]},
+      {"symbol": "T", "name": "temperature", "unit": "K", "description": "Absolute temperature of the surface", "typical_range": [1.0, 100000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Ideal black body (emissivity 1)"],
+    "validity_conditions": [],
+    "tags": ["radiation", "black body", "stefan-boltzmann", "glowing", "star", "thermal radiation"],
+    "source": "OpenStax University Physics Volume 2, Chapter 1 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "first_law",
+    "name": "First law of thermodynamics",
+    "latex": "\\Delta U = Q - W",
+    "sympy_expr": "dU = Q - W",
+    "variables": [
+      {"symbol": "dU", "name": "change in internal energy", "unit": "J", "description": "Increase in internal energy", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "Q", "name": "heat", "unit": "J", "description": "Heat added to the system", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "W", "name": "work", "unit": "J", "description": "Work done by the system", "typical_range": [0.0, 10000000000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Closed system"],
+    "validity_conditions": [],
+    "tags": ["first law", "internal energy", "heat", "work", "gas", "piston", "energy conservation"],
+    "source": "OpenStax University Physics Volume 2, Chapter 3 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "molecular_kinetic_energy",
+    "name": "Average kinetic energy of a gas molecule",
+    "latex": "\\bar{K} = \\frac{3}{2} k_B T",
+    "sympy_expr": "KE = 3*kB*T/2",
+    "variables": [
+      {"symbol": "KE", "name": "average kinetic energy", "unit": "J", "description": "Mean translational kinetic energy per molecule", "typical_range": [1e-24, 1e-17]},
+      {"symbol": "kB", "name": "Boltzmann constant", "unit": "J/K", "description": "Boltzmann's constant", "typical_range": null},
+      {"symbol": "T", "name": "temperature", "unit": "K", "description": "Absolute temperature of the gas", "typical_range": [1.0, 1000000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Ideal gas"],
+    "validity_conditions": [],
+    "tags": ["kinetic theory", "molecule", "gas", "temperature", "average kinetic energy", "boltzmann"],
+    "source": "OpenStax University Physics Volume 2, Chapter 2 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "rms_speed",
+    "name": "Root-mean-square speed of gas molecules",
+    "latex": "v_{rms} = \\sqrt{\\frac{3 k_B T}{m}}",
+    "sympy_expr": "v = sqrt(3*kB*T/m)",
+    "variables": [
+      {"symbol": "v", "name": "rms speed", "unit": "m/s", "description": "Root-mean-square molecular speed", "typical_range": [1.0, 100000.0]},
+      {"symbol": "kB", "name": "Boltzmann constant", "unit": "J/K", "description": "Boltzmann's constant", "typical_range": null},
+      {"symbol": "T", "name": "temperature", "unit": "K", "description": "Absolute temperature of the gas", "typical_range": [1.0, 1000000.0]},
+      {"symbol": "m", "name": "molecular mass", "unit": "kg", "description": "Mass of one molecule", "typical_range": [1e-27, 1e-24]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Ideal gas"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["kinetic theory", "molecule", "rms speed", "gas", "temperature", "how fast molecules move"],
+    "source": "OpenStax University Physics Volume 2, Chapter 2 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "heat_engine_work",
+    "name": "Work of a heat engine",
+    "latex": "W = Q_h - Q_c",
+    "sympy_expr": "W = Qh - Qc",
+    "variables": [
+      {"symbol": "W", "name": "work output", "unit": "J", "description": "Net work done per cycle", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "Qh", "name": "heat in", "unit": "J", "description": "Heat taken from the hot reservoir", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "Qc", "name": "heat out", "unit": "J", "description": "Heat dumped to the cold reservoir", "typical_range": [0.0, 10000000000.0]}
+    ],
+    "domain": "thermodynamics",
+    "assumptions": ["Cyclic process"],
+    "validity_conditions": [],
+    "tags": ["heat engine", "engine", "work", "hot reservoir", "cold reservoir", "cycle", "exhaust"],
+    "source": "OpenStax University Physics Volume 2, Chapter 4 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "coulomb_law",
+    "name": "Coulomb's law",
+    "latex": "F = \\frac{k q_1 q_2}{r^2}",
+    "sympy_expr": "F = k*q1*q2/r**2",
+    "variables": [
+      {"symbol": "F", "name": "electric force", "unit": "N", "description": "Magnitude of the force between the charges", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "k", "name": "Coulomb constant", "unit": "N*m^2/C^2", "description": "1/(4 pi epsilon_0)", "typical_range": null},
+      {"symbol": "q1", "name": "charge 1", "unit": "C", "description": "Magnitude of the first charge", "typical_range": [1e-12, 0.01]},
+      {"symbol": "q2", "name": "charge 2", "unit": "C", "description": "Magnitude of the second charge", "typical_range": [1e-12, 0.01]},
+      {"symbol": "r", "name": "separation", "unit": "m", "description": "Distance between the charges", "typical_range": [1e-06, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Point charges", "Charges at rest in vacuum"],
+    "validity_conditions": [],
+    "tags": ["coulomb", "electric force", "charge", "repel", "attract", "electrostatic", "static"],
+    "source": "OpenStax University Physics Volume 2, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "point_charge_field",
+    "name": "Electric field of a point charge",
+    "latex": "E = \\frac{k q}{r^2}",
+    "sympy_expr": "E = k*q/r**2",
+    "variables": [
+      {"symbol": "E", "name": "electric field", "unit": "N/C", "description": "Field strength at distance r", "typical_range": [0.0, 100000000000000.0]},
+      {"symbol": "k", "name": "Coulomb constant", "unit": "N*m^2/C^2", "description": "1/(4 pi epsilon_0)", "typical_range": null},
+      {"symbol": "q", "name": "charge", "unit": "C", "description": "Magnitude of the source charge", "typical_range": [1e-12, 0.01]},
+      {"symbol": "r", "name": "distance", "unit": "m", "description": "Distance from the charge", "typical_range": [1e-06, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Point charge at rest in vacuum"],
+    "validity_conditions": [],
+    "tags": ["electric field", "point charge", "field strength", "charge", "newtons per coulomb"],
+    "source": "OpenStax University Physics Volume 2, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "electric_force_field",
+    "name": "Force on a charge in an electric field",
+    "latex": "F = q E",
+    "sympy_expr": "F = q*E",
+    "variables": [
+      {"symbol": "F", "name": "electric force", "unit": "N", "description": "Force on the charge", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "q", "name": "charge", "unit": "C", "description": "Magnitude of the charge", "typical_range": [1e-12, 0.01]},
+      {"symbol": "E", "name": "electric field", "unit": "N/C", "description": "Field strength at the charge", "typical_range": [0.0, 1000000000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Field not changed by the test charge"],
+    "validity_conditions": [],
+    "tags": ["electric field", "electric force", "charge", "field", "electron", "proton"],
+    "source": "OpenStax University Physics Volume 2, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "point_charge_potential",
+    "name": "Electric potential of a point charge",
+    "latex": "V = \\frac{k q}{r}",
+    "sympy_expr": "V = k*q/r",
+    "variables": [
+      {"symbol": "V", "name": "electric potential", "unit": "V", "description": "Potential at distance r (zero at infinity)", "typical_range": [0.0, 1000000000000.0]},
+      {"symbol": "k", "name": "Coulomb constant", "unit": "N*m^2/C^2", "description": "1/(4 pi epsilon_0)", "typical_range": null},
+      {"symbol": "q", "name": "charge", "unit": "C", "description": "Magnitude of the source charge", "typical_range": [1e-12, 0.01]},
+      {"symbol": "r", "name": "distance", "unit": "m", "description": "Distance from the charge", "typical_range": [1e-06, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Point charge at rest in vacuum"],
+    "validity_conditions": [],
+    "tags": ["electric potential", "voltage", "point charge", "potential", "volts"],
+    "source": "OpenStax University Physics Volume 2, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "uniform_field_potential",
+    "name": "Potential difference in a uniform field",
+    "latex": "V = E d",
+    "sympy_expr": "V = E*d",
+    "variables": [
+      {"symbol": "V", "name": "potential difference", "unit": "V", "description": "Voltage between the two points", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "E", "name": "electric field", "unit": "V/m", "description": "Uniform field strength", "typical_range": [0.0, 10000000000.0]},
+      {"symbol": "d", "name": "distance", "unit": "m", "description": "Separation along the field", "typical_range": [1e-09, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Uniform field", "Displacement along the field lines"],
+    "validity_conditions": [],
+    "tags": ["uniform field", "parallel plates", "potential difference", "voltage", "electric field"],
+    "source": "OpenStax University Physics Volume 2, Chapter 7 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "electric_power",
+    "name": "Electric power",
+    "latex": "P = I V",
+    "sympy_expr": "P = I*V",
+    "variables": [
+      {"symbol": "P", "name": "power", "unit": "W", "description": "Rate of energy delivered", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current through the device", "typical_range": [0.0, 10000.0]},
+      {"symbol": "V", "name": "voltage", "unit": "V", "description": "Voltage across the device", "typical_range": [0.0, 1000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Steady (DC) current"],
+    "validity_conditions": [],
+    "tags": ["electric power", "watts", "current", "voltage", "appliance", "bulb", "charger"],
+    "source": "OpenStax University Physics Volume 2, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "power_current_resistance",
+    "name": "Power dissipated in a resistor (current)",
+    "latex": "P = I^2 R",
+    "sympy_expr": "P = I**2*R",
+    "variables": [
+      {"symbol": "P", "name": "power", "unit": "W", "description": "Power dissipated as heat", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current through the resistor", "typical_range": [0.0, 10000.0]},
+      {"symbol": "R", "name": "resistance", "unit": "ohm", "description": "Resistance", "typical_range": [0.001, 1000000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ohmic resistor", "Steady current"],
+    "validity_conditions": [],
+    "tags": ["power", "resistor", "heating", "joule heating", "current", "resistance", "watts"],
+    "source": "OpenStax University Physics Volume 2, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "power_voltage_resistance",
+    "name": "Power dissipated in a resistor (voltage)",
+    "latex": "P = \\frac{V^2}{R}",
+    "sympy_expr": "P = V**2/R",
+    "variables": [
+      {"symbol": "P", "name": "power", "unit": "W", "description": "Power dissipated as heat", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "V", "name": "voltage", "unit": "V", "description": "Voltage across the resistor", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "R", "name": "resistance", "unit": "ohm", "description": "Resistance", "typical_range": [0.001, 1000000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ohmic resistor", "Steady voltage"],
+    "validity_conditions": [],
+    "tags": ["power", "resistor", "heater", "voltage", "resistance", "watts", "outlet"],
+    "source": "OpenStax University Physics Volume 2, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "charge_current_time",
+    "name": "Charge from current and time",
+    "latex": "Q = I t",
+    "sympy_expr": "Q = I*t",
+    "variables": [
+      {"symbol": "Q", "name": "charge", "unit": "C", "description": "Charge that flows", "typical_range": [0.0, 10000000.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Steady current", "typical_range": [0.0, 10000.0]},
+      {"symbol": "t", "name": "time", "unit": "s", "description": "Time the current flows", "typical_range": [0.0, 10000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Steady current"],
+    "validity_conditions": [],
+    "tags": ["charge", "current", "coulombs", "battery", "time", "amp hours"],
+    "source": "OpenStax University Physics Volume 2, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "resistivity",
+    "name": "Resistance of a wire",
+    "latex": "R = \\frac{\\rho L}{A}",
+    "sympy_expr": "R = rho*L/A",
+    "variables": [
+      {"symbol": "R", "name": "resistance", "unit": "ohm", "description": "Resistance of the wire", "typical_range": [0.001, 1000000000.0]},
+      {"symbol": "rho", "name": "resistivity", "unit": "ohm*m", "description": "Resistivity of the material", "typical_range": [1e-09, 1e+16]},
+      {"symbol": "L", "name": "wire length", "unit": "m", "description": "Length of the wire", "typical_range": [0.0001, 1000000.0]},
+      {"symbol": "A", "name": "cross-sectional area", "unit": "m^2", "description": "Cross-sectional area of the wire", "typical_range": [1e-12, 1.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Uniform wire", "Constant temperature"],
+    "validity_conditions": [],
+    "tags": ["resistivity", "wire", "resistance", "copper", "length", "gauge", "thickness"],
+    "source": "OpenStax University Physics Volume 2, Chapter 9 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "series_resistors",
+    "name": "Two resistors in series",
+    "latex": "R = R_1 + R_2",
+    "sympy_expr": "R = R1 + R2",
+    "variables": [
+      {"symbol": "R", "name": "equivalent resistance", "unit": "ohm", "description": "Total resistance", "typical_range": [0.001, 1000000000.0]},
+      {"symbol": "R1", "name": "resistance 1", "unit": "ohm", "description": "First resistor", "typical_range": [0.001, 1000000000.0]},
+      {"symbol": "R2", "name": "resistance 2", "unit": "ohm", "description": "Second resistor", "typical_range": [0.001, 1000000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ideal wires"],
+    "validity_conditions": [],
+    "tags": ["series", "resistors", "equivalent resistance", "circuit", "total resistance"],
+    "source": "OpenStax University Physics Volume 2, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "parallel_resistors",
+    "name": "Two resistors in parallel",
+    "latex": "\\frac{1}{R} = \\frac{1}{R_1} + \\frac{1}{R_2}",
+    "sympy_expr": "1/R = 1/R1 + 1/R2",
+    "variables": [
+      {"symbol": "R", "name": "equivalent resistance", "unit": "ohm", "description": "Total resistance", "typical_range": [0.001, 1000000000.0]},
+      {"symbol": "R1", "name": "resistance 1", "unit": "ohm", "description": "First resistor", "typical_range": [0.001, 1000000000.0]},
+      {"symbol": "R2", "name": "resistance 2", "unit": "ohm", "description": "Second resistor", "typical_range": [0.001, 1000000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ideal wires"],
+    "validity_conditions": [],
+    "tags": ["parallel", "resistors", "equivalent resistance", "circuit", "total resistance"],
+    "source": "OpenStax University Physics Volume 2, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "capacitance",
+    "name": "Capacitance",
+    "latex": "Q = C V",
+    "sympy_expr": "Q = C*V",
+    "variables": [
+      {"symbol": "Q", "name": "charge", "unit": "C", "description": "Charge on each plate", "typical_range": [0.0, 100.0]},
+      {"symbol": "C", "name": "capacitance", "unit": "F", "description": "Capacitance", "typical_range": [1e-15, 10.0]},
+      {"symbol": "V", "name": "voltage", "unit": "V", "description": "Voltage across the capacitor", "typical_range": [0.0, 1000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ideal capacitor"],
+    "validity_conditions": [],
+    "tags": ["capacitor", "capacitance", "charge", "voltage", "farad", "plates"],
+    "source": "OpenStax University Physics Volume 2, Chapter 8 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "capacitor_energy",
+    "name": "Energy stored in a capacitor",
+    "latex": "U = \\frac{1}{2} C V^2",
+    "sympy_expr": "U = C*V**2/2",
+    "variables": [
+      {"symbol": "U", "name": "stored energy", "unit": "J", "description": "Energy stored in the electric field", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "C", "name": "capacitance", "unit": "F", "description": "Capacitance", "typical_range": [1e-15, 10.0]},
+      {"symbol": "V", "name": "voltage", "unit": "V", "description": "Voltage across the capacitor", "typical_range": [0.0, 1000000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ideal capacitor"],
+    "validity_conditions": [],
+    "tags": ["capacitor", "energy", "flash", "defibrillator", "stored energy", "capacitance"],
+    "source": "OpenStax University Physics Volume 2, Chapter 8 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "parallel_plate_capacitor",
+    "name": "Parallel-plate capacitor in vacuum",
+    "latex": "C = \\frac{A}{4 \\pi k d}",
+    "sympy_expr": "C = A/(4*pi*k*d)",
+    "variables": [
+      {"symbol": "C", "name": "capacitance", "unit": "F", "description": "Capacitance", "typical_range": [1e-15, 1.0]},
+      {"symbol": "A", "name": "plate area", "unit": "m^2", "description": "Area of each plate", "typical_range": [1e-08, 10000.0]},
+      {"symbol": "k", "name": "Coulomb constant", "unit": "N*m^2/C^2", "description": "1/(4 pi epsilon_0)", "typical_range": null},
+      {"symbol": "d", "name": "plate separation", "unit": "m", "description": "Gap between the plates", "typical_range": [1e-09, 1.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Vacuum between the plates", "Plates large compared with the gap"],
+    "validity_conditions": [],
+    "tags": ["parallel plate", "capacitor", "capacitance", "plate area", "gap", "separation"],
+    "source": "OpenStax University Physics Volume 2, Chapter 8 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "rc_time_constant",
+    "name": "RC time constant",
+    "latex": "\\tau = R C",
+    "sympy_expr": "tau = R*C",
+    "variables": [
+      {"symbol": "tau", "name": "time constant", "unit": "s", "description": "Time to charge to about 63%", "typical_range": [1e-12, 10000000.0]},
+      {"symbol": "R", "name": "resistance", "unit": "ohm", "description": "Resistance in the circuit", "typical_range": [0.001, 1000000000.0]},
+      {"symbol": "C", "name": "capacitance", "unit": "F", "description": "Capacitance", "typical_range": [1e-15, 10.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Single resistor and capacitor in series"],
+    "validity_conditions": [],
+    "tags": ["RC circuit", "time constant", "charging", "discharging", "capacitor", "resistor"],
+    "source": "OpenStax University Physics Volume 2, Chapter 10 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "magnetic_force_charge",
+    "name": "Magnetic force on a moving charge",
+    "latex": "F = q v B",
+    "sympy_expr": "F = q*v*B",
+    "variables": [
+      {"symbol": "F", "name": "magnetic force", "unit": "N", "description": "Force on the charge", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "q", "name": "charge", "unit": "C", "description": "Magnitude of the charge", "typical_range": [1e-12, 0.01]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed of the charge", "typical_range": [0.0, 300000000.0]},
+      {"symbol": "B", "name": "magnetic field", "unit": "T", "description": "Field strength", "typical_range": [1e-09, 50.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Velocity perpendicular to the field"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["magnetic force", "lorentz force", "moving charge", "magnetic field", "tesla", "electron"],
+    "source": "OpenStax University Physics Volume 2, Chapter 11 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "magnetic_force_wire",
+    "name": "Magnetic force on a current-carrying wire",
+    "latex": "F = B I L",
+    "sympy_expr": "F = B*I*L",
+    "variables": [
+      {"symbol": "F", "name": "magnetic force", "unit": "N", "description": "Force on the wire", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "B", "name": "magnetic field", "unit": "T", "description": "Field strength", "typical_range": [1e-09, 50.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current in the wire", "typical_range": [0.0, 10000.0]},
+      {"symbol": "L", "name": "wire length", "unit": "m", "description": "Length of wire in the field", "typical_range": [0.0001, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Wire perpendicular to a uniform field"],
+    "validity_conditions": [],
+    "tags": ["magnetic force", "wire", "current", "motor", "magnetic field", "tesla"],
+    "source": "OpenStax University Physics Volume 2, Chapter 11 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "cyclotron_radius",
+    "name": "Radius of a charge's circular path in a magnetic field",
+    "latex": "r = \\frac{m v}{q B}",
+    "sympy_expr": "r = m*v/(q*B)",
+    "variables": [
+      {"symbol": "r", "name": "path radius", "unit": "m", "description": "Radius of the circular path", "typical_range": [1e-09, 10000000.0]},
+      {"symbol": "m", "name": "particle mass", "unit": "kg", "description": "Mass of the particle", "typical_range": [1e-31, 1e-20]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed of the particle", "typical_range": [1.0, 30000000.0]},
+      {"symbol": "q", "name": "charge", "unit": "C", "description": "Magnitude of the charge", "typical_range": [1e-20, 1e-15]},
+      {"symbol": "B", "name": "magnetic field", "unit": "T", "description": "Field strength", "typical_range": [1e-09, 50.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Velocity perpendicular to a uniform field"],
+    "validity_conditions": ["Speeds far below the speed of light"],
+    "tags": ["cyclotron", "circular path", "mass spectrometer", "magnetic field", "radius", "particle"],
+    "source": "OpenStax University Physics Volume 2, Chapter 11 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "wire_magnetic_field",
+    "name": "Magnetic field of a long straight wire",
+    "latex": "B = \\frac{\\mu_0 I}{2 \\pi r}",
+    "sympy_expr": "B = mu0*I/(2*pi*r)",
+    "variables": [
+      {"symbol": "B", "name": "magnetic field", "unit": "T", "description": "Field strength at distance r", "typical_range": [0.0, 100.0]},
+      {"symbol": "mu0", "name": "magnetic constant", "unit": "N/A^2", "description": "Vacuum permeability", "typical_range": null},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current in the wire", "typical_range": [0.0, 10000.0]},
+      {"symbol": "r", "name": "distance", "unit": "m", "description": "Distance from the wire", "typical_range": [1e-06, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Long straight wire", "Vacuum or air around the wire"],
+    "validity_conditions": [],
+    "tags": ["magnetic field", "straight wire", "current", "power line", "tesla", "distance from wire"],
+    "source": "OpenStax University Physics Volume 2, Chapter 12 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "solenoid_field",
+    "name": "Magnetic field inside a long solenoid",
+    "latex": "B = \\mu_0 n I",
+    "sympy_expr": "B = mu0*n*I",
+    "variables": [
+      {"symbol": "B", "name": "magnetic field", "unit": "T", "description": "Field strength inside the solenoid", "typical_range": [0.0, 100.0]},
+      {"symbol": "mu0", "name": "magnetic constant", "unit": "N/A^2", "description": "Vacuum permeability", "typical_range": null},
+      {"symbol": "n", "name": "turns per length", "unit": "1/m", "description": "Number of turns per meter", "typical_range": [1.0, 1000000.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current in the coil", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Long solenoid", "Air core"],
+    "validity_conditions": [],
+    "tags": ["solenoid", "coil", "electromagnet", "magnetic field", "turns", "current"],
+    "source": "OpenStax University Physics Volume 2, Chapter 12 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "motional_emf",
+    "name": "Motional emf",
+    "latex": "\\mathcal{E} = B L v",
+    "sympy_expr": "emf = B*L*v",
+    "variables": [
+      {"symbol": "emf", "name": "induced emf", "unit": "V", "description": "Voltage induced across the rod", "typical_range": [0.0, 1000000.0]},
+      {"symbol": "B", "name": "magnetic field", "unit": "T", "description": "Field strength", "typical_range": [1e-09, 50.0]},
+      {"symbol": "L", "name": "rod length", "unit": "m", "description": "Length of the moving rod", "typical_range": [0.0001, 10000.0]},
+      {"symbol": "v", "name": "speed", "unit": "m/s", "description": "Speed of the rod", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Rod, velocity, and field mutually perpendicular", "Uniform field"],
+    "validity_conditions": [],
+    "tags": ["induction", "motional emf", "generator", "moving rod", "faraday", "induced voltage"],
+    "source": "OpenStax University Physics Volume 2, Chapter 13 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "inductor_energy",
+    "name": "Energy stored in an inductor",
+    "latex": "U = \\frac{1}{2} L I^2",
+    "sympy_expr": "U = L*I**2/2",
+    "variables": [
+      {"symbol": "U", "name": "stored energy", "unit": "J", "description": "Energy stored in the magnetic field", "typical_range": [0.0, 1000000000.0]},
+      {"symbol": "L", "name": "inductance", "unit": "H", "description": "Inductance", "typical_range": [1e-09, 10000.0]},
+      {"symbol": "I", "name": "current", "unit": "A", "description": "Current through the inductor", "typical_range": [0.0, 10000.0]}
+    ],
+    "domain": "electromagnetism",
+    "assumptions": ["Ideal inductor"],
+    "validity_conditions": [],
+    "tags": ["inductor", "inductance", "energy", "coil", "henry", "magnetic energy"],
+    "source": "OpenStax University Physics Volume 2, Chapter 14 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "thin_lens",
+    "name": "Thin lens equation",
+    "latex": "\\frac{1}{f} = \\frac{1}{d_o} + \\frac{1}{d_i}",
+    "sympy_expr": "1/f = 1/do + 1/di",
+    "variables": [
+      {"symbol": "f", "name": "focal length", "unit": "m", "description": "Focal length of the lens", "typical_range": [0.0001, 100.0]},
+      {"symbol": "do", "name": "object distance", "unit": "m", "description": "Distance from the object to the lens", "typical_range": [0.0001, 1000000.0]},
+      {"symbol": "di", "name": "image distance", "unit": "m", "description": "Distance from the lens to the real image", "typical_range": [0.0001, 1000000.0]}
+    ],
+    "domain": "optics",
+    "assumptions": ["Thin lens", "Real object and real image", "Paraxial rays"],
+    "validity_conditions": [],
+    "tags": ["lens", "focal length", "image", "object distance", "magnifying glass", "camera", "projector"],
+    "source": "OpenStax University Physics Volume 3, Chapter 2 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "lens_power",
+    "name": "Optical power of a lens",
+    "latex": "P = \\frac{1}{f}",
+    "sympy_expr": "P = 1/f",
+    "variables": [
+      {"symbol": "P", "name": "lens power", "unit": "1/m", "description": "Optical power in diopters", "typical_range": [0.01, 10000.0]},
+      {"symbol": "f", "name": "focal length", "unit": "m", "description": "Focal length of the lens", "typical_range": [0.0001, 100.0]}
+    ],
+    "domain": "optics",
+    "assumptions": ["Thin lens", "Converging lens"],
+    "validity_conditions": [],
+    "tags": ["diopters", "lens power", "glasses", "focal length", "prescription"],
+    "source": "OpenStax University Physics Volume 3, Chapter 2 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "lens_magnification",
+    "name": "Image height from distances",
+    "latex": "\\frac{h_i}{h_o} = \\frac{d_i}{d_o}",
+    "sympy_expr": "hi/ho = di/do",
+    "variables": [
+      {"symbol": "hi", "name": "image height", "unit": "m", "description": "Height of the image", "typical_range": [1e-06, 10000.0]},
+      {"symbol": "ho", "name": "object height", "unit": "m", "description": "Height of the object", "typical_range": [1e-06, 10000.0]},
+      {"symbol": "di", "name": "image distance", "unit": "m", "description": "Distance from the lens to the image", "typical_range": [0.0001, 1000000.0]},
+      {"symbol": "do", "name": "object distance", "unit": "m", "description": "Distance from the object to the lens", "typical_range": [0.0001, 1000000.0]}
+    ],
+    "domain": "optics",
+    "assumptions": ["Thin lens", "Magnitudes only (inversion ignored)"],
+    "validity_conditions": [],
+    "tags": ["magnification", "image height", "lens", "projector", "camera", "object height"],
+    "source": "OpenStax University Physics Volume 3, Chapter 2 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
+  },
+  {
+    "id": "photon_energy",
+    "name": "Photon energy from frequency",
+    "latex": "E = h f",
+    "sympy_expr": "E = h*f",
+    "variables": [
+      {"symbol": "E", "name": "photon energy", "unit": "J", "description": "Energy of one photon", "typical_range": [1e-30, 1e-10]},
+      {"symbol": "h", "name": "Planck constant", "unit": "J*s", "description": "Planck's constant", "typical_range": null},
+      {"symbol": "f", "name": "frequency", "unit": "Hz", "description": "Frequency of the light", "typical_range": [1000.0, 1e+24]}
+    ],
+    "domain": "modern",
+    "assumptions": ["Single photon"],
+    "validity_conditions": [],
+    "tags": ["photon", "energy", "frequency", "light", "planck", "quantum", "x-ray"],
+    "source": "OpenStax University Physics Volume 3, Chapter 6 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "photon_energy_wavelength",
+    "name": "Photon energy from wavelength",
+    "latex": "E = \\frac{h c}{\\lambda}",
+    "sympy_expr": "E = h*c/lam",
+    "variables": [
+      {"symbol": "E", "name": "photon energy", "unit": "J", "description": "Energy of one photon", "typical_range": [1e-30, 1e-10]},
+      {"symbol": "h", "name": "Planck constant", "unit": "J*s", "description": "Planck's constant", "typical_range": null},
+      {"symbol": "c", "name": "speed of light constant", "unit": "m/s", "description": "Speed of light in vacuum", "typical_range": null},
+      {"symbol": "lam", "name": "wavelength", "unit": "m", "description": "Wavelength of the light", "typical_range": [1e-16, 100000.0]}
+    ],
+    "domain": "modern",
+    "assumptions": ["Single photon in vacuum"],
+    "validity_conditions": [],
+    "tags": ["photon", "energy", "wavelength", "light", "nanometers", "color", "laser"],
+    "source": "OpenStax University Physics Volume 3, Chapter 6 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "mass_energy",
+    "name": "Mass-energy equivalence",
+    "latex": "E = m c^2",
+    "sympy_expr": "E = m*c**2",
+    "variables": [
+      {"symbol": "E", "name": "rest energy", "unit": "J", "description": "Energy equivalent of the mass", "typical_range": [0.0, 1e+50]},
+      {"symbol": "m", "name": "mass", "unit": "kg", "description": "Rest mass", "typical_range": [1e-31, 1e+30]},
+      {"symbol": "c", "name": "speed of light constant", "unit": "m/s", "description": "Speed of light in vacuum", "typical_range": null}
+    ],
+    "domain": "modern",
+    "assumptions": ["Rest energy (object at rest)"],
+    "validity_conditions": [],
+    "tags": ["mass-energy", "einstein", "e=mc2", "rest energy", "nuclear", "annihilation"],
+    "source": "OpenStax University Physics Volume 3, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "de_broglie",
+    "name": "de Broglie wavelength",
+    "latex": "\\lambda = \\frac{h}{p}",
+    "sympy_expr": "lam = h/p",
+    "variables": [
+      {"symbol": "lam", "name": "de Broglie wavelength", "unit": "m", "description": "Matter wavelength of the particle", "typical_range": [1e-20, 0.001]},
+      {"symbol": "h", "name": "Planck constant", "unit": "J*s", "description": "Planck's constant", "typical_range": null},
+      {"symbol": "p", "name": "momentum", "unit": "kg*m/s", "description": "Momentum of the particle", "typical_range": [1e-35, 1000.0]}
+    ],
+    "domain": "modern",
+    "assumptions": [],
+    "validity_conditions": [],
+    "tags": ["de broglie", "matter wave", "wavelength", "electron", "momentum", "quantum"],
+    "source": "OpenStax University Physics Volume 3, Chapter 6 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "photon_momentum",
+    "name": "Momentum of a photon",
+    "latex": "p = \\frac{E}{c}",
+    "sympy_expr": "p = E/c",
+    "variables": [
+      {"symbol": "p", "name": "photon momentum", "unit": "kg*m/s", "description": "Momentum carried by the photon", "typical_range": [1e-40, 1e-15]},
+      {"symbol": "E", "name": "photon energy", "unit": "J", "description": "Energy of the photon", "typical_range": [1e-30, 1e-10]},
+      {"symbol": "c", "name": "speed of light constant", "unit": "m/s", "description": "Speed of light in vacuum", "typical_range": null}
+    ],
+    "domain": "modern",
+    "assumptions": ["In vacuum"],
+    "validity_conditions": [],
+    "tags": ["photon", "momentum", "radiation pressure", "light", "solar sail"],
+    "source": "OpenStax University Physics Volume 3, Chapter 6 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "photoelectric_effect",
+    "name": "Photoelectric effect",
+    "latex": "K_{max} = h f - \\phi",
+    "sympy_expr": "KE = h*f - phi",
+    "variables": [
+      {"symbol": "KE", "name": "maximum kinetic energy", "unit": "J", "description": "Kinetic energy of the fastest ejected electrons", "typical_range": [0.0, 1e-15]},
+      {"symbol": "h", "name": "Planck constant", "unit": "J*s", "description": "Planck's constant", "typical_range": null},
+      {"symbol": "f", "name": "frequency", "unit": "Hz", "description": "Frequency of the incident light", "typical_range": [10000000000000.0, 1e+18]},
+      {"symbol": "phi", "name": "work function", "unit": "J", "description": "Minimum energy to free an electron", "typical_range": [1e-20, 1e-18]}
+    ],
+    "domain": "modern",
+    "assumptions": ["Light above the threshold frequency"],
+    "validity_conditions": [],
+    "tags": ["photoelectric", "work function", "electron", "light", "threshold", "einstein"],
+    "source": "OpenStax University Physics Volume 3, Chapter 6 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "time_dilation",
+    "name": "Time dilation",
+    "latex": "\\Delta t = \\frac{\\Delta t_0}{\\sqrt{1 - v^2/c^2}}",
+    "sympy_expr": "t = t0/sqrt(1 - v**2/c**2)",
+    "variables": [
+      {"symbol": "t", "name": "dilated time", "unit": "s", "description": "Time interval measured by the observer", "typical_range": [1e-12, 1000000000000.0]},
+      {"symbol": "t0", "name": "proper time", "unit": "s", "description": "Time interval in the moving clock's frame", "typical_range": [1e-12, 1000000000000.0]},
+      {"symbol": "v", "name": "relative speed", "unit": "m/s", "description": "Speed of the moving clock", "typical_range": [0.0, 299792457.0]},
+      {"symbol": "c", "name": "speed of light constant", "unit": "m/s", "description": "Speed of light in vacuum", "typical_range": null}
+    ],
+    "domain": "modern",
+    "assumptions": ["Inertial frames", "Constant relative speed"],
+    "validity_conditions": [],
+    "tags": ["time dilation", "relativity", "special relativity", "twin paradox", "muon", "moving clock"],
+    "source": "OpenStax University Physics Volume 3, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
+  },
+  {
+    "id": "length_contraction",
+    "name": "Length contraction",
+    "latex": "L = L_0 \\sqrt{1 - v^2/c^2}",
+    "sympy_expr": "L = L0*sqrt(1 - v**2/c**2)",
+    "variables": [
+      {"symbol": "L", "name": "contracted length", "unit": "m", "description": "Length measured by the observer", "typical_range": [1e-15, 1000000000000000.0]},
+      {"symbol": "L0", "name": "proper length", "unit": "m", "description": "Length in the object's rest frame", "typical_range": [1e-15, 1000000000000000.0]},
+      {"symbol": "v", "name": "relative speed", "unit": "m/s", "description": "Speed of the object", "typical_range": [0.0, 299792457.0]},
+      {"symbol": "c", "name": "speed of light constant", "unit": "m/s", "description": "Speed of light in vacuum", "typical_range": null}
+    ],
+    "domain": "modern",
+    "assumptions": ["Inertial frames", "Length along the direction of motion"],
+    "validity_conditions": [],
+    "tags": ["length contraction", "relativity", "special relativity", "spaceship", "fast moving"],
+    "source": "OpenStax University Physics Volume 3, Chapter 5 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.99
   }
 ]

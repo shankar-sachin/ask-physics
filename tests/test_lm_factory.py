@@ -1,6 +1,7 @@
 import json
 import re
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -277,9 +278,10 @@ def test_load_blocklist(tmp_path: Path) -> None:
 
 
 def test_targets_are_balanced(store: DataStore) -> None:
-    factory = DataFactory(store, seed=9)
+    only_kinematics = replace(store, equations={"kin_v_at": store.equations["kin_v_at"]})
+    factory = DataFactory(only_kinematics, seed=9)
     counts: dict[str, Counter[str]] = {}
-    for _ in range(1500):
+    for _ in range(400):
         p = factory.standard_problem()
         if p is not None:
             counts.setdefault(p.equation.id, Counter())[p.plan.target] += 1

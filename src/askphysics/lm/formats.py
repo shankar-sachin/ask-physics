@@ -21,10 +21,14 @@ from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
 # Always-allowed numbers: "dropped" means v0 = 0, "a single" object means 1.
 STRUCTURAL_NUMBERS = ("0", "1")
 
-# Not preceded by identifier characters or an exponent: the 2 in m/s^2 or second ** 2 is no number.
-_NUMBER = re.compile(r"(?<![A-Za-z0-9_.^*])(?<!\*\* )-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+# Not preceded by identifier characters or an exponent: the 2 in m/s^2, the 1 in m^-1, or
+# second ** 2 is no number.
+_NUMBER = re.compile(
+    r"(?<![A-Za-z0-9_.^*])(?<!\*\* )(?<!\^-)(?<!\*\* -)-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
+)
+# A unit starts with a letter; "^-" allows negative exponents ("s^-1", "m^-1").
 _UNIT_AFTER_NUMBER = re.compile(
-    _NUMBER.pattern + r"\s*([A-Za-z][A-Za-z0-9/^*]*(?:\([A-Za-z0-9/^*]+\))?)"
+    _NUMBER.pattern + r"\s*([A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?)"
 )
 
 

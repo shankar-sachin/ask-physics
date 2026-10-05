@@ -6,5 +6,8 @@
   {"name": "molar_gas_constant", "symbol": "R", "value": 8.314462618, "unit": "J/(mol*K)", "uncertainty": 0.0, "source": "Exact (N_A * k_B, truncated to 10 significant figures); CODATA 2022 (NIST)"},
   {"name": "elementary_charge", "symbol": "e", "value": 1.602176634e-19, "unit": "C", "uncertainty": 0.0, "source": "Exact by SI definition (2019); CODATA 2022 (NIST)"},
   {"name": "planck_constant", "symbol": "h", "value": 6.62607015e-34, "unit": "J*s", "uncertainty": 0.0, "source": "Exact by SI definition (2019); CODATA 2022 (NIST)"},
-  {"name": "standard_atmosphere", "symbol": "atm", "value": 101325.0, "unit": "Pa", "uncertainty": 0.0, "source": "Defined value (10th CGPM, 1954)"}
+  {"name": "standard_atmosphere", "symbol": "atm", "value": 101325.0, "unit": "Pa", "uncertainty": 0.0, "source": "Defined value (10th CGPM, 1954)"},
+  {"name": "coulomb_constant", "symbol": "k_e", "value": 8987551786.2, "unit": "N*m^2/C^2", "uncertainty": 1.4, "source": "1/(4 pi epsilon_0) from the CODATA 2022 vacuum electric permittivity (NIST)"},
+  {"name": "magnetic_constant", "symbol": "mu_0", "value": 1.25663706127e-06, "unit": "N/A^2", "uncertainty": 2e-16, "source": "Vacuum magnetic permeability, CODATA 2022 recommended values (NIST)"},
+  {"name": "stefan_boltzmann_constant", "symbol": "sigma", "value": 5.670374419e-08, "unit": "W/(m^2*K^4)", "uncertainty": 0.0, "source": "Exact (derived from the exact SI defining constants); CODATA 2022 (NIST)"}
 ]

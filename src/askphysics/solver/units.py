@@ -86,6 +86,23 @@ def check_dimensions(q: Quantity, expected_unit: str) -> bool:
     return bool(q.dimensionality == ureg.Quantity(1, _parse_unit(expected_unit)).dimensionality)
 
 
+def unit_string(units: Any) -> str:
+    """Pint's spelling of ``units``, without a bare leading 1.
+
+    Pint writes a reciprocal unit as "1 / meter". Model-written text may only contain
+    numbers from its input, so that 1 can't be copied into an explanation; "meter ** -1"
+    is the same unit with nothing but an exponent.
+    """
+    text = str(units)
+    if not text.startswith("1 / "):
+        return text
+    factors = []
+    for name, power in sorted(dict(units._units).items(), key=lambda item: -item[1]):
+        exponent = int(power) if float(power).is_integer() else power
+        factors.append(name if exponent == 1 else f"{name} ** {exponent}")
+    return " * ".join(factors)
+
+
 def format_quantity(q: Quantity, sig_figs: int = 6) -> str:
     """Format a quantity with a fixed number of significant figures."""
     return f"{q.magnitude:.{sig_figs}g} {q.units}"
