@@ -110,15 +110,18 @@ def _solutions(sympy_expr: str, unknown: str) -> tuple[sp.Expr, ...]:
 def check_dimensional_consistency(equation: Equation) -> bool:
     """True if both sides of the equation have the same dimensions given the declared units.
 
-    Substitutes ``1 * unit`` for every variable and evaluates both sides with
+    Substitutes a quantity in each variable's unit and evaluates both sides with
     Pint. Adding incompatible quantities raises inside Pint, which counts as
-    inconsistent.
+    inconsistent. Each variable gets a different magnitude, because only the units
+    matter and equal ones would turn ``v/(v - vs)`` into a division by zero.
     """
     eq = parse_equation(equation.sympy_expr)
-    ones = {v.symbol: quantity(1.0, v.unit) for v in equation.variables}
+    probes = {
+        v.symbol: quantity(1.0 + 0.137 * (i + 1), v.unit) for i, v in enumerate(equation.variables)
+    }
     try:
-        lhs = _evaluate(eq.lhs, ones)
-        rhs = _evaluate(eq.rhs, ones)
+        lhs = _evaluate(eq.lhs, probes)
+        rhs = _evaluate(eq.rhs, probes)
     except pint.errors.DimensionalityError:
         return False
     lhs_q = lhs if isinstance(lhs, pint.Quantity) else quantity(float(lhs), "dimensionless")

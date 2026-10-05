@@ -8,6 +8,16 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- 43 new equations (12 → 55): average speed, vertical launches, centripetal
+  acceleration and force, angular velocity, period and frequency, Hooke's law,
+  impulse, torque, rotational dynamics and energy, moment of inertia, work,
+  power, spring energy, the work-energy theorem, angular momentum, recoil,
+  surface gravity, orbital and escape speed, Kepler's third law, density,
+  pressure, hydrostatic pressure, buoyancy, continuity, flow rate, spring and
+  pendulum periods, wave speed, string waves, intensity, and the Doppler
+  effect. New domains: fluids, waves (plus optics and modern, used by the
+  next batch). Every equation is checked to solve for each of its variables.
+  Retrain models after this; the factory covers every new equation.
 - Questions are normalized before anything reads them, so real-world
   spellings work: "2,000-kg", "3.00 × 10⁸ m/s", "m/s²", "kg·m/s", "55-kg",
   "20 meters per second", "25 °C", "2.5 µC", "220 Ω". Across the OpenStax
@@ -46,6 +56,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The dimensional check set every variable to 1, so an equation like
+  `f = fs*v/(v - vs)` crashed validation with a division by zero.
 - More unit strings crashed Pint's parser ("K^0", "m^^2"); any string it
   can't parse is now simply not a unit. A number too large for a float
   ("1e999") no longer crashes number extraction.

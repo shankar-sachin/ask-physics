@@ -37,8 +37,9 @@ def test_nonsense_returns_nothing(retriever: KeywordRetriever) -> None:
 
 
 def test_domain_hint_boosts_but_does_not_filter(retriever: KeywordRetriever) -> None:
-    plain = retriever.search("mass", k=12)
-    boosted = retriever.search("mass", k=12, domains=["energy"])
+    everything = 1000
+    plain = retriever.search("mass", k=everything)
+    boosted = retriever.search("mass", k=everything, domains=["energy"])
     assert {h.equation.id for h in plain.equations} == {h.equation.id for h in boosted.equations}
     before = {h.equation.id: h.score for h in plain.equations}
     after = {h.equation.id: h.score for h in boosted.equations}
@@ -47,10 +48,14 @@ def test_domain_hint_boosts_but_does_not_filter(retriever: KeywordRetriever) -> 
 
 
 def test_domain_hint_breaks_ties(retriever: KeywordRetriever) -> None:
-    # "mass" scores 1.0 for several equations; the hint decides which comes first.
-    assert retriever.search("mass", k=3).equations[0].equation.id == "momentum"
-    hinted = retriever.search("mass", k=3, domains=["gravitation"])
-    assert hinted.equations[0].equation.id == "newton_gravitation"
+    # "mass" ties several equations from different domains; the hint decides which comes first.
+    plain = retriever.search("mass", k=1000).equations
+    tied = [h for h in plain if h.score == plain[0].score]
+    other_domain = next(
+        h.equation.domain for h in tied if h.equation.domain != tied[0].equation.domain
+    )
+    hinted = retriever.search("mass", k=3, domains=[other_domain])
+    assert hinted.equations[0].equation.domain == other_domain
 
 
 def test_deterministic(retriever: KeywordRetriever) -> None:

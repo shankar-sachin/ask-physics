@@ -22,6 +22,10 @@ Domain = Literal[
     "gravitation",
     "electromagnetism",
     "thermodynamics",
+    "fluids",
+    "waves",
+    "optics",
+    "modern",
 ]
 Category = Literal["standard", "fermi", "out_of_scope"]
 Origin = Literal["given", "constant", "assumption"]
