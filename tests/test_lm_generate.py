@@ -19,6 +19,7 @@ from askphysics.lm.formats import (
     relevant_constants,
     serialize_classification,
     serialize_plan,
+    stated_quantities,
 )
 from askphysics.lm.generate import (
     Decoder,
@@ -108,7 +109,7 @@ def test_random_weights_still_produce_valid_plans(
     for k in plan.known_values:  # every value fits its variable's dimensions
         assert check_dimensions(quantity(1.0, k.unit), variables[k.symbol].unit), k
     given = [(format_number(k.value), k.unit) for k in plan.known_values if k.origin == "given"]
-    stated = question_quantities(QUESTION)
+    stated = stated_quantities(QUESTION)
     assert all(given.count(g) <= stated.count(g) for g in given)  # no quantity used twice
     assert {k.symbol for k in plan.known_values} | set(plan.unknowns) == symbols
     for text in [*plan.assumptions, plan.strategy]:
@@ -266,7 +267,7 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
         assert gold.target in target_options(list(variables.values()), q, consts), q
         gold_by_symbol = {k.symbol: k for k in gold.known_values}
         order = [s for s in variables if s not in gold.unknowns]
-        unused = question_quantities(q)
+        unused = stated_quantities(q)
         for i, symbol in enumerate(order):  # in the order the decoder writes them
             k = gold_by_symbol[symbol]
             options = assignable_options(
@@ -353,3 +354,13 @@ def test_a_slot_with_no_legal_value_still_decodes(store: DataStore, tokenizer: T
     consts = list(store.constants.values())
     plan = decode_plan(_decoder(tokenizer, 3), "How much energy is that?", "standard", eqs, consts)
     assert plan.equation_ids == ["gravitational_pe"]
+
+
+def test_dimensionless_values_are_bare_numbers(store: DataStore) -> None:
+    friction = {v.symbol: v for v in store.equations["kinetic_friction"].variables}
+    q = "A crate feels 14 N of friction with a 40 N normal force and coefficient 0.35."
+    mu = known_value_options(friction["mu"], q, [])
+    assert ValueOption("0.35", "dimensionless", "given") in mu
+    assert not any(o.number == "40" for o in mu)  # a number with a unit is never dimensionless
+    q = "Sliding friction is 14 N under a 40 N normal force. What is the coefficient?"
+    assert target_options(list(friction.values()), q, []) == ["mu"]

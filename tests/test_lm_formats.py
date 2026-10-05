@@ -17,6 +17,7 @@ from askphysics.lm.formats import (
     relevant_constants,
     serialize_classification,
     serialize_plan,
+    stated_quantities,
 )
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, KnownValue, Plan
@@ -122,3 +123,15 @@ def test_numbers_too_big_for_a_float_are_skipped() -> None:
     text = "A 1e999 m wall and 5 kg of sand"
     assert extract_numbers(text) == ["5"]
     assert question_quantities(text) == [("5", "kg")]
+
+
+def test_stated_quantities_add_bare_numbers_as_dimensionless() -> None:
+    text = "A 5 kg box with a friction coefficient of 0.3 on a 2 m ramp"
+    assert stated_quantities(text) == [("5", "kg"), ("2", "m"), ("0.3", "dimensionless")]
+
+
+def test_e_notation_is_never_split_into_a_number_and_the_unit_e() -> None:
+    assert question_quantities("about 7.5e+19 molecules, and 6.3e+20, then") == [
+        ("7.5e+19", "molecules")
+    ]
+    assert stated_quantities("6.3e+20, then 2 C") == [("2", "C"), ("6.3e+20", "dimensionless")]

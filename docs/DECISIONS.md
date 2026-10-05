@@ -453,6 +453,10 @@ writes:
   the fourth eval, where "lifting it 11 m took 11000 J, what is its mass?"
   was solved for g with an invented m = 1 kg.
 
+- A number with no unit after it is a dimensionless quantity, so it can
+  fill a friction coefficient, an efficiency, or a count; a number with a
+  unit never can. Added with the dimensionless equations (v0.3).
+
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable
 would have it forced into the plan; the data factory never writes one, and

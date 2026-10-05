@@ -311,6 +311,42 @@ VAR_SYNONYMS: dict[str, tuple[str, ...]] = {
     "wire length": ("wire length", "length of the wire"),
     "work function": ("work function",),
     "work output": ("work output", "work done", "useful work"),
+    # Dimensionless quantities, written as bare numbers.
+    "kinetic friction force": ("kinetic friction force", "friction force", "friction"),
+    "coefficient of kinetic friction": (
+        "coefficient of kinetic friction",
+        "friction coefficient",
+        "coefficient of friction",
+    ),
+    "normal force": ("normal force", "normal force", "contact force"),
+    "maximum static friction": ("maximum static friction", "max static friction force"),
+    "coefficient of static friction": (
+        "coefficient of static friction",
+        "static friction coefficient",
+    ),
+    "efficiency": ("efficiency", "efficiency"),
+    "useful energy out": ("useful energy out", "useful output energy", "useful work"),
+    "energy in": ("energy in", "input energy", "energy supplied"),
+    "maximum efficiency": ("maximum efficiency", "Carnot efficiency", "ideal efficiency"),
+    "cold reservoir temperature": ("cold reservoir temperature", "cold side temperature"),
+    "hot reservoir temperature": ("hot reservoir temperature", "hot side temperature"),
+    "refractive index": ("refractive index", "index of refraction"),
+    "speed of light in the medium": (
+        "speed of light in the medium",
+        "speed of light in the material",
+    ),
+    "secondary voltage": ("secondary voltage", "output voltage"),
+    "primary voltage": ("primary voltage", "input voltage"),
+    "secondary turns": ("secondary turns", "turns on the secondary"),
+    "primary turns": ("primary turns", "turns on the primary"),
+    "magnification": ("magnification", "magnifying power"),
+    "number of molecules": ("number of molecules", "molecule count"),
+    "Lorentz factor": ("Lorentz factor", "gamma factor"),
+    "emissivity": ("emissivity",),
+    "relative permittivity": ("relative permittivity", "dielectric constant"),
+    "average induced emf": ("average induced emf", "average emf", "induced voltage"),
+    "number of turns": ("number of turns", "turns", "coil turns"),
+    "coil area": ("coil area", "area of the coil"),
 }
 
 # --------------------------------------------------------------------------- generic questions
