@@ -68,15 +68,20 @@ Budgets are about 20 tokens per parameter. Steps ≈ tokens ÷ (batch × 260):
 | solem | 29.9M | ~600M | 32 | ~72,000 |
 | celeste | 119.6M | ~2.4B | 32 | ~290,000 |
 
+These budgets assume varied data. On template data a model stops improving
+on held-out phrasings long before its budget runs out (see the results
+below), so train in short runs and extend only while validation loss keeps
+falling.
+
 ```bash
 caffeinate -dims askphysics model train --model fermi-tellus-1 \
-  --data build/data --tokenizer build/tokenizer.json --steps 7500 --batch-size 32
+  --data build/data --tokenizer build/tokenizer.json --steps 1500 --batch-size 32
 ```
 
 - `caffeinate` keeps the Mac awake. Weights land in
   `~/.cache/askphysics/models/<model>/`, where `askphysics` looks for them.
 - Runs checkpoint as they go. If one stops, rerun the same command with
-  `--resume`.
+  `--resume`. A fresh run (no `--resume`) starts a fresh `metrics.jsonl`.
 - Train tellus first and check it before spending hours on solem. Train
   celeste only if solem's held-out results leave room for it to help
   (open question Q16).
@@ -84,7 +89,8 @@ caffeinate -dims askphysics model train --model fermi-tellus-1 \
 ## 6. Check the results
 
 ```bash
-askphysics model info             # params, size, last validation loss
+askphysics model info                                  # params, size, last validation loss
+askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a few minutes
 ```
 
 - The validation split uses held-out templates, so a falling validation loss
@@ -94,6 +100,58 @@ askphysics model info             # params, size, last validation loss
 - Each evaluation logs `val_loss` plus `val_loss_classify`, `val_loss_plan`,
   and `val_loss_explain`, so you can see which task is overfitting. The CLI
   prints the final per-task numbers when training ends.
-- Send the `model info` table and `metrics.jsonl` from the model directory;
+- Loss includes free prose the model can never predict exactly (which of
+  eight reasoning sentences, which explanation wording), so it has a floor.
+  `model eval` scores what the pipeline needs instead: it decodes held-out
+  questions with the constrained decoder and reports the share with the right
+  category and the share of plans that compute the right answer ("valid
+  plan"). Failures print with what was expected; everything lands in
+  `eval.json` next to the weights.
+- Send the `model info` table, `metrics.jsonl`, and the `model eval` table;
   they feed the model cards and the v0.3 exit criteria (90% valid plans on
   unseen templates).
+
+## 7. Results so far
+
+### fermi-tellus-1 on the original templates (v0.2 factory)
+
+1,500 steps at batch 32, 10.7K target tokens/s on the M5 Pro, 7 minutes.
+Train loss 0.014, val loss flat at about 1.17 from step 150 on. With 14
+generic templates and 7 scenarios the model memorized every phrasing within
+150 steps; the tokenizer only reached 1,455 tokens.
+
+### fermi-tellus-1 on composed templates (PR #26)
+
+1,500 steps at batch 32, 10.4K target tokens/s, 7.5 minutes. Tokenizer:
+2,557 tokens.
+
+| Step | Train | Val | Classify | Plan | Explain |
+|------|-------|-----|----------|------|---------|
+| 150 | 0.56 | 0.828 | 1.035 | 0.520 | 1.715 |
+| 300 | 0.24 | 0.584 | 0.918 | 0.264 | 1.396 |
+| 600 | 0.16 | 0.555 | 1.126 | 0.184 | 1.320 |
+| 900 | 0.06 | 0.445 | 1.116 | 0.099 | 1.028 |
+| 1,200 | 0.05 | 0.441 | 1.151 | 0.079 | 1.045 |
+| 1,500 | 0.05 | 0.430 | 1.148 | 0.061 | 1.049 |
+
+- **Plan** kept improving the whole run (0.52 to 0.061). That's the task
+  that matters most, since plans are what Noether computes from.
+- **Explain** levelled off near 1.05 by step 900. Much of that is the
+  irreducible choice among explanation and assumption wordings.
+- **Classify** bottomed out at step 300 (0.918) and then crept up to 1.15:
+  the reasoning and redirect sentences of held-out Fermi and out-of-scope
+  templates are text the model never saw, and it grew overconfident in the
+  training ones. The category itself may still be right; `model eval`
+  measures that.
+
+### Next
+
+1. Run `askphysics model eval` on tellus. If category accuracy and the valid
+   plan rate are high, tellus is good enough for its job (reading every
+   question) and the classify loss is just prose.
+2. Probe solem's throughput (section 4), then train it in short runs, about
+   3,000 steps first, watching per-task val loss. Extend only while val
+   keeps falling.
+3. If classify accuracy is weak: more Fermi and out-of-scope templates, and
+   reasoning sentences tied to the question (its domain or the reason it is
+   out of scope) rather than picked at random.
