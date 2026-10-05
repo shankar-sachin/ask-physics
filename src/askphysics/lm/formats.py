@@ -27,8 +27,11 @@ _NUMBER = re.compile(
     r"(?<![A-Za-z0-9_.^*])(?<!\*\* )(?<!\^-)(?<!\*\* -)-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
 )
 # A unit starts with a letter; "^-" allows negative exponents ("s^-1", "m^-1").
+# The number is atomic, so "7.5e+19" is never split into 7.5 and the unit "e".
 _UNIT_AFTER_NUMBER = re.compile(
-    _NUMBER.pattern + r"\s*([A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?)"
+    "(?>"
+    + _NUMBER.pattern
+    + r")\s*([A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?)"
 )
 
 
@@ -80,6 +83,22 @@ def question_quantities(text: str) -> list[tuple[str, str]]:
         if is_valid_unit(unit) and math.isfinite(float(number)):
             out.append((format_number(float(number)), unit))
     return out
+
+
+def stated_quantities(text: str) -> list[tuple[str, str]]:
+    """``question_quantities`` plus every bare number, as a dimensionless quantity.
+
+    A friction coefficient or an efficiency is written without a unit ("a coefficient of
+    0.3"), so a number with no unit after it can fill a dimensionless variable. Numbers
+    that carry a unit are never offered as dimensionless.
+    """
+    with_unit = {m.start() for m in _UNIT_AFTER_NUMBER.finditer(text) if is_valid_unit(m.group(1))}
+    bare = [
+        (format_number(float(m.group())), "dimensionless")
+        for m in _NUMBER.finditer(text)
+        if m.start() not in with_unit and math.isfinite(float(m.group()))
+    ]
+    return question_quantities(text) + bare
 
 
 def _unique(items: Iterable[str]) -> list[str]:

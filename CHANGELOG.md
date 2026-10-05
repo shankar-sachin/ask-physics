@@ -8,6 +8,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- 12 more equations (98 → 110) with dimensionless quantities: kinetic and
+  static friction, efficiency, Carnot efficiency, refractive index, the
+  ideal transformer, magnification, the ideal gas law by molecule count,
+  the Lorentz factor, emissivity, dielectric capacitors, and Faraday's law
+  for a coil. Questions write these as bare numbers ("a friction
+  coefficient of 0.3"), and the plan decoder now reads a number with no unit
+  after it as a dimensionless quantity.
 - 43 more equations (55 → 98) in thermodynamics (heat, latent heat,
   expansion, conduction, radiation, the first law, kinetic theory, heat
   engines), electromagnetism (Coulomb's law, fields, potential, electric
@@ -69,6 +76,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A number in e-notation with no unit after it ("6.3e+20,") was split into
+  6.3 and the unit "e" (Pint's elementary charge).
 - Quantities with negative exponents in their unit ("5 s^-1", "230 m^-1",
   including "s⁻¹" after normalization) weren't read, and the 1 in "m^-1" was
   read as a number.

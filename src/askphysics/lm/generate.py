@@ -35,8 +35,8 @@ from askphysics.lm.formats import (
     plan_numbers,
     plan_prompt,
     plan_units,
-    question_quantities,
     relevant_constants,
+    stated_quantities,
 )
 from askphysics.lm.model import FermiLM, KVCache
 from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer, pretokenize
@@ -455,7 +455,7 @@ def known_value_options(
         if option not in options:
             options.append(option)
 
-    for number, unit in question_quantities(question):
+    for number, unit in stated_quantities(question):
         if _fits(unit, variable):
             add(ValueOption(number, unit, "given"))
     for c in constants:
@@ -506,7 +506,7 @@ def target_options(
     non-constant symbol if the count rules them all out.
     """
     free = [v for v in variables if _table_constant(v, constants) is None]
-    given = question_quantities(question)
+    given = stated_quantities(question)
     out: list[Variable] = []
     for v in free:
         slots = sum(1 for other in free if _fits(other.unit, v))
@@ -583,7 +583,7 @@ def decode_plan(
     decoder.emit(', "known_values": [')
     knowns = []
     to_fill = [s for s in symbols if s not in unknowns]
-    unused = question_quantities(question)
+    unused = stated_quantities(question)
     for i, symbol in enumerate(to_fill):
         decoder.emit(("" if i == 0 else ", ") + f'{{"symbol": "{symbol}", "value": ')
         options = (

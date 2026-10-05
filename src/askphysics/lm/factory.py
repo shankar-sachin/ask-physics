@@ -176,6 +176,11 @@ class DataFactory:
         if typical is not None and typical[1] > 0 and (typical[1] < low or typical[0] > high):
             high = typical[1]
             low = max(typical[0], high * 1e-3)
+        if unit == "dimensionless":  # a coefficient or a count: a bare number in its own range
+            low, high = typical if typical and typical[0] > 0 else (0.1, 10.0)
+            value = math.exp(self.rng.uniform(math.log(low), math.log(high)))
+            number = format_number(float(f"{value:.{self.rng.choice((2, 2, 3))}g}"))
+            return number, unit, number
         value = math.exp(self.rng.uniform(math.log(low), math.log(high)))
         shown_unit = self.rng.choice(tpl.ALT_UNITS.get(unit, (unit,)))
         shown = quantity(value, unit).to(shown_unit).magnitude
