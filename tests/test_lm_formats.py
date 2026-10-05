@@ -13,6 +13,7 @@ from askphysics.lm.formats import (
     plan_numbers,
     plan_prompt,
     plan_units,
+    question_quantities,
     relevant_constants,
     serialize_classification,
     serialize_plan,
@@ -109,3 +110,9 @@ def test_relevant_constants_match_by_dimension(store: DataStore) -> None:
     gas = relevant_constants([store.equations["ideal_gas_law"]], consts)
     assert {c.name for c in gas} >= {"molar_gas_constant", "standard_atmosphere"}
     assert "planck_constant" not in {c.name for c in gas}
+
+
+def test_quantities_with_dangling_operators_are_skipped() -> None:
+    text = "A force of 5 N/ acts on 2 kg, and 3 m* is not a unit."
+    assert extract_units(text) == ["kg"]
+    assert question_quantities(text) == [("2", "kg")]
