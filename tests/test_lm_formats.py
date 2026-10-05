@@ -116,3 +116,9 @@ def test_quantities_with_dangling_operators_are_skipped() -> None:
     text = "A force of 5 N/ acts on 2 kg, and 3 m* is not a unit."
     assert extract_units(text) == ["kg"]
     assert question_quantities(text) == [("2", "kg")]
+
+
+def test_numbers_too_big_for_a_float_are_skipped() -> None:
+    text = "A 1e999 m wall and 5 kg of sand"
+    assert extract_numbers(text) == ["5"]
+    assert question_quantities(text) == [("5", "kg")]

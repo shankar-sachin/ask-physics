@@ -8,6 +8,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Questions are normalized before anything reads them, so real-world
+  spellings work: "2,000-kg", "3.00 × 10⁸ m/s", "m/s²", "kg·m/s", "55-kg",
+  "20 meters per second", "25 °C", "2.5 µC", "220 Ω". Across the OpenStax
+  *Physics* text, 12% more quantities are read, and accelerations written
+  "m/s²" are no longer read as speeds.
 - `askphysics model eval`: decodes held-out questions with the constrained
   decoder and reports category accuracy and the valid plan rate (plans that
   compute the right answer), with sample failures and an `eval.json` report.
@@ -41,6 +46,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- More unit strings crashed Pint's parser ("K^0", "m^^2"); any string it
+  can't parse is now simply not a unit. A number too large for a float
+  ("1e999") no longer crashes number extraction.
 - A question containing a dangling unit operator ("5 N/", "3 m*") crashed
   the unit parser instead of ignoring the fragment.
 - Our docs said OpenStax *University Physics* is CC BY 4.0; it is CC BY-NC-SA
