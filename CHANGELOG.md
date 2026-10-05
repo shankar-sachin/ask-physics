@@ -8,6 +8,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `askphysics model eval`: decodes held-out questions with the constrained
+  decoder and reports category accuracy and the valid plan rate (plans that
+  compute the right answer), with sample failures and an `eval.json` report.
 - `THIRD_PARTY_LICENSES.md`: every library, font, and image source we use,
   with its license.
 - A website at https://askphysics.vercel.app that runs the real `askphysics`

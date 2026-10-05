@@ -253,6 +253,75 @@ def train_cmd(
     console.print(f"[ok]✓[/] {config.name} saved to {safe(str(out_dir))}")
 
 
+@model_app.command("eval")
+def eval_cmd(
+    model: Annotated[str, typer.Option(help="Installed model to score.")] = "fermi-tellus-1",
+    data: Annotated[Path, typer.Option(help="Dataset directory from build-data.")] = Path(
+        "build/data"
+    ),
+    examples: Annotated[int, typer.Option(min=1, help="Examples per task (classify, plan).")] = 200,
+    directory: Annotated[
+        Path | None, typer.Option(help="Model directory (default: the installed models dir).")
+    ] = None,
+    device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu (default: best).")] = None,
+    seed: Annotated[int, typer.Option()] = 0,
+) -> None:
+    """Score a model on held-out questions: right category, and plans that compute right."""
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+    from askphysics.lm.checkpoints import default_model_dir, load_model
+    from askphysics.lm.device import select_device
+    from askphysics.lm.evaluate import evaluate_tasks, sample_examples
+    from askphysics.lm.factory import read_examples
+    from askphysics.lm.generate import Decoder
+
+    model_dir = directory or default_model_dir() / model
+    try:
+        loaded, tokenizer = load_model(model_dir, select_device(device))
+    except AskPhysicsError as exc:
+        raise _fail(str(exc)) from exc
+    picked = sample_examples(read_examples(data / "val"), examples, seed)
+    if not picked:
+        raise _fail(f"no validation examples in {data / 'val'}; run build-data first")
+    decoder = Decoder(loaded, tokenizer)
+    store = load_all()
+    with Progress(
+        TextColumn(f"[brand]scoring {model}"),
+        BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
+        MofNCompleteColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("eval", total=len(picked))
+        report = evaluate_tasks(
+            decoder, picked, store, on_progress=lambda n: progress.update(task, completed=n)
+        )
+    (model_dir / "eval.json").write_text(report.to_json(), encoding="utf-8")
+
+    table = Table(
+        title=Text(f"{model} on held-out questions", style="brand"),
+        title_justify="left",
+        border_style="muted",
+        header_style="label",
+    )
+    table.add_column("check")
+    table.add_column("score", justify="right")
+    rows = [
+        (f"right category ({report.classify_examples} classify)", report.category_accuracy),
+        (f"right equation ({report.plan_examples} plan)", report.equation_accuracy),
+        ("right target", report.target_accuracy),
+        ("right numbers and units", report.knowns_accuracy),
+        ("[accent]valid plan (right answer)[/]", report.valid_plan_rate),
+    ]
+    for label, score in rows:
+        table.add_row(label, f"{score:.1%}")
+    console.print(table)
+    for f in report.failures[:5]:
+        console.print(f"  [muted]{f['task']} miss:[/] {safe(f['question'])}")
+        console.print(f"    [muted]expected[/] {safe(str(f['expected']))}")
+        console.print(f"    [muted]got     [/] {safe(str(f['got']))}")
+    console.print(f"[ok]✓[/] full report in {safe(str(model_dir / 'eval.json'))}")
+
+
 @model_app.command("info")
 def info_cmd(
     directory: Annotated[
