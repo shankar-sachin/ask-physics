@@ -26,8 +26,10 @@ def _parse_unit(unit: str) -> pint.Unit:
         parsed = ureg.parse_units(unit)
     except (pint.errors.UndefinedUnitError, pint.errors.DefinitionSyntaxError) as exc:
         raise UnitParseError(f"unknown unit {unit!r}") from exc
-    except (AttributeError, TypeError, ValueError, SyntaxError, AssertionError) as exc:
-        # Pint's expression parser asserts on dangling operators ("N/", "m*").
+    except Exception as exc:
+        # Pint's expression parser fails in many ways on text that isn't a unit: it asserts
+        # on dangling operators ("N/"), raises KeyError on zero powers ("K^0"), and more.
+        # Anything it can't parse is simply not a unit.
         raise UnitParseError(f"cannot parse unit {unit!r}") from exc
     return parsed
 

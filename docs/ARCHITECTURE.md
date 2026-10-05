@@ -52,6 +52,7 @@ and celeste gets one escalation shot (ADR-010).
 | `llm/fake.py` | `FakeLLMClient`: deterministic canned responses for tests and demos | `models` |
 | `llm/fermi_client.py` (v0.3) | `FermiClient`: routes tasks across tellus, solem, celeste | `lm` |
 | `lm/` (v0.2) | The Fermi models: config, tokenizer, transformer, constrained decoding, data factory, training | torch, safetensors |
+| `normalize.py` (v0.3) | Rewrites real-world quantity spellings (commas, powers of ten, superscripts, middle dots, "per", µ, Ω) into canonical forms when a question enters the pipeline | Pint (unit check) |
 | `retrieval/base.py` | `Retriever` and `VectorStore` protocols | `models` |
 | `retrieval/keyword.py` | `KeywordRetriever`: in-memory tag and token scorer | `models` |
 | `retrieval/vector.py` | `VectorRetriever` (stub until v0.6) | `retrieval/base` |

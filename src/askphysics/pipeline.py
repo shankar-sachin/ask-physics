@@ -38,6 +38,7 @@ from askphysics.models import (
     RetrievalResult,
     SanityReport,
 )
+from askphysics.normalize import normalize_question
 from askphysics.retrieval.base import Retriever
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.fermi import propagate_range
@@ -401,8 +402,12 @@ class Pipeline:
         return cls(llm=llm, retriever=retriever, data=store, settings=settings)
 
     def run(self, text: str) -> Answer:
-        """Answer one question. Expected failures become degraded answers, never exceptions."""
-        question = Question(text=text)
+        """Answer one question. Expected failures become degraded answers, never exceptions.
+
+        The question is normalized first ("2,000-kg", "m/s²", powers of ten become forms the
+        decoder reads), so every stage, and the answer card, see the same text.
+        """
+        question = Question(text=normalize_question(text))
         caveats: list[str] = []
 
         try:

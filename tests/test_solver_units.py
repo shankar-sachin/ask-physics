@@ -55,7 +55,7 @@ def test_format_quantity() -> None:
     assert format_quantity(quantity(19.80570624, "m/s")) == "19.8057 meter / second"
 
 
-@pytest.mark.parametrize("text", ["N/", "m*", "GeV/", "Air*"])
+@pytest.mark.parametrize("text", ["N/", "m*", "GeV/", "Air*", "K^0", "m^^2", "/s"])
 def test_dangling_operators_are_invalid_not_a_crash(text: str) -> None:
     # Pint's parser raises AssertionError on these; real text ("5 N/ ...") contains them.
     assert not is_valid_unit(text)
