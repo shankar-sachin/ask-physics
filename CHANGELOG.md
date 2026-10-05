@@ -8,6 +8,19 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- 43 more equations (55 → 98) in thermodynamics (heat, latent heat,
+  expansion, conduction, radiation, the first law, kinetic theory, heat
+  engines), electromagnetism (Coulomb's law, fields, potential, electric
+  power, resistivity, series and parallel resistors, capacitors, RC circuits,
+  magnetic forces, the field of a wire and a solenoid, motional emf,
+  inductors), optics (thin lens, lens power, magnification), and modern
+  physics (photon energy and momentum, E = mc², de Broglie, photoelectric
+  effect, time dilation, length contraction). Three new constants (CODATA
+  2022): the Coulomb constant, the magnetic constant, and the
+  Stefan-Boltzmann constant.
+- The data factory samples a variable from its own typical range when the
+  everyday range for its unit doesn't fit (a molecule's mass, a particle's
+  charge).
 - 43 new equations (12 → 55): average speed, vertical launches, centripetal
   acceleration and force, angular velocity, period and frequency, Hooke's law,
   impulse, torque, rotational dynamics and energy, moment of inertia, work,
@@ -56,6 +69,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Quantities with negative exponents in their unit ("5 s^-1", "230 m^-1",
+  including "s⁻¹" after normalization) weren't read, and the 1 in "m^-1" was
+  read as a number.
+- A reciprocal result unit was written "1 / meter", whose 1 an explanation
+  isn't allowed to copy; it is now "meter ** -1".
 - The dimensional check set every variable to 1, so an equation like
   `f = fs*v/(v - vs)` crashed validation with a division by zero.
 - More unit strings crashed Pint's parser ("K^0", "m^^2"); any string it

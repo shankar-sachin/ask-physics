@@ -176,7 +176,7 @@ take over in v0.3.
 | Noether: single-equation solve with units (SymPy + Pint) | Works |
 | Dimensional consistency and order-of-magnitude sanity checks | Works |
 | Keyword retrieval over the equation database | Works |
-| Seed data with full validation: 55 equations (growing toward 100 for v0.3), 4 examples, 8 constants, 8 Fermi assumptions | Works |
+| Seed data with full validation: 98 equations, 4 examples, 11 constants, 8 Fermi assumptions | Works |
 | CLI: `ask`, `version`, `validate-data`, `model build-data / train-tokenizer / train / info` | Works |
 | Confidence scoring (crude, documented formula) | Works |
 | Eval set (8 questions) with a validating loader | Works |

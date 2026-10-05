@@ -8,6 +8,7 @@ from askphysics.solver.units import (
     is_valid_unit,
     parse_quantity,
     quantity,
+    unit_string,
 )
 
 
@@ -61,3 +62,18 @@ def test_dangling_operators_are_invalid_not_a_crash(text: str) -> None:
     assert not is_valid_unit(text)
     with pytest.raises(UnitParseError):
         quantity(1.0, text)
+
+
+@pytest.mark.parametrize(
+    ("unit", "expected"),
+    [
+        ("1/m", "meter ** -1"),
+        ("1/(m*s)", "meter ** -1 * second ** -1"),
+        ("1/s^2", "second ** -2"),
+        ("m/s", "meter / second"),
+    ],
+)
+def test_unit_string_never_starts_with_a_bare_one(unit: str, expected: str) -> None:
+    text = unit_string(quantity(1.0, unit).units)
+    assert text == expected
+    assert check_dimensions(quantity(1.0, text), unit)

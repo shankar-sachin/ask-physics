@@ -42,7 +42,7 @@ from askphysics.lm.tokenizer import END
 from askphysics.models import Classification, Constant, Equation, KnownValue, Plan, Variable
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.symbolic import solve_for
-from askphysics.solver.units import check_dimensions, quantity
+from askphysics.solver.units import check_dimensions, quantity, unit_string
 
 Task = Literal["classify", "plan", "explain"]
 LEAK_THRESHOLD = 0.7
@@ -157,14 +157,25 @@ class DataFactory:
                 return c
         return None
 
-    def _sample(self, unit: str, *, adjective: bool = False) -> tuple[str, str, str]:
+    def _sample(
+        self,
+        unit: str,
+        *,
+        adjective: bool = False,
+        typical: tuple[float, float] | None = None,
+    ) -> tuple[str, str, str]:
         """A realistic value for a variable measured in ``unit``.
 
         Returns (number text, unit as written, the two as they appear in the question).
         Units are sometimes converted ("km/h"), spelled out ("meters"), or written without
-        a space ("20m"); adjectives ("a 5 kg ball") keep the symbol.
+        a space ("20m"); adjectives ("a 5 kg ball") keep the symbol. A variable whose
+        ``typical`` range lies outside the everyday range for its unit (a molecule's mass,
+        an electron's charge) is sampled from its own range instead.
         """
         low, high = tpl.FRIENDLY_RANGES.get(unit, (1.0, 1000.0))
+        if typical is not None and typical[1] > 0 and (typical[1] < low or typical[0] > high):
+            high = typical[1]
+            low = max(typical[0], high * 1e-3)
         value = math.exp(self.rng.uniform(math.log(low), math.log(high)))
         shown_unit = self.rng.choice(tpl.ALT_UNITS.get(unit, (unit,)))
         shown = quantity(value, unit).to(shown_unit).magnitude
@@ -258,7 +269,7 @@ class DataFactory:
                     )
                 )
                 continue
-            number, unit, shown = self._sample(v.unit)
+            number, unit, shown = self._sample(v.unit, typical=v.typical_range)
             knowns.append(
                 KnownValue(symbol=v.symbol, value=float(number), unit=unit, origin="given")
             )
@@ -324,7 +335,9 @@ class DataFactory:
                 )
                 continue
             adjective = "{" + v.symbol + "_a}" in sc.template.text
-            number_text, unit, shown = self._sample(v.unit, adjective=adjective)
+            number_text, unit, shown = self._sample(
+                v.unit, adjective=adjective, typical=v.typical_range
+            )
             knowns.append(
                 KnownValue(symbol=v.symbol, value=float(number_text), unit=unit, origin="given")
             )
@@ -385,7 +398,7 @@ class DataFactory:
             constants=constants,
             plan=plan,
             value=float(f"{value:.6g}"),
-            unit=str(outcome.value.units),
+            unit=unit_string(outcome.value.units),
         )
 
     # ------------------------------------------------------------------ examples per task

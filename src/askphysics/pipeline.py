@@ -43,7 +43,7 @@ from askphysics.retrieval.base import Retriever
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.fermi import propagate_range
 from askphysics.solver.symbolic import solve_for
-from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
+from askphysics.solver.units import check_dimensions, is_valid_unit, quantity, unit_string
 
 # Placeholder system prompts. The full drafts, with hardening rules, are in
 # docs/PROMPTS.md. From v0.3 the Fermi models use the task formats there instead.
@@ -192,7 +192,7 @@ def compute(p: Plan, *, data: DataStore) -> ComputeResult:
     return ComputeResult(
         target=p.target,
         value=float(outcome.value.magnitude),
-        unit=str(outcome.value.units),
+        unit=unit_string(outcome.value.units),
         symbolic_solution=outcome.symbolic_solution,
         substitutions={s: f"{q.magnitude} {q.units}" for s, q in knowns.items()},
         notes=outcome.notes,
