@@ -320,3 +320,23 @@ def test_fillers_only_when_nothing_stated_is_left(store: DataStore) -> None:
     assert ValueOption("0", "m/s", "assumption") in v0
     a = assignable_options(known_value_options(kin["a"], q, consts), kin["a"], unused, pending[1:])
     assert a == [ValueOption("3", "m/s^2", "given")]  # not standard gravity
+
+
+def test_a_constant_fillable_variable_is_not_the_target_when_another_is_open(
+    store: DataStore,
+) -> None:
+    consts = relevant_constants(
+        [store.equations["gravitational_pe"]], list(store.constants.values())
+    )
+    pe = store.equations["gravitational_pe"].variables
+    q = "Lifting a wrench by 11 m took 11000 J of work against gravity. What is its mass?"
+    assert target_options(pe, q, consts) == ["m"]  # g comes from the table
+    # When g is the only thing left open, it can still be the target.
+    q = "A 4 kg rock gains 200 J of potential energy when lifted 5 m. What is g there?"
+    assert target_options(pe, q, consts) == ["g"]
+
+
+def test_the_only_assumed_filler_is_zero(store: DataStore) -> None:
+    pe = {v.symbol: v for v in store.equations["gravitational_pe"].variables}
+    options = known_value_options(pe["m"], "Lifting it 11 m took 11000 J.", [])
+    assert options == [ValueOption("0", "kg", "assumption")]  # never an invented 1 kg
