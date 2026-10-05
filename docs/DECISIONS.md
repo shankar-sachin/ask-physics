@@ -432,17 +432,23 @@ writes:
 - A known value is chosen from (number, unit, origin) options: quantities
   written in the question whose units fit the variable, with the unit that
   follows the number kept attached (origin `given`); table constants that
-  fit (`constant`); or a structural 0 or 1 in the variable's unit
+  fit (`constant`); or an assumed 0 in the variable's unit
   (`assumption`).
 - The target is chosen from variables the question leaves open: those whose
   dimensions have fewer stated quantities than the chosen equations have
   variables. Table constants are never targets. If the count rules out
   everything, every non-constant variable stays open.
 - Each stated quantity fills at most one variable, and a table constant or
-  structural 0 or 1 may only fill a slot when the variables still to fill
+  assumed 0 may only fill a slot when the variables still to fill
   outnumber the unused quantities that fit them. Added after the second
   eval (71.5% valid plans), whose misses wrote one speed into both v and v0
   or wrote v = 0 with "34 mph" sitting unused.
+
+- The only assumed filler is 0 ("from rest"); the data factory never
+  assumes anything else. And a variable a table constant can fill (g) is
+  only the target when no open variable lacks such a fallback. Added after
+  the fourth eval, where "lifting it 11 m took 11000 J, what is its mass?"
+  was solved for g with an invented m = 1 kg.
 
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable

@@ -27,7 +27,6 @@ from torch import Tensor
 
 from askphysics.errors import AskPhysicsError, LLMError
 from askphysics.lm.formats import (
-    STRUCTURAL_NUMBERS,
     classify_prompt,
     explain_numbers,
     explain_prompt,
@@ -62,6 +61,10 @@ DOMAINS = (
     "thermodynamics",
 )
 ORIGINS = ("given", "constant", "assumption")
+
+# The only number a standard plan may assume without it being stated: "from rest" means v0 = 0.
+# The data factory never assumes anything else, and a 1 here let the model invent m = 1 kg.
+FILLER_NUMBERS = ("0",)
 
 MAX_EQUATIONS = 3
 MAX_DOMAINS = 3
@@ -436,8 +439,8 @@ def known_value_options(
     """What a standard plan may write for ``variable``.
 
     A quantity written in the question with matching dimensions (its number and unit stay
-    together), a table constant with matching dimensions, or a structural 0 or 1 in the
-    variable's own unit ("dropped" means v0 = 0). A mass can never be filled with a speed,
+    together), a table constant with matching dimensions, or an assumed 0 in the variable's
+    own unit ("dropped" means v0 = 0). A mass can never be filled with a speed,
     and "570 pounds" can't turn into 570 kilograms. Noether still checks units later; this
     only stops the model from writing values that could never be right.
     """
@@ -453,7 +456,7 @@ def known_value_options(
     for c in constants:
         if _fits(c.unit, variable):
             add(ValueOption(format_number(c.value), c.unit, "constant"))
-    for number in STRUCTURAL_NUMBERS:
+    for number in FILLER_NUMBERS:
         add(ValueOption(number, variable.unit, "assumption"))
     return options
 
@@ -467,7 +470,7 @@ def assignable_options(
     """Narrow ``known_value_options`` to what is still free as a plan is written.
 
     Each quantity in the question fills at most one variable, so ``unused`` holds the
-    (number, unit) pairs not yet taken. A table constant or a structural 0 or 1 is only
+    (number, unit) pairs not yet taken. A table constant or an assumed 0 is only
     allowed when the variables still to fill (``pending``, including ``variable``) outnumber
     the unused quantities that fit them; otherwise a stated value would go unused, and a
     question never states a value for nothing. Falls back to ``options`` if nothing is left.
@@ -491,18 +494,24 @@ def target_options(
 
     A variable is a candidate when the question states fewer quantities of its dimensions
     than the equations have variables of those dimensions. "Given a force, two masses,
-    find..." leaves only the distance. Table constants are never targets. Falls back to
-    every non-constant symbol if the count rules them all out.
+    find..." leaves only the distance. Table constants are never targets, and a variable a
+    constant could fill (g) only is when nothing else is open. Falls back to every
+    non-constant symbol if the count rules them all out.
     """
     free = [v for v in variables if _table_constant(v, constants) is None]
     given = question_quantities(question)
-    out = []
+    out: list[Variable] = []
     for v in free:
         slots = sum(1 for other in free if _fits(other.unit, v))
         stated = sum(1 for _, unit in given if _fits(unit, v))
         if stated < slots:
-            out.append(v.symbol)
-    return out or [v.symbol for v in free] or [v.symbol for v in variables]
+            out.append(v)
+    # A variable a table constant can fill (g by standard gravity) is only the unknown if no
+    # open variable lacks such a fallback: "lifting it 11 m took 11000 J, what is its mass?"
+    # asks for m, and g comes from the table.
+    without_fallback = [v for v in out if not any(_fits(c.unit, v) for c in constants)]
+    picked = without_fallback or out
+    return [v.symbol for v in picked] or [v.symbol for v in free] or [v.symbol for v in variables]
 
 
 def decode_plan(
