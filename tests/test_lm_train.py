@@ -74,6 +74,18 @@ def test_padding_is_ignored(tokenizer: Tokenizer) -> None:
     assert labels[1, 1] == IGNORE_INDEX
 
 
+def test_batch_widths_are_bucketed(tokenizer: Tokenizer) -> None:
+    rows = [([1] * 70, 2), ([1] * 10, 1)]
+    inputs, labels = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64)
+    assert inputs.shape == labels.shape == (2, 128)
+    assert (labels[:, 69:] == IGNORE_INDEX).all()
+    # Rounding never pushes past the model's context, and never cuts a row short.
+    inputs, _ = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64, max_width=100)
+    assert inputs.shape == (2, 100)
+    inputs, _ = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64, max_width=50)
+    assert inputs.shape == (2, 69)
+
+
 def test_too_long_examples_skipped(tokenizer: Tokenizer) -> None:
     e = Example("explain", "train", "t", "<|explain|>" + "x " * 600, "y<|end|>")
     data = tokenize_examples([e], tokenizer, 64)
