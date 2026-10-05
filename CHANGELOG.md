@@ -41,6 +41,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A question containing a dangling unit operator ("5 N/", "3 m*") crashed
+  the unit parser instead of ignoring the fragment.
 - Our docs said OpenStax *University Physics* is CC BY 4.0; it is CC BY-NC-SA
   4.0. Equation entries only cite it as a reference and copy no text, so
   nothing changes in the data. Real-phrasing data will come from OpenStax

@@ -53,3 +53,11 @@ def test_convert_rejects_invalid_target_unit() -> None:
 
 def test_format_quantity() -> None:
     assert format_quantity(quantity(19.80570624, "m/s")) == "19.8057 meter / second"
+
+
+@pytest.mark.parametrize("text", ["N/", "m*", "GeV/", "Air*"])
+def test_dangling_operators_are_invalid_not_a_crash(text: str) -> None:
+    # Pint's parser raises AssertionError on these; real text ("5 N/ ...") contains them.
+    assert not is_valid_unit(text)
+    with pytest.raises(UnitParseError):
+        quantity(1.0, text)

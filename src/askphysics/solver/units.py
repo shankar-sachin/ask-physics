@@ -26,7 +26,8 @@ def _parse_unit(unit: str) -> pint.Unit:
         parsed = ureg.parse_units(unit)
     except (pint.errors.UndefinedUnitError, pint.errors.DefinitionSyntaxError) as exc:
         raise UnitParseError(f"unknown unit {unit!r}") from exc
-    except (AttributeError, TypeError, ValueError, SyntaxError) as exc:
+    except (AttributeError, TypeError, ValueError, SyntaxError, AssertionError) as exc:
+        # Pint's expression parser asserts on dangling operators ("N/", "m*").
         raise UnitParseError(f"cannot parse unit {unit!r}") from exc
     return parsed
 
@@ -56,7 +57,8 @@ def parse_quantity(text: str) -> Quantity:
         parsed: Any = ureg.Quantity(text)
     except (pint.errors.UndefinedUnitError, pint.errors.DefinitionSyntaxError) as exc:
         raise UnitParseError(f"cannot parse quantity {text!r}") from exc
-    except (AttributeError, TypeError, ValueError, SyntaxError) as exc:
+    except (AttributeError, TypeError, ValueError, SyntaxError, AssertionError) as exc:
+        # Pint's expression parser asserts on dangling operators ("N/", "m*").
         raise UnitParseError(f"cannot parse quantity {text!r}") from exc
     if not isinstance(parsed, pint.Quantity) or parsed.unitless:
         raise UnitParseError(f"{text!r} is a bare number; quantities need units")
