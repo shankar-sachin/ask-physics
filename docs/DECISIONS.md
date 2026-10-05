@@ -456,3 +456,53 @@ so no retraining is needed, and every gold plan from the data factory fits
 the constraints (a test checks this). What remains for the model is
 genuine reading: which of two masses is the first, and whether a speed is
 the initial or the final one.
+
+---
+
+## ADR-016: Real-phrasing data from OpenStax Physics (CC BY 4.0), text only
+
+**Status:** Accepted (v0.3), decided by the maintainer
+
+**Context.** fermi-tellus-1 reaches 86.5% valid plans on held-out
+*templates*, but every question it has seen was written by our data
+factory. Real people phrase things differently, and we have no measurement
+of that at all. We need human-written physics questions and prose. The
+project and its weights are MIT, so the source's license has to allow
+commercial use without share-alike.
+
+Checking licenses at the source (each book's `LICENSE` file and collection
+metadata in the `openstax/osbooks-*` repositories) showed that OpenStax
+*University Physics* and *College Physics* are **CC BY-NC-SA 4.0**, not CC
+BY as our docs said. OpenStax *Physics* (2020, high school) is **CC BY 4.0**:
+about 2,000 exercises and 100 sections of prose. Its preface notes that some
+artwork came through separate permissions.
+
+**Decision.**
+
+- Use OpenStax *Physics* (2020) as the source of real-phrasing data. Pulls
+  part of the v0.6 "CC-BY text" deliverable forward.
+- **Text only.** No figures, captions, or media.
+- Imported text keeps its license. It lives in its own directory with its
+  own `LICENSE` (CC BY 4.0) and an attribution file naming the book, its
+  authors as OpenStax credits them, the URL, the license, and that we
+  extracted and reformatted it. It is never relabelled MIT.
+- Uses, in order: (1) an eval of real questions our equations can answer,
+  with gold plans written by the project and reviewed by the maintainer;
+  (2) its other questions as classify examples; (3) its prose as an extra
+  language-modeling stage before task training.
+- Model cards and `THIRD_PARTY_LICENSES.md` credit OpenStax for any weights
+  trained on it. The OpenStax name and logo are not used beyond that
+  attribution.
+- Rejected sources: *University Physics* and *College Physics* (NC-SA),
+  SciQ (CC BY-NC), ScienceQA (CC BY-NC-SA), GPT-generated sets such as
+  camel-ai physics (ADR-009), MMLU and GPQA (benchmarks; training on them
+  contaminates evaluation). Physics StackExchange (CC BY-SA) needs its own
+  ADR first, because share-alike may reach trained weights.
+
+**Consequences.** We get the first measurement on human phrasing, and
+training text that isn't ours. Gold plans are labor: an external model may
+not write them (ADR-009), so the project writes them and the maintainer
+reviews them. CC BY attribution travels with every artifact that contains
+or was trained on the text. This is a careful reading of the licenses, not
+legal advice; a lawyer should review `THIRD_PARTY_LICENSES.md`, this ADR,
+and the model cards before any commercial launch.

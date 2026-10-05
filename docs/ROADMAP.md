@@ -67,6 +67,9 @@ tested on `fermi-luna-1`, without needing a GPU.
 - Ship the trained weights (ADR-012): GitHub release assets pinned by a
   checksum manifest, `askphysics model pull`, the installers and Homebrew
   formula fetching tellus and solem, and celeste on first escalation.
+- Real-phrasing data from OpenStax *Physics* (CC BY 4.0, ADR-016): an eval
+  of real questions with project-written gold plans, plus its questions and
+  prose in training.
 
 **Exit criteria**
 - On a held-out set of factory-style questions (unseen templates), solem
@@ -74,6 +77,8 @@ tested on `fermi-luna-1`, without needing a GPU.
   least a third of solem's failures.
 - Zero invented equation ids or numbers (guaranteed by constraints, verified
   by tests).
+- The valid plan rate on the real-question eval is measured and reported
+  next to the template one.
 - `askphysics ask` with solem answers in under 2 seconds on an M5 Pro.
 - A fresh install on a clean machine answers with solem, with no training
   and no manual download step.
@@ -132,7 +137,8 @@ tested on `fermi-luna-1`, without needing a GPU.
   fusion. sqlite-vec because the database stays small and one file holds
   vectors, metadata, and keyword search.
 - 500+ equations and 1000+ worked examples per `docs/DATA_SOURCING.md`, with
-  licenses tracked; CC-BY physics text added to the training corpus.
+  licenses tracked; more CC BY physics text in the training corpus (OpenStax
+  *Physics* arrives in v0.3, ADR-016).
 - Retrieval eval set (50+ questions) with Recall@5.
 
 **Exit criteria**

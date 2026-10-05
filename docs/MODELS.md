@@ -131,8 +131,9 @@ model:
 3. **Out-of-scope questions** from category-error, unknowable, and non-physics
    templates, each paired with a reason and a redirect.
 4. **Explanations** generated from plan plus computed result.
-5. **Later (v0.6):** CC-BY physics text (OpenStax) for broader language, with
-   licenses tracked per source.
+5. **Real human phrasing (ADR-016):** questions and prose from OpenStax
+   *Physics* (2020, CC BY 4.0, text only, attributed). Not *University
+   Physics* or *College Physics*, which are CC BY-NC-SA.
 
 The factory never reads `evals/`, and a similarity check enforces it
 (`docs/EVALS.md`).
