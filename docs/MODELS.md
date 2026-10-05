@@ -85,7 +85,9 @@ failures are impossible by construction rather than caught afterwards:
   table constant, or a structural 0 or 1, and its units must fit the
   variable. The target must be a variable the question leaves open: fewer
   quantities of its dimensions are given than the equations have variables
-  of those dimensions.
+  of those dimensions. Each stated quantity fills one variable at most, and
+  a constant or 0 only fills a slot once no stated quantity that fits is
+  left.
 - **Explain:** digits in prose may only spell numbers present in the
   computed result or the plan.
 
