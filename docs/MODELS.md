@@ -113,7 +113,11 @@ model:
 
 1. **Standard questions** from the equation database: for each equation and
    target symbol, sample values inside each variable's `typical_range`,
-   render through phrasing templates, and pair with the gold `Plan`. Noether solves every example; anything it can't solve is
+   render through phrasing templates, and pair with the gold `Plan`.
+   Questions are composed from parts (frame, how each value is stated,
+   variable synonyms, unit spellings and conversions, openers, sign-offs,
+   casual punctuation) or come from worded scenarios, so the models can't
+   just memorize sentences. Any held-out part sends an example to validation. Noether solves every example; anything it can't solve is
    dropped.
 2. **Fermi questions** from the assumptions table ("how many X to Y").
 3. **Out-of-scope questions** from category-error, unknowable, and non-physics

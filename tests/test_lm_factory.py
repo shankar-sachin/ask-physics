@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -12,12 +13,14 @@ from askphysics.lm.factory import (
     build_dataset,
     equation_phrase,
     load_blocklist,
+    plain_name,
     read_examples,
     word_overlap,
 )
 from askphysics.lm.formats import (
     explain_numbers,
     extract_numbers,
+    extract_units,
     format_number,
     plan_numbers,
     plan_units,
@@ -25,7 +28,7 @@ from askphysics.lm.formats import (
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Plan
 from askphysics.solver.symbolic import solve_for
-from askphysics.solver.units import quantity
+from askphysics.solver.units import check_dimensions, quantity
 
 EVALS = Path(__file__).resolve().parents[1] / "evals" / "questions.yaml"
 
@@ -134,10 +137,102 @@ def test_templates_format_cleanly() -> None:
     for t, reason, closest in tpl.OUT_OF_SCOPE:
         t.text.format(**slots)
         assert not extract_numbers(reason.format(**slots) + closest.format(**slots))
-    for reasoning in (*tpl.STANDARD_REASONING, *tpl.FERMI_REASONING):
-        assert not extract_numbers(reasoning)
-    ids = [t.id for t in (*tpl.GENERIC, *tpl.FERMI, *tpl.EXPLAIN)]
+    free_text = (
+        *tpl.STANDARD_REASONING,
+        *tpl.FERMI_REASONING,
+        *tpl.STRATEGIES,
+        *tpl.PREAMBLES,
+        *tpl.SIGN_OFFS,
+        *tpl.ASSUME_LEADS,
+    )
+    for text in free_text:
+        assert not any(ch.isdigit() for ch in text), text
+    generic = {
+        "target": "t",
+        "Target": "T",
+        "tsym": "x",
+        "knowns": "k",
+        "Knowns": "K",
+        "facts": "F.",
+    }
+    for t in tpl.GENERIC:
+        t.text.format(**generic)
+    for t in tpl.KNOWN_PATTERNS:
+        t.text.format(name="mass", a_name="a mass", sym="m", q="2 kg")
+    ids = [
+        t.id
+        for t in (
+            *tpl.GENERIC,
+            *tpl.KNOWN_PATTERNS,
+            *tpl.FERMI,
+            *tpl.EXPLAIN,
+            *(s.template for s in tpl.SCENARIOS),
+            *(o[0] for o in tpl.OUT_OF_SCOPE),
+        )
+    ]
     assert len(ids) == len(set(ids))
+    for family in (tpl.GENERIC, tpl.KNOWN_PATTERNS, tpl.FERMI, tpl.EXPLAIN):
+        assert any(t.held_out for t in family) and not all(t.held_out for t in family)
+    assert any(s.template.held_out for s in tpl.SCENARIOS)
+
+
+def test_scenarios_match_their_equations(store: DataStore) -> None:
+    for sc in tpl.SCENARIOS:
+        eq = store.equations[sc.equation]
+        symbols = {v.symbol for v in eq.variables}
+        assert sc.target in symbols, sc.template.id
+        assert {f[0] for f in sc.forced} <= symbols - {sc.target}, sc.template.id
+        fields = set(re.findall(r"{(\w+)}", sc.template.text))
+        given = {s.removesuffix("_a") for s in fields} - {
+            "object",
+            "object2",
+            "vehicle",
+            "vehicle2",
+        }
+        assert given <= symbols - {sc.target}, sc.template.id
+        assert not extract_numbers(" ".join(sc.assumptions)), sc.template.id
+
+
+def test_every_scenario_produces_a_solved_problem(
+    store: DataStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    factory = DataFactory(store, seed=2)
+    for sc in tpl.SCENARIOS:
+        monkeypatch.setattr(tpl, "SCENARIOS", (sc,))
+        problems = [factory._scenario_problem() for _ in range(40)]
+        assert any(p is not None for p in problems), sc.template.id
+
+
+def test_unit_spellings_are_copyable() -> None:
+    for symbol, spellings in tpl.UNIT_SPELLINGS.items():
+        for spelled in spellings:
+            assert extract_units(f"It is 12 {spelled}.") == [spelled], spelled
+            assert check_dimensions(quantity(1.0, spelled), symbol), spelled
+
+
+def test_variable_synonyms_cover_the_database(store: DataStore) -> None:
+    names = {v.name for eq in store.equations.values() for v in eq.variables}
+    constants = {n for n in names if "constant" in n}
+    assert names - constants <= tpl.VAR_SYNONYMS.keys()
+    for name in names - constants:
+        assert not any(ch.isdigit() for ch in plain_name(name)), name
+
+
+def test_questions_are_diverse(examples: list[Example]) -> None:
+    questions = [_payload(e.prompt, PLAN)["question"] for e in examples if e.task == "plan"]
+    assert len(set(questions)) / len(questions) > 0.97
+    templates = {e.template.split("+")[0] for e in examples}
+    assert len(templates) > 60
+
+
+def test_casual_dressing_keeps_symbols_intact(store: DataStore) -> None:
+    factory = DataFactory(store, seed=0)
+    for _ in range(200):
+        assert factory._lower_first("V = 5 V. Find I.").startswith("V =")
+        assert factory._lower_first("KE is known.").startswith("KE")
+        assert factory._lower_first("I need the speed.").startswith("I ")
+    assert factory._lower_first("A ball falls.") == "a ball falls."
+    assert factory._lower_first("What is it?") == "what is it?"
 
 
 def test_equation_phrase() -> None:

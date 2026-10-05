@@ -1,14 +1,24 @@
-"""Phrasing templates for the data factory (``lm/factory.py``).
+"""Phrasing for the data factory (``lm/factory.py``).
 
-Every template has a stable id. Ids ending in ``_h`` are **held out**: they
-never appear in training data, only in the validation split, so validation
-measures how well a model handles phrasings it has never seen.
+Questions are composed from parts (a frame, a way of stating each known
+value, variable synonyms, unit spellings, a preamble, a sign-off, and a
+little casual noise) so a model sees thousands of distinct phrasings instead
+of memorizing a few dozen sentences (risk R14).
+
+Every frame and pattern has a stable id. Ids ending in ``_h`` are **held
+out**: an example built with any held-out part goes to the validation split
+only, so validation measures how well a model handles phrasings it has never
+seen.
 
 Rules for writing templates:
 - Never copy or paraphrase anything from ``evals/`` (``docs/EVALS.md``).
 - Free text the models must reproduce (reasoning, assumptions, strategy) may
   only contain digits that appear in the question, because constrained
-  decoding forbids any other number.
+  decoding forbids any other number. Preambles and sign-offs contain no
+  digits at all.
+- A unit written in a question must be one token Pint understands
+  ("meters", not "meters per second"), right after its number, so the
+  constrained decoder can copy it.
 """
 
 from __future__ import annotations
@@ -25,6 +35,8 @@ class Template:
     def held_out(self) -> bool:
         return self.id.endswith("_h")
 
+
+# --------------------------------------------------------------------------- values and units
 
 # Realistic question values per unit (low, high), sampled log-uniformly.
 FRIENDLY_RANGES: dict[str, tuple[float, float]] = {
@@ -47,18 +59,114 @@ FRIENDLY_RANGES: dict[str, tuple[float, float]] = {
 
 # Alternative units a question may use; values are converted, the plan copies the unit as written.
 ALT_UNITS: dict[str, tuple[str, ...]] = {
-    "m": ("m", "m", "cm", "km", "ft"),
-    "m/s": ("m/s", "m/s", "km/h"),
-    "kg": ("kg", "kg", "g"),
-    "s": ("s", "s", "min"),
+    "m": ("m", "m", "m", "cm", "km", "ft"),
+    "m/s": ("m/s", "m/s", "m/s", "km/h", "mph"),
+    "kg": ("kg", "kg", "kg", "g", "lb"),
+    "s": ("s", "s", "s", "min"),
     "N": ("N", "N", "kN"),
     "J": ("J", "J", "kJ"),
-    "Pa": ("Pa", "kPa"),
-    "m^3": ("m^3", "L"),
-    "A": ("A", "mA"),
+    "Pa": ("Pa", "kPa", "kPa", "atm"),
+    "m^3": ("m^3", "L", "L"),
+    "A": ("A", "A", "mA"),
 }
 
-# Generic question templates. {target} is a variable name, {knowns} a natural-language list.
+# Spelled-out forms of unit symbols. One token each, so the decoder can copy them.
+UNIT_SPELLINGS: dict[str, tuple[str, ...]] = {
+    "m": ("meters", "metres", "meters"),
+    "cm": ("centimeters",),
+    "km": ("kilometers",),
+    "ft": ("feet",),
+    "s": ("seconds", "seconds", "sec"),
+    "min": ("minutes",),
+    "km/h": ("kph",),
+    "kg": ("kilograms",),
+    "g": ("grams",),
+    "lb": ("pounds",),
+    "N": ("newtons",),
+    "kN": ("kilonewtons",),
+    "J": ("joules",),
+    "kJ": ("kilojoules",),
+    "V": ("volts",),
+    "A": ("amperes", "amp"),
+    "mA": ("milliamps",),
+    "ohm": ("ohms", "ohms", "ohm"),
+    "Pa": ("pascals",),
+    "kPa": ("kilopascals",),
+    "L": ("liters", "litres"),
+    "mol": ("moles",),
+    "K": ("kelvin",),
+}
+
+# --------------------------------------------------------------------------- variable names
+
+# Ways to name each database variable in a question. The first is the database name.
+VAR_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "final velocity": ("final velocity", "final speed", "speed at the end", "end speed"),
+    "initial velocity": (
+        "initial velocity",
+        "initial speed",
+        "starting speed",
+        "starting velocity",
+    ),
+    "acceleration": ("acceleration", "acceleration", "rate of acceleration"),
+    "time": ("time", "elapsed time", "duration", "time interval"),
+    "displacement": ("displacement", "distance traveled", "distance covered", "displacement"),
+    "net force": ("net force", "total force", "resultant force", "net force"),
+    "mass": ("mass",),
+    "gravitational acceleration": (
+        "gravitational acceleration",
+        "acceleration due to gravity",
+        "local gravity",
+        "surface gravity",
+    ),
+    "weight": ("weight", "weight", "weight force"),
+    "kinetic energy": ("kinetic energy", "kinetic energy", "energy of motion"),
+    "speed": ("speed", "speed", "velocity"),
+    "potential energy": ("potential energy", "gravitational potential energy", "stored energy"),
+    "height": ("height", "height", "elevation", "vertical height"),
+    "momentum": ("momentum", "momentum", "linear momentum"),
+    "velocity": ("velocity", "speed"),
+    "mass 1": ("mass 1", "first mass", "mass of the first object", "mass of object one"),
+    "mass 2": ("mass 2", "second mass", "mass of the second object", "mass of object two"),
+    "velocity 1": ("velocity 1", "first velocity", "velocity of the first object"),
+    "velocity 2": ("velocity 2", "second velocity", "velocity of the second object"),
+    "gravitational force": (
+        "gravitational force",
+        "force of gravity",
+        "gravitational pull",
+        "gravitational attraction",
+    ),
+    "separation": ("separation", "distance between them", "center-to-center distance"),
+    "voltage": ("voltage", "voltage", "potential difference", "voltage drop"),
+    "current": ("current", "current", "electric current"),
+    "resistance": ("resistance",),
+    "pressure": ("pressure", "pressure", "gas pressure"),
+    "volume": ("volume", "volume", "container volume"),
+    "amount": ("amount of gas", "number of moles", "amount of substance"),
+    "temperature": ("temperature", "temperature", "absolute temperature"),
+}
+
+# --------------------------------------------------------------------------- generic questions
+
+# How one known value is stated. {name} the variable name, {a_name} with "a"/"an",
+# {sym} its symbol, {q} the number and unit.
+KNOWN_PATTERNS: tuple[Template, ...] = (
+    Template("kp_01", "the {name} is {q}"),
+    Template("kp_02", "{a_name} of {q}"),
+    Template("kp_03", "{name} = {q}"),
+    Template("kp_04", "{sym} = {q}"),
+    Template("kp_05", "the {name} equals {q}"),
+    Template("kp_06", "{name}: {q}"),
+    Template("kp_07", "the {name} {sym} is {q}"),
+    Template("kp_08", "the {name} was measured at {q}"),
+    Template("kp_09", "{q} for the {name}"),
+    Template("kp_10_h", "the {name} comes out to {q}"),
+    Template("kp_11", "the {name} is {q} ({sym})"),
+    Template("kp_12", "{name} {sym} = {q}"),
+)
+
+# Question frames. {target}/{Target} the unknown's name, {tsym} its symbol, {knowns}/{Knowns}
+# the known values as a list, {facts} the known values as sentences.
 GENERIC: tuple[Template, ...] = (
     Template("gen_01", "What is the {target} when {knowns}?"),
     Template("gen_02", "Find the {target} given that {knowns}."),
@@ -74,83 +182,738 @@ GENERIC: tuple[Template, ...] = (
     Template("gen_12", "Quick one: {knowns}. {Target}?"),
     Template("gen_13_h", "Assuming {knowns}, what would the {target} be?"),
     Template("gen_14", "Please solve for the {target}, where {knowns}."),
+    Template("gen_15", "{facts} What is the {target}?"),
+    Template("gen_16", "{facts} Find the {target}."),
+    Template("gen_17", "{facts} Solve for {tsym}."),
+    Template("gen_18", "{facts} How big is the {target}?"),
+    Template("gen_19", "Solve for {tsym} when {knowns}."),
+    Template("gen_20", "Find {tsym}, given {knowns}."),
+    Template("gen_21", "Determine {tsym} if {knowns}."),
+    Template("gen_22", "What {target} do you get when {knowns}?"),
+    Template("gen_23", "How much {target} is there if {knowns}?"),
+    Template("gen_24", "Using {knowns}, find the {target}."),
+    Template("gen_25", "{Knowns}. Find the {target}."),
+    Template("gen_26", "{Knowns}. Solve for the {target}."),
+    Template("gen_27", "{Knowns}, so what is the {target}?"),
+    Template("gen_28", "Known: {knowns}. Unknown: the {target}."),
+    Template("gen_29", "The {target} is unknown, but {knowns}. What is it?"),
+    Template("gen_30", "I need the {target}. I know {knowns}."),
+    Template("gen_31", "Can you figure out the {target}? {Knowns}."),
+    Template("gen_32", "Help me find the {target} when {knowns}."),
+    Template("gen_33_h", "{facts} What does the {target} come out to?"),
+    Template("gen_34", "Given that {knowns}, solve for {tsym}."),
+    Template("gen_35", "If we have {knowns}, what's {tsym}?"),
+    Template("gen_36", "How do I get the {target} when {knowns}?"),
+    Template("gen_37", "Compute the {target} for {knowns}."),
+    Template("gen_38_h", "Say {knowns}. What's the {target} then?"),
+    Template("gen_39", "{facts} I want to know the {target}."),
+    Template("gen_40", "Find the {target}: {knowns}."),
+    Template("gen_41", "{Target} = ? when {knowns}."),
+    Template("gen_42", "What {target} results if {knowns}?"),
+    Template("gen_43_h", "{facts} Work out {tsym}."),
+    Template("gen_44", "Determine the value of the {target} given {knowns}."),
 )
 
-# Scenario templates for specific equations: (equation id, template, forced knowns).
-# Forced knowns are (symbol, value or "g" for standard gravity, unit, origin).
-SCENARIOS: tuple[tuple[str, Template, str, tuple[tuple[str, str, str, str], ...]], ...] = (
-    (
+# --------------------------------------------------------------------------- framing noise
+
+# Openers and sign-offs, chosen for a minority of questions. No digits, ever.
+PREAMBLES: tuple[str, ...] = (
+    "Physics question:",
+    "Homework help:",
+    "Quick question.",
+    "Need help with this one.",
+    "From my textbook:",
+    "Here's a problem I'm stuck on.",
+    "Okay so",
+    "Hey,",
+    "Exam practice:",
+    "Lab question:",
+    "Can you help?",
+    "Problem:",
+    "Hi!",
+    "My teacher asked this:",
+    "Practice problem.",
+    "Real quick,",
+    "Help please:",
+    "I'm studying for a test.",
+    "This came up in class:",
+    "So",
+)
+SIGN_OFFS: tuple[str, ...] = (
+    "Thanks!",
+    "Show the steps.",
+    "Please explain.",
+    "Thanks in advance.",
+    "Any help appreciated.",
+    "Explain your reasoning.",
+    "Ty",
+    "Cheers.",
+)
+
+# --------------------------------------------------------------------------- scenarios
+
+
+@dataclass(frozen=True)
+class Scenario:
+    """A worded problem for one equation.
+
+    Slots: ``{object}``, ``{object2}``, ``{vehicle}``, ``{vehicle2}``, and one per given
+    symbol (``{t}`` reads "12 s"). ``{m_a}`` writes the value as an adjective ("a 5 kg
+    ball"), so it always uses the unit symbol. ``forced`` are knowns the wording implies:
+    (symbol, value or "g" for standard gravity, unit, origin).
+    """
+
+    equation: str
+    template: Template
+    target: str
+    forced: tuple[tuple[str, str, str, str], ...] = ()
+    assumptions: tuple[str, ...] = ()
+
+
+_REST = ("v0", "0", "m/s", "assumption")
+_GRAVITY = ("a", "g", "m/s^2", "constant")
+_G = ("g", "g", "m/s^2", "constant")
+_DROP = ("Released from rest", "Air resistance is negligible")
+_FROM_REST = ("Starts from rest", "Acceleration stays constant")
+
+SCENARIOS: tuple[Scenario, ...] = (
+    # kin_v_squared
+    Scenario(
         "kin_v_squared",
         Template(
             "drop_speed_01", "A {object} is dropped from {d}. How fast is it going when it lands?"
         ),
         "v",
-        (("v0", "0", "m/s", "assumption"), ("a", "g", "m/s^2", "constant")),
+        (_REST, _GRAVITY),
+        _DROP,
     ),
-    (
+    Scenario(
         "kin_v_squared",
         Template("drop_speed_02_h", "How fast does a {object} hit the floor after falling {d}?"),
         "v",
-        (("v0", "0", "m/s", "assumption"), ("a", "g", "m/s^2", "constant")),
+        (_REST, _GRAVITY),
+        _DROP,
     ),
-    (
-        "kin_x_at",
-        Template("drop_dist_01", "How far does a {object} fall in {t} after being released?"),
-        "x",
-        (("v0", "0", "m/s", "assumption"), ("a", "g", "m/s^2", "constant")),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "drop_speed_03",
+            "Someone lets go of a {object} from a balcony {d} up. What speed does it reach just "
+            "before impact?",
+        ),
+        "v",
+        (_REST, _GRAVITY),
+        _DROP,
     ),
-    (
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "drop_speed_04",
+            "I knocked a {object} off a ledge that's {d} high. How fast was it moving at the "
+            "bottom?",
+        ),
+        "v",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "ramp_speed_01",
+            "A {vehicle} starts from rest and speeds up at {a} over {d}. What speed does it reach?",
+        ),
+        "v",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "ramp_speed_02",
+            "A {vehicle} already doing {v0} accelerates at {a} for a stretch of {d}. What is its "
+            "final speed?",
+        ),
+        "v",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "runway_01",
+            "A {vehicle} has to reach {v} from a standstill within {d}. What acceleration does "
+            "that take?",
+        ),
+        "a",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "drop_height_01_h", "From what height would a {object} have to fall to land at {v}?"
+        ),
+        "d",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "drop_height_02",
+            "A {object} hits the ground at {v}. If it fell from rest, how far did it drop?",
+        ),
+        "d",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    # kin_v_at
+    Scenario(
         "kin_v_at",
         Template(
             "start_rest_01",
             "A {vehicle} starts from rest and accelerates at {a} for {t}. What is its final speed?",
         ),
         "v",
-        (("v0", "0", "m/s", "assumption"),),
+        (_REST,),
+        _FROM_REST,
     ),
-    (
+    Scenario(
+        "kin_v_at",
+        Template(
+            "speed_up_01",
+            "A {vehicle} moving at {v0} speeds up at {a} for {t}. How fast is it going afterward?",
+        ),
+        "v",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "speed_up_02_h",
+            "Traveling at {v0}, a {vehicle} gains speed at {a}. What is its speed {t} later?",
+        ),
+        "v",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "reach_time_01",
+            "How long does a {vehicle} need to get from {v0} up to {v} if it accelerates at {a}?",
+        ),
+        "t",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "reach_time_02",
+            "Starting from a standstill, a {vehicle} accelerates at {a}. How many seconds until "
+            "it hits {v}?",
+        ),
+        "t",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_v_at",
+        Template("accel_01", "A {vehicle} goes from {v0} to {v} in {t}. What is its acceleration?"),
+        "a",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "accel_02",
+            "In {t}, a {vehicle} that started at rest is doing {v}. What was its average "
+            "acceleration?",
+        ),
+        "a",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_v_at",
+        Template("fall_speed_01", "A {object} falls from rest. How fast is it moving after {t}?"),
+        "v",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "throw_down_01",
+            "A {object} is thrown straight down at {v0}. What is its speed after {t} of falling?",
+        ),
+        "v",
+        (_GRAVITY,),
+        ("Air resistance is negligible",),
+    ),
+    # kin_x_at
+    Scenario(
+        "kin_x_at",
+        Template("drop_dist_01", "How far does a {object} fall in {t} after being released?"),
+        "x",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_x_at",
+        Template(
+            "drop_dist_02",
+            "A {object} slips off a cliff and falls for {t}. How far has it dropped?",
+        ),
+        "x",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_x_at",
+        Template(
+            "launch_dist_01",
+            "A {vehicle} starts from rest and accelerates at {a} for {t}. How far does it travel?",
+        ),
+        "x",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_x_at",
+        Template(
+            "launch_dist_02_h",
+            "What distance does a {vehicle} cover in {t} if it begins at {v0} and accelerates at "
+            "{a}?",
+        ),
+        "x",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_x_at",
+        Template("cruise_01", "A {vehicle} cruises at a steady {v0} for {t}. How far does it go?"),
+        "x",
+        (("a", "0", "m/s^2", "assumption"),),
+        ("Speed stays constant",),
+    ),
+    Scenario(
+        "kin_x_at",
+        Template(
+            "track_accel_01",
+            "Starting from rest, a {vehicle} covers {x} in {t}. What is its acceleration?",
+        ),
+        "a",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_x_at",
+        Template("fall_time_01", "How long does it take a {object} to fall {x} from rest?"),
+        "t",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    # newton_second_law
+    Scenario(
+        "newton_second_law",
+        Template(
+            "push_force_01", "What net force does it take to accelerate a {m_a} {vehicle} at {a}?"
+        ),
+        "F",
+        (),
+        ("Friction is ignored",),
+    ),
+    Scenario(
+        "newton_second_law",
+        Template(
+            "push_accel_01",
+            "A net force of {F} acts on a {m_a} {object}. What is its acceleration?",
+        ),
+        "a",
+    ),
+    Scenario(
+        "newton_second_law",
+        Template(
+            "push_accel_02",
+            "You shove a {object} with a mass of {m} using a net force of {F}. How quickly does "
+            "it accelerate?",
+        ),
+        "a",
+        (),
+        ("Friction is ignored",),
+    ),
+    Scenario(
+        "newton_second_law",
+        Template(
+            "push_mass_01",
+            "A {F_a} net force makes a {object} accelerate at {a}. What is its mass?",
+        ),
+        "m",
+    ),
+    Scenario(
+        "newton_second_law",
+        Template(
+            "push_mass_02_h",
+            "Pushing a {vehicle} with {F} of net force gives it an acceleration of {a}. How heavy "
+            "is it in kilograms?",
+        ),
+        "m",
+        (),
+        ("Friction is ignored",),
+    ),
+    Scenario(
+        "newton_second_law",
+        Template(
+            "brake_force_01", "A {m_a} {vehicle} slows down at {a}. What net force is acting on it?"
+        ),
+        "F",
+    ),
+    # weight
+    Scenario(
         "weight",
-        Template("weight_earth_01", "How much does a {m} {object} weigh on Earth?"),
+        Template("weight_earth_01", "How much does a {m_a} {object} weigh on Earth?"),
         "W",
-        (("g", "g", "m/s^2", "constant"),),
+        (_G,),
+        ("Standard gravity at the surface",),
     ),
-    (
+    Scenario(
+        "weight",
+        Template("weight_earth_02", "What is the weight of a {object} with a mass of {m}?"),
+        "W",
+        (_G,),
+        ("Standard gravity at the surface",),
+    ),
+    Scenario(
+        "weight",
+        Template("weight_mass_01", "A {object} weighs {W} on Earth. What is its mass?"),
+        "m",
+        (_G,),
+        ("Standard gravity at the surface",),
+    ),
+    Scenario(
+        "weight",
+        Template(
+            "weight_planet_01",
+            "On a planet where gravity is {g}, how much would a {m_a} {object} weigh?",
+        ),
+        "W",
+    ),
+    Scenario(
+        "weight",
+        Template(
+            "weight_planet_02_h",
+            "A {m_a} {object} weighs {W} on some alien world. What is the gravitational "
+            "acceleration there?",
+        ),
+        "g",
+    ),
+    Scenario(
+        "weight",
+        Template(
+            "scale_01", "A bathroom scale reads a force of {W} under a {object}. What mass is that?"
+        ),
+        "m",
+        (_G,),
+        ("Standard gravity at the surface",),
+    ),
+    # gravitational_pe
+    Scenario(
         "gravitational_pe",
         Template(
-            "lift_pe_01", "How much potential energy does a {m} {object} gain when lifted {h}?"
+            "lift_pe_01", "How much potential energy does a {m_a} {object} gain when lifted {h}?"
         ),
         "U",
-        (("g", "g", "m/s^2", "constant"),),
+        (_G,),
+        ("Standard gravity near the surface",),
     ),
-    (
+    Scenario(
+        "gravitational_pe",
+        Template(
+            "shelf_pe_01",
+            "A {m_a} {object} sits on a shelf {h} above the floor. How much gravitational "
+            "potential energy does it have?",
+        ),
+        "U",
+        (_G,),
+        ("Standard gravity near the surface", "The floor is the reference level"),
+    ),
+    Scenario(
+        "gravitational_pe",
+        Template(
+            "lift_height_01",
+            "How high do you have to raise a {m_a} {object} to store {U} of potential energy?",
+        ),
+        "h",
+        (_G,),
+        ("Standard gravity near the surface",),
+    ),
+    Scenario(
+        "gravitational_pe",
+        Template(
+            "lift_mass_01_h",
+            "Lifting a {object} by {h} took {U} of work against gravity. What is its mass?",
+        ),
+        "m",
+        (_G,),
+        ("Standard gravity near the surface",),
+    ),
+    Scenario(
+        "gravitational_pe",
+        Template(
+            "crane_pe_01",
+            "A crane hoists a {m_a} load up {h}. How much energy goes into potential energy?",
+        ),
+        "U",
+        (_G,),
+        ("Standard gravity near the surface",),
+    ),
+    # kinetic_energy
+    Scenario(
+        "kinetic_energy",
+        Template(
+            "ke_01",
+            "A {m_a} {object} flies through the air at {v}. How much kinetic energy does it carry?",
+        ),
+        "KE",
+    ),
+    Scenario(
+        "kinetic_energy",
+        Template(
+            "ke_02",
+            "How much energy of motion does a {vehicle} with a mass of {m} have when it does {v}?",
+        ),
+        "KE",
+    ),
+    Scenario(
+        "kinetic_energy",
+        Template(
+            "ke_speed_01", "A {m_a} {object} has {KE} of kinetic energy. How fast is it moving?"
+        ),
+        "v",
+    ),
+    Scenario(
+        "kinetic_energy",
+        Template(
+            "ke_mass_01_h",
+            "Something zipping along at {v} carries {KE} of kinetic energy. What is its mass?",
+        ),
+        "m",
+    ),
+    # momentum
+    Scenario(
+        "momentum",
+        Template("p_01", "A {m_a} {vehicle} rolls along at {v}. How much momentum does it have?"),
+        "p",
+    ),
+    Scenario(
+        "momentum",
+        Template(
+            "p_speed_01",
+            "A {object} with a mass of {m} has a momentum of {p}. How fast is it going?",
+        ),
+        "v",
+    ),
+    Scenario(
+        "momentum",
+        Template("p_mass_01_h", "An object moving at {v} has {p} of momentum. What's its mass?"),
+        "m",
+    ),
+    # inelastic_collision
+    Scenario(
+        "inelastic_collision",
+        Template(
+            "couple_01",
+            "A {m1_a} {vehicle} moving at {v1} bumps into a {m2_a} {vehicle2} moving at {v2} in "
+            "the same direction, and they lock together. How fast do they move afterward?",
+        ),
+        "vf",
+        (),
+        ("Both move in the same direction before the collision",),
+    ),
+    Scenario(
+        "inelastic_collision",
+        Template(
+            "couple_02",
+            "A {m1_a} cart rolling at {v1} hits a {m2_a} cart sitting still, and the two latch "
+            "together. What is their shared speed?",
+        ),
+        "vf",
+        (("v2", "0", "m/s", "assumption"),),
+        ("The second cart starts at rest",),
+    ),
+    Scenario(
+        "inelastic_collision",
+        Template(
+            "couple_03_h",
+            "Two lumps of clay collide and stick: one has mass {m1} and speed {v1}, the other "
+            "mass {m2} and speed {v2}, moving the same way. What is the final velocity?",
+        ),
+        "vf",
+        (),
+        ("Both move in the same direction before the collision",),
+    ),
+    # newton_gravitation
+    Scenario(
+        "newton_gravitation",
+        Template(
+            "grav_01",
+            "What is the gravitational pull between a {m1_a} {object} and a {m2_a} {object2} that "
+            "are {r} apart?",
+        ),
+        "F",
+    ),
+    Scenario(
+        "newton_gravitation",
+        Template(
+            "grav_02_h",
+            "Two boulders of {m1} and {m2} sit {r} apart. How strongly do they attract each other?",
+        ),
+        "F",
+    ),
+    # ohms_law
+    Scenario(
         "ohms_law",
         Template(
             "battery_01",
-            "What current flows when a {V} battery is connected across a {R} resistor?",
+            "What current flows when a {V_a} battery is connected across a {R_a} resistor?",
         ),
         "I",
         (),
+        ("Ideal battery with no internal resistance",),
+    ),
+    Scenario(
+        "ohms_law",
+        Template(
+            "heater_01", "How much current does a {R_a} heating element draw from a {V_a} supply?"
+        ),
+        "I",
+        (),
+        ("Ideal supply with no internal resistance",),
+    ),
+    Scenario(
+        "ohms_law",
+        Template(
+            "drop_v_01",
+            "A current of {I} runs through a {R_a} resistor. What is the voltage across it?",
+        ),
+        "V",
+    ),
+    Scenario(
+        "ohms_law",
+        Template(
+            "resist_01",
+            "A {V_a} source pushes {I} through a circuit. What is the circuit's resistance?",
+        ),
+        "R",
+        (),
+        ("The circuit acts as a single resistance",),
+    ),
+    Scenario(
+        "ohms_law",
+        Template("resist_02_h", "What resistor would let exactly {I} flow from a {V_a} battery?"),
+        "R",
+        (),
+        ("Ideal battery with no internal resistance",),
+    ),
+    Scenario(
+        "ohms_law",
+        Template(
+            "led_v_01",
+            "An LED circuit carries {I} through a {R_a} resistor. How many volts drop across the "
+            "resistor?",
+        ),
+        "V",
+    ),
+    # ideal_gas_law
+    Scenario(
+        "ideal_gas_law",
+        Template(
+            "tank_p_01",
+            "A sealed {V_a} tank holds {n} of gas at {T}. How much pressure does the gas exert on "
+            "the walls?",
+        ),
+        "P",
+        (),
+        ("The gas behaves ideally",),
+    ),
+    Scenario(
+        "ideal_gas_law",
+        Template("gas_v_01", "What volume do {n} of gas take up at {P} and {T}?"),
+        "V",
+        (),
+        ("The gas behaves ideally",),
+    ),
+    Scenario(
+        "ideal_gas_law",
+        Template(
+            "gas_n_01", "A {V_a} cylinder contains gas at {P} and {T}. How many moles are inside?"
+        ),
+        "n",
+        (),
+        ("The gas behaves ideally",),
+    ),
+    Scenario(
+        "ideal_gas_law",
+        Template(
+            "gas_t_01_h",
+            "At what temperature would {n} of gas in a {V_a} container reach a pressure of {P}?",
+        ),
+        "T",
+        (),
+        ("The gas behaves ideally",),
+    ),
+    Scenario(
+        "ideal_gas_law",
+        Template(
+            "balloon_01",
+            "A weather balloon holds {n} of helium at {T} and {P}. What is its volume?",
+        ),
+        "V",
+        (),
+        ("Helium behaves as an ideal gas",),
     ),
 )
 
-SCENARIO_ASSUMPTIONS: dict[str, tuple[str, ...]] = {
-    "drop_speed_01": ("Released from rest", "Air resistance is negligible"),
-    "drop_speed_02_h": ("Released from rest", "Air resistance is negligible"),
-    "drop_dist_01": ("Released from rest", "Air resistance is negligible"),
-    "start_rest_01": ("Starts from rest", "Acceleration stays constant"),
-    "weight_earth_01": ("Standard gravity at the surface",),
-    "lift_pe_01": ("Standard gravity near the surface",),
-    "battery_01": ("Ideal battery with no internal resistance",),
-}
+OBJECTS = (
+    "ball", "rock", "phone", "book", "watermelon", "brick", "coin", "toy car", "wrench",
+    "apple", "bowling ball", "stone", "pumpkin", "laptop", "basketball", "hammer", "mug",
+    "backpack", "dumbbell", "pebble", "baseball", "suitcase", "bucket", "shoe", "melon",
+    "crate", "box", "tennis ball", "water bottle", "potted plant",
+)  # fmt: skip
+VEHICLES = (
+    "car", "bike", "train", "scooter", "sled", "cart", "boat", "truck", "bus", "motorcycle",
+    "skateboarder", "go-kart", "tram", "drone", "rocket sled", "jet ski", "snowmobile",
+)  # fmt: skip
 
-OBJECTS = ("ball", "rock", "phone", "book", "watermelon", "brick", "coin", "toy car", "wrench")
-VEHICLES = ("car", "bike", "train", "scooter", "sled", "cart", "boat")
+# --------------------------------------------------------------------------- reasoning and strategy
 
 STANDARD_REASONING = (
     "All the needed values are given, so this is a standard {domain} problem.",
     "The question gives the inputs directly; it is {domain}.",
     "A well-posed {domain} question with every value stated or a standard constant.",
+    "Everything required is stated, so a single {domain} equation answers it.",
+    "Standard {domain}: the known values pin down the unknown.",
+    "This is textbook {domain} with the inputs supplied.",
+    "The inputs are given outright, so no estimation is needed; it is {domain}.",
+    "A direct {domain} calculation from the stated values.",
 )
+
+STRATEGIES = (
+    "Use {eq} and solve for the {target}.",
+    "Rearrange {eq} for the {target}.",
+    "Solve {eq} for {sym}.",
+    "Apply {eq} and isolate {sym}.",
+    "Plug the known values into {eq} and solve for the {target}.",
+    "Start from {eq}, then solve it for {sym}.",
+    "{Eq} links the knowns to the {target}; solve it for {sym}.",
+    "Substitute the givens into {eq} to get the {target}.",
+)
+
+# --------------------------------------------------------------------------- Fermi questions
 
 # Fermi questions (classification only until the Fermi engine lands in v0.7).
 FERMI: tuple[Template, ...] = (
@@ -160,19 +923,64 @@ FERMI: tuple[Template, ...] = (
     Template("fermi_04_h", "Roughly how many {small} could fit inside a {container}?"),
     Template("fermi_05", "If you lined up {small} end to end, how many would span a {long}?"),
     Template("fermi_06", "How much energy would it take to lift a {heavy} to the top of a {tall}?"),
+    Template("fermi_07", "About how many {small} are there in a packed {container}?"),
+    Template("fermi_08", "How many {people} could you fit in a {container}?"),
+    Template("fermi_09", "How much does all the air in a {container} weigh?"),
+    Template("fermi_10", "How many {small} tall is a {tall}?"),
+    Template("fermi_11_h", "Estimate how many {small} it would take to cover a {area}."),
+    Template(
+        "fermi_12",
+        "If a {huge} sat on one side of a giant scale, how many {people} would balance it?",
+    ),
+    Template("fermi_13", "How long would it take to walk the length of a {long} a thousand times?"),
+    Template("fermi_14", "How much water does a {container} hold?"),
+    Template("fermi_15", "How many {small} would it take to pave a {area}?"),
+    Template("fermi_16", "Ballpark: how many {people} weigh as much as a {huge}?"),
+    Template("fermi_17", "How many times does a person's heart beat in a lifetime?"),
+    Template("fermi_18", "How many {small} could you buy with all the coins in a {container}?"),
+    Template(
+        "fermi_19_h", "What's a rough guess for the number of {small} that would bury a {heavy}?"
+    ),
+    Template(
+        "fermi_20", "How much energy does a {heavy} have when it rolls down a {tall}-sized hill?"
+    ),
+    Template("fermi_21", "How many {small} laid flat would cover a {area}?"),
+    Template("fermi_22", "How many {people} holding hands would stretch across a {long}?"),
+    Template("fermi_23", "Order of magnitude: how many {small} fit in a {container}?"),
+    Template("fermi_24", "How many {small} does the average person go through in a year?"),
 )
 FERMI_SLOTS: dict[str, tuple[str, ...]] = {
-    "small": ("tennis balls", "marbles", "ping pong balls", "golf balls", "pennies", "dice"),
-    "container": ("school bus", "bathtub", "swimming pool", "classroom", "shipping container"),
-    "tall": ("skyscraper", "lighthouse", "redwood tree", "radio tower"),
-    "heavy": ("school bus", "elephant", "pickup truck", "grand piano", "blue whale"),
-    "long": ("football field", "city block", "suspension bridge", "runway"),
-}
+    "small": (
+        "tennis balls", "marbles", "ping pong balls", "golf balls", "pennies", "dice",
+        "jelly beans", "grains of rice", "sugar cubes", "LEGO bricks", "paper clips",
+        "soccer balls", "eggs", "playing cards", "popcorn kernels", "bricks",
+    ),
+    "container": (
+        "school bus", "bathtub", "swimming pool", "classroom", "shipping container",
+        "car trunk", "refrigerator", "stadium", "hot air balloon", "concert hall",
+    ),
+    "tall": ("skyscraper", "lighthouse", "redwood tree", "radio tower", "mountain", "giraffe"),
+    "heavy": (
+        "school bus", "elephant", "pickup truck", "grand piano", "blue whale", "horse",
+        "cow", "minivan",
+    ),
+    "huge": ("cruise ship", "jumbo jet", "aircraft carrier", "space shuttle", "train"),
+    "long": ("football field", "city block", "suspension bridge", "runway", "marathon course"),
+    "area": ("football field", "parking lot", "basketball court", "city park", "tennis court"),
+    "people": ("people", "students", "adults", "kids"),
+}  # fmt: skip
 FERMI_REASONING = (
     "Physically meaningful, but it needs estimated everyday quantities.",
     "A Fermi estimate: the answer depends on assumed sizes and masses.",
     "Answerable with order-of-magnitude assumptions rather than given values.",
+    "No values are given, so it needs rough estimates of everyday sizes.",
+    "An estimation problem: reasonable assumptions give an order of magnitude.",
+    "Real physics, but the inputs have to be estimated, not read off.",
+    "A back-of-the-envelope estimate built from typical quantities.",
+    "Meaningful but underspecified; typical values make it answerable roughly.",
 )
+
+# --------------------------------------------------------------------------- out of scope
 
 # Out-of-scope questions with a reason and a redirect.
 OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
@@ -214,18 +1022,139 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
         "Research-level physics with no settled answer; out of scope.",
         "What is the gravitational force between two people standing a meter apart?",
     ),
+    (
+        Template("oos_speed_01", "How fast is {abstract}?"),
+        "Category error: {abstract} does not move, so it has no speed.",
+        "How fast does sound travel through air?",
+    ),
+    (
+        Template("oos_volume_01", "What is the volume of {emotion}?"),
+        "Category error: {emotion} is a feeling and takes up no space.",
+        "What is the volume of a typical coffee mug?",
+    ),
+    (
+        Template("oos_energy_01_h", "How much energy is in {abstract}?"),
+        "Category error: {abstract} is not a physical system that stores energy.",
+        "How much energy is stored in a typical phone battery?",
+    ),
+    (
+        Template("oos_density_01", "What is the density of {abstract}?"),
+        "Category error: {abstract} has neither mass nor volume.",
+        "What is the density of seawater?",
+    ),
+    (
+        Template("oos_stock_01", "Will {company} stock go up next week?"),
+        "Not a physics question; it is a financial prediction.",
+        "How much electricity does a typical data center use?",
+    ),
+    (
+        Template("oos_opinion_01", "Which is cooler, {topic_a} or {topic_b}?"),
+        "Not a physics question; it asks for an opinion.",
+        "How much energy does it take to heat a cup of water to boiling?",
+    ),
+    (
+        Template("oos_lottery_01", "What numbers will win the lottery in {city} next month?"),
+        "Unknowable: a fair lottery draw is random by design.",
+        "How does a ball bounce when dropped onto a hard floor?",
+    ),
+    (
+        Template("oos_meaning_01", "What is the meaning of life?"),
+        "Not a physics question; it is philosophy.",
+        "How much energy does the human body use in a day?",
+    ),
+    (
+        Template("oos_recipe_01", "How do I make the perfect {food}?"),
+        "Not a physics question; it is cooking advice.",
+        "How long does it take to bring a pot of water to a boil?",
+    ),
+    (
+        Template("oos_history_01_h", "Who was the first ruler of {city}?"),
+        "Not a physics question; it is history.",
+        "How tall can a stone tower be before it crushes its own base?",
+    ),
+    (
+        Template("oos_color_01", "What color is {emotion}?"),
+        "Category error: {emotion} is a feeling and reflects no light.",
+        "Why does the sky look blue during the day?",
+    ),
+    (
+        Template("oos_dream_01", "How much does a dream weigh?"),
+        "Category error: a dream is an experience, not an object with weight.",
+        "How much does the human brain weigh?",
+    ),
+    (
+        Template("oos_before_01", "What happened before time existed?"),
+        "Unknowable: physics has no settled account of anything without time.",
+        "How old is the universe?",
+    ),
+    (
+        Template("oos_mind_01", "What am I thinking right now?"),
+        "Not answerable: physics cannot read anyone's thoughts.",
+        "How fast do signals travel along a human nerve?",
+    ),
+    (
+        Template("oos_code_01", "Write me a poem about {food}."),
+        "Not a physics question; it asks for creative writing.",
+        "How many calories are in a typical serving of {food}?",
+    ),
+    (
+        Template("oos_exact_01", "Exactly how many grains of sand are on every beach on Earth?"),
+        "Unknowable to an exact count; only a rough estimate is possible.",
+        "Roughly how many grains of sand fit in a bucket?",
+    ),
+    (
+        Template("oos_friction_01", "What is the friction coefficient of {abstract}?"),
+        "Category error: {abstract} has no surface, so it has no friction.",
+        "What is the friction coefficient of rubber on dry concrete?",
+    ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {
-    "abstract": ("a promise", "Tuesday", "a good idea", "justice", "a rumor"),
-    "abstract2": ("letter Q", "concept of zero", "word silence", "idea of blue sky"),
-    "emotion": ("jealousy", "boredom", "nostalgia", "pride"),
-    "city": ("Lisbon", "Nairobi", "Osaka", "Denver"),
-    "food": ("pizza", "taco", "bagel", "burger"),
-}
+    "abstract": (
+        "a promise", "Tuesday", "a good idea", "justice", "a rumor", "a secret",
+        "an opinion", "a memory", "the alphabet", "a song title", "a wish",
+    ),
+    "abstract2": (
+        "letter Q", "concept of zero", "word silence", "idea of blue sky", "number seven",
+    ),
+    "emotion": ("jealousy", "boredom", "nostalgia", "pride", "joy", "anxiety", "hope", "regret"),
+    "city": ("Lisbon", "Nairobi", "Osaka", "Denver", "Lima", "Oslo", "Hanoi", "Perth"),
+    "food": ("pizza", "taco", "bagel", "burger", "pancake", "sushi", "salad", "curry"),
+    "company": ("Acme", "a tech giant", "my favorite company", "an airline"),
+    "topic_a": ("cats", "summer", "jazz", "basketball"),
+    "topic_b": ("dogs", "winter", "rock music", "soccer"),
+}  # fmt: skip
+
+# --------------------------------------------------------------------------- explanations
 
 EXPLAIN: tuple[Template, ...] = (
     Template("exp_01", "Using [{id}], the {target} comes out to {value} {unit}.{assume}"),
     Template("exp_02", "From [{id}] ({name}), {target} = {value} {unit}.{assume}"),
     Template("exp_03", "Solving [{id}] for the {target} gives {value} {unit}.{assume}"),
     Template("exp_04_h", "The {target} is {value} {unit}, from [{id}].{assume}"),
+    Template("exp_05", "{Name} [{id}] gives a {target} of {value} {unit}.{assume}"),
+    Template("exp_06", "Rearranging [{id}] for the {target}: {value} {unit}.{assume}"),
+    Template("exp_07", "The {target} works out to {value} {unit} by [{id}].{assume}"),
+    Template(
+        "exp_08",
+        "Applying [{id}] ({name}) to the given values, the {target} is {value} {unit}.{assume}",
+    ),
+    Template(
+        "exp_09_h",
+        "Plugging the numbers into [{id}] gives {value} {unit} for the {target}.{assume}",
+    ),
+    Template("exp_10", "With [{id}], we get {target} = {value} {unit}.{assume}"),
+    Template(
+        "exp_11",
+        "Answer: {value} {unit}. That's the {target}, from [{id}] ({name}).{assume}",
+    ),
+    Template("exp_12", "By [{id}], the {target} equals {value} {unit}.{assume}"),
+)  # fmt: skip
+
+# How the assumptions are listed at the end of an explanation. {listed} is "a; b".
+ASSUME_LEADS: tuple[str, ...] = (
+    " This assumes {listed}.",
+    " Assumptions: {listed}.",
+    " It assumes {listed}.",
+    " This takes {listed} as given.",
+    " Assuming {listed}.",
 )

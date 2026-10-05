@@ -89,10 +89,48 @@ def equation_phrase(name: str) -> str:
     return "the " + name[:1].lower() + name[1:]
 
 
-def _join(phrases: Sequence[str]) -> str:
+def _join(phrases: Sequence[str], style: int = 0) -> str:
+    """List phrases: "a, b and c" (style 0), "a, b, and c" (1), or "a; b; c" (2)."""
     if len(phrases) == 1:
         return phrases[0]
-    return ", ".join(phrases[:-1]) + " and " + phrases[-1]
+    if style == 2:
+        return "; ".join(phrases)
+    comma = "," if style == 1 and len(phrases) > 2 else ""
+    return ", ".join(phrases[:-1]) + f"{comma} and " + phrases[-1]
+
+
+def _capitalize(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+def _article(name: str) -> str:
+    return ("an " if name[:1].lower() in "aeiou" else "a ") + name
+
+
+def plain_name(var_name: str) -> str:
+    """A name for a variable with no digits ("second mass", not "mass 2").
+
+    Model-written text may only contain numbers from the question, so prose never says
+    "mass 2" unless the question did.
+    """
+    for name in tpl.VAR_SYNONYMS.get(var_name, ()):
+        if not any(ch.isdigit() for ch in name):
+            return name
+    return var_name
+
+
+def _is_plain_word(token: str) -> bool:
+    """A word whose case can change freely: not a symbol like "V", "KE", or "v0"."""
+    return len(token) > 1 and token[1:].isalpha() and token[1:].islower()
+
+
+@dataclass(frozen=True)
+class _Phrase:
+    text: str
+    symbol_first: bool  # starts with a case-sensitive symbol, so never recapitalize it
+
+    def sentence(self) -> str:
+        return (self.text if self.symbol_first else _capitalize(self.text)) + "."
 
 
 class DataFactory:
@@ -103,6 +141,7 @@ class DataFactory:
         self.rng = random.Random(seed)
         self.blocklist = list(blocklist)
         self.constants = list(store.constants.values())
+        self.by_symbol = {c.symbol: c for c in self.constants}
         self.retriever = KeywordRetriever(store.equations.values(), store.examples.values())
         self.dropped = 0
 
@@ -117,14 +156,50 @@ class DataFactory:
                 return c
         return None
 
-    def _sample(self, unit: str) -> tuple[str, str]:
-        """A realistic value for a variable measured in ``unit``: (number text, unit as written)."""
+    def _sample(self, unit: str, *, adjective: bool = False) -> tuple[str, str, str]:
+        """A realistic value for a variable measured in ``unit``.
+
+        Returns (number text, unit as written, the two as they appear in the question).
+        Units are sometimes converted ("km/h"), spelled out ("meters"), or written without
+        a space ("20m"); adjectives ("a 5 kg ball") keep the symbol.
+        """
         low, high = tpl.FRIENDLY_RANGES.get(unit, (1.0, 1000.0))
         value = math.exp(self.rng.uniform(math.log(low), math.log(high)))
         shown_unit = self.rng.choice(tpl.ALT_UNITS.get(unit, (unit,)))
         shown = quantity(value, unit).to(shown_unit).magnitude
         digits = self.rng.choice((2, 2, 3))
-        return format_number(float(f"{shown:.{digits}g}")), shown_unit
+        number = format_number(float(f"{shown:.{digits}g}"))
+        if "." not in number and "e" not in number and self.rng.random() < 0.05:
+            number += ".0"
+        spellings = tpl.UNIT_SPELLINGS.get(shown_unit)
+        if spellings and not adjective and self.rng.random() < 0.3:
+            return number, self.rng.choice(spellings), f"{number} {self.rng.choice(spellings)}"
+        gap = "" if self.rng.random() < 0.1 else " "
+        return number, shown_unit, f"{number}{gap}{shown_unit}"
+
+    def _name(self, var_name: str) -> str:
+        return self.rng.choice(tpl.VAR_SYNONYMS.get(var_name, (var_name,)))
+
+    def _lower_first(self, text: str) -> str:
+        words = text.split(" ", 2)
+        first = words[0].rstrip(",:.!?")
+        article = first == "A" and len(words) > 1 and words[1] != "="
+        return text[:1].lower() + text[1:] if article or _is_plain_word(first) else text
+
+    def _dress(self, question: str) -> str:
+        """Casual framing: an opener, a sign-off, dropped punctuation, a lowercase start."""
+        if self.rng.random() < 0.1:
+            question = question.rstrip("?.")
+        if self.rng.random() < 0.08:
+            question = self._lower_first(question)
+        if self.rng.random() < 0.2:
+            preamble = self.rng.choice(tpl.PREAMBLES)
+            if preamble[-1] not in ".:!?":
+                question = self._lower_first(question)
+            question = f"{preamble} {question}"
+        if self.rng.random() < 0.1:
+            question = f"{question} {self.rng.choice(tpl.SIGN_OFFS)}"
+        return question
 
     def _leaks(self, question: str) -> bool:
         return any(word_overlap(question, b) >= LEAK_THRESHOLD for b in self.blocklist)
@@ -142,14 +217,17 @@ class DataFactory:
 
     def standard_problem(self) -> StandardProblem | None:
         """One solved standard problem, or None if this attempt failed a check."""
-        if self.rng.random() < 0.35:
+        if self.rng.random() < 0.45:
             return self._scenario_problem()
         eq = self.rng.choice(list(self.store.equations.values()))
         targets = [v for v in eq.variables if self._constant_for(v.name, v.unit) is None]
         target = self.rng.choice(targets)
-        template = self.rng.choice(tpl.GENERIC)
+        frame = self.rng.choice(tpl.GENERIC)
+        pattern = self.rng.choice(tpl.KNOWN_PATTERNS)
+        mixed = self.rng.random() < 0.25
+        used = [pattern]
         knowns: list[KnownValue] = []
-        phrases: list[str] = []
+        phrases: list[_Phrase] = []
         for v in eq.variables:
             if v.symbol == target.symbol:
                 continue
@@ -161,47 +239,80 @@ class DataFactory:
                     )
                 )
                 continue
-            number, unit = self._sample(v.unit)
+            number, unit, shown = self._sample(v.unit)
             knowns.append(
                 KnownValue(symbol=v.symbol, value=float(number), unit=unit, origin="given")
             )
-            phrases.append(f"the {v.name} is {number} {unit}")
-        knowns_text = _join(phrases)
-        question = template.text.format(
-            target=target.name,
-            Target=target.name.capitalize(),
+            if mixed:
+                pattern = self.rng.choice(tpl.KNOWN_PATTERNS)
+                used.append(pattern)
+            name = self._name(v.name)
+            text = pattern.text.format(name=name, a_name=_article(name), sym=v.symbol, q=shown)
+            phrases.append(_Phrase(text, pattern.text.startswith("{sym}")))
+        if self.rng.random() < 0.5:
+            self.rng.shuffle(phrases)
+        knowns_text = _join([p.text for p in phrases], self.rng.randrange(3))
+        target_name = self._name(target.name)
+        question = frame.text.format(
+            target=target_name,
+            Target=_capitalize(target_name),
+            tsym=target.symbol,
             knowns=knowns_text,
-            Knowns=knowns_text[:1].upper() + knowns_text[1:],
+            Knowns=knowns_text if phrases[0].symbol_first else _capitalize(knowns_text),
+            facts=" ".join(p.sentence() for p in phrases),
         )
-        return self._finish(question, template.id, eq, target.symbol, knowns, list(eq.assumptions))
+        pattern_id = "kp_mix" if mixed else pattern.id
+        if mixed and any(p.held_out for p in used):
+            pattern_id += "_h"
+        return self._finish(
+            self._dress(question),
+            f"{frame.id}+{pattern_id}",
+            eq,
+            target.symbol,
+            knowns,
+            list(eq.assumptions),
+        )
 
     def _scenario_problem(self) -> StandardProblem | None:
-        eq_id, template, target, forced = self.rng.choice(tpl.SCENARIOS)
-        eq = self.store.equations[eq_id]
-        forced_symbols = {f[0] for f in forced}
-        knowns: list[KnownValue] = []
+        sc = self.rng.choice(tpl.SCENARIOS)
+        eq = self.store.equations[sc.equation]
+        forced = {f[0]: f for f in sc.forced}
+        objects = self.rng.sample(tpl.OBJECTS, 2)
+        vehicles = self.rng.sample(tpl.VEHICLES, 2)
         slots: dict[str, str] = {
-            "object": self.rng.choice(tpl.OBJECTS),
-            "vehicle": self.rng.choice(tpl.VEHICLES),
+            "object": objects[0],
+            "object2": objects[1],
+            "vehicle": vehicles[0],
+            "vehicle2": vehicles[1],
         }
-        g = self.store.constants["standard_gravity"]
+        knowns: list[KnownValue] = []
         for v in eq.variables:
-            if v.symbol == target:
+            if v.symbol == sc.target:
                 continue
-            if v.symbol in forced_symbols:
-                _, value, unit, origin = next(f for f in forced if f[0] == v.symbol)
-                number = g.value if value == "g" else float(value)
-                unit = g.unit if value == "g" else unit
+            if v.symbol in forced:
+                _, value, unit, origin = forced[v.symbol]
+                table = self.by_symbol.get(value)
+                number = table.value if table else float(value)
+                unit = table.unit if table else unit
                 knowns.append(KnownValue(symbol=v.symbol, value=number, unit=unit, origin=origin))
                 continue
-            number_text, unit = self._sample(v.unit)
+            const = self._constant_for(v.name, v.unit)
+            if const is not None:
+                knowns.append(
+                    KnownValue(
+                        symbol=v.symbol, value=const.value, unit=const.unit, origin="constant"
+                    )
+                )
+                continue
+            adjective = "{" + v.symbol + "_a}" in sc.template.text
+            number_text, unit, shown = self._sample(v.unit, adjective=adjective)
             knowns.append(
                 KnownValue(symbol=v.symbol, value=float(number_text), unit=unit, origin="given")
             )
-            slots[v.symbol] = f"{number_text} {unit}"
-        question = template.text.format(**slots)
-        assumptions = [*tpl.SCENARIO_ASSUMPTIONS.get(template.id, ()), *eq.assumptions]
-        return self._finish(question, template.id, eq, target, knowns, assumptions)
+            slots[v.symbol] = slots[v.symbol + "_a"] = shown
+        question = self._dress(sc.template.text.format(**slots))
+        assumptions = [*sc.assumptions, *eq.assumptions]
+        return self._finish(question, sc.template.id, eq, sc.target, knowns, assumptions)
 
     def _finish(
         self,
@@ -226,19 +337,16 @@ class DataFactory:
             return None
         retrieved = self._retrieved(question, eq)
         constants = relevant_constants(retrieved, self.constants)
-        target_name = eq.variable(target).name
+        target_name = plain_name(eq.variable(target).name)
+        phrase = equation_phrase(eq.name)
         plan = Plan(
             equation_ids=[eq.id],
             target=target,
             unknowns=[target],
             known_values=knowns,
             assumptions=assumptions,
-            strategy=self.rng.choice(
-                (
-                    f"Use {equation_phrase(eq.name)} and solve for the {target_name}.",
-                    f"Rearrange {equation_phrase(eq.name)} for the {target_name}.",
-                    f"Solve {equation_phrase(eq.name)} for {target}.",
-                )
+            strategy=self.rng.choice(tpl.STRATEGIES).format(
+                eq=phrase, Eq=_capitalize(phrase), target=target_name, sym=target
             ),
         )
         # Training targets must be outputs the constrained decoder could produce.
@@ -265,7 +373,8 @@ class DataFactory:
 
     @staticmethod
     def _split(template_id: str) -> Literal["train", "val"]:
-        return "val" if template_id.endswith("_h") else "train"
+        """Validation if any part of the template id ("gen_01+kp_10_h") is held out."""
+        return "val" if any(p.endswith("_h") for p in template_id.split("+")) else "train"
 
     def plan_example(self) -> Example | None:
         p = self.standard_problem()
@@ -282,11 +391,12 @@ class DataFactory:
         assume = ""
         if p.plan.assumptions:
             listed = "; ".join(a[:1].lower() + a[1:] for a in p.plan.assumptions)
-            assume = f" This assumes {listed}."
+            assume = self.rng.choice(tpl.ASSUME_LEADS).format(listed=listed)
         text = template.text.format(
             id=p.equation.id,
             name=p.equation.name,
-            target=p.equation.variable(p.plan.target).name,
+            Name=_capitalize(p.equation.name),
+            target=plain_name(p.equation.variable(p.plan.target).name),
             value=format_number(p.value),
             unit=p.unit,
             assume=assume,
@@ -309,8 +419,8 @@ class DataFactory:
             question = p.question
         elif roll < 0.75:
             template = self.rng.choice(tpl.FERMI)
-            question = template.text.format(
-                **{k: self.rng.choice(v) for k, v in tpl.FERMI_SLOTS.items()}
+            question = self._dress(
+                template.text.format(**{k: self.rng.choice(v) for k, v in tpl.FERMI_SLOTS.items()})
             )
             domains = ["energy"] if "energy" in question else []
             c = Classification(
@@ -320,7 +430,7 @@ class DataFactory:
         else:
             template, reason, closest = self.rng.choice(tpl.OUT_OF_SCOPE)
             slots = {k: self.rng.choice(v) for k, v in tpl.OOS_SLOTS.items()}
-            question = template.text.format(**slots)
+            question = self._dress(template.text.format(**slots))
             c = Classification(
                 category="out_of_scope",
                 reasoning=reason.format(**slots),
