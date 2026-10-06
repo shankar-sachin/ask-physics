@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "askphysics"
-version = "0.2.0"
+version = "0.3.0"
 description = "Answers physics questions, from textbook to absurd, with our own small language models and Noether, a math engine built on SymPy and Pint."
 readme = "README.md"
 license = "MIT"

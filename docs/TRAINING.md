@@ -1,6 +1,6 @@
 # Training the Fermi models
 
-The runbook for v0.3: training `fermi-tellus-1`, `fermi-solem-1`, and maybe
+The runbook for training `fermi-tellus-1`, `fermi-solem-1`, and maybe
 `fermi-celeste-1` on the maintainer's M5 Pro (48 GB). Users never do this;
 they download the weights we ship (ADR-012). Design background is in
 [`MODELS.md`](MODELS.md).
@@ -146,8 +146,8 @@ askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a
   Those cases print first, because each one is a hole a rule or more data
   should close.
 - Send the `model info` table, `metrics.jsonl`, and the `model eval` table;
-  they feed the model cards and the v0.3 exit criteria (90% valid plans on
-  unseen templates).
+  they feed the model cards and the v0.4 exit criteria (90% valid plans on
+  unseen templates, 0.1% or less confidently wrong).
 
 ## 7. Results so far
 

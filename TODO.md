@@ -59,18 +59,11 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
 
 ---
 
-## v0.3.0 Fermi models trained and wired in
+## v0.3.0 Fermi models wired in (done)
 
 The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md).
 
-### Training (on the maintainer's M5 Pro)
-- [ ] Measure real tokens per second for each config; update `docs/MODELS.md`.
-- [ ] Train `fermi-tellus-1`; record the loss curve and held-out plan validity.
-- [ ] Train `fermi-solem-1`; same.
-- [ ] Train `fermi-celeste-1` (~120M) only if solem's held-out results leave
-      room for it to help (open question Q16).
-
-### Integration
+- [x] Train `fermi-tellus-1`; record the loss curve and held-out plan validity.
 - [x] `FermiClient` implementing `LLMClient` with the task formats from
       `docs/PROMPTS.md`.
 - [x] Router per ADR-010: tellus classifies, solem plans and explains, up
@@ -79,6 +72,20 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 - [x] Add the `fermi` provider to `Settings`; make it the default when
       weights are installed, with a clear message when they aren't.
 - [x] `askphysics ask --model` to force a specific Fermi model.
+- [x] Held-out factory eval (`model eval`): valid-plan rate, answers after
+      the router's retries, and confidently wrong answers.
+- [x] 110 equations; the question normalizer; OpenStax *Physics* prose.
+
+---
+
+## v0.4.0 solem, weights, solver, and the wiki
+
+### Training (on the maintainer's M5 Pro)
+- [ ] Train `fermi-solem-1` with the prose stage; record the loss curve,
+      held-out plan validity, and confidently wrong rate.
+- [ ] Measure real tokens per second for each config; update `docs/MODELS.md`.
+- [ ] Train `fermi-celeste-1` (~120M) only if solem's held-out results leave
+      room for it to help (open question Q16).
 
 ### Distribution (ADR-012)
 - [ ] Export bf16 safetensors per model and a manifest (URL, size, sha256).
@@ -89,20 +96,23 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
       are installed.
 
 ### Evals
-- [ ] Held-out factory set (unseen templates): valid-plan rate per model and
-      celeste rescue rate.
+- [ ] Celeste rescue rate on the held-out factory set.
+- [ ] Real-question eval from OpenStax *Physics* exercises, with
+      project-written gold plans the maintainer reviews (ADR-016).
+- [ ] OpenStax questions as extra classify examples.
 - [ ] Run the 8 eval questions per model and record results in the model cards.
 
-### Docs
+### Solver
+- [ ] Multi-equation chaining: dependency order over the plan's unknowns.
+- [ ] Offset units (Celsius, Fahrenheit) converted before substitution.
+- [ ] 15+ worked examples.
+
+### Docs and the Ask Physics Wiki
 - [ ] Model cards for each trained model: config, data, tokens, time, curves,
-      results, known failure modes.
-
-## After v0.3: the Ask Physics Wiki (v0.4)
-
+      results, known failure modes, OpenStax attribution.
 - [ ] `docs/wiki/` as the single source: guides, FAQ, glossary, model cards.
 - [ ] Generate an equation page per database entry (formula, variables with
       units, validity, source, license).
 - [ ] CI workflow that publishes `docs/wiki/` to the GitHub Wiki.
 - [ ] Website wiki at `/wiki/` built from the same pages, with rendered math
       and search; link each equation id on the answer card to its page.
-
