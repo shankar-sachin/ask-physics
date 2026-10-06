@@ -13,8 +13,10 @@ the ``explanation`` prose.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any, NamedTuple
 
 from askphysics.config import Settings
@@ -64,6 +66,75 @@ EXPLAIN_SYSTEM_PROMPT = (
 )
 
 LIMIT_CASE_CAVEAT = "Limit-case checks are not implemented yet (v0.8)."
+FALLBACK_REFUSAL = "It doesn't look like a physics question the equation database can answer."
+# Refusal reasons that needn't repeat the question's words ("Not a physics question; it is
+# history."). Any other reason must share a content word with the question, so a model
+# can't transplant one ("anxiety is a feeling" for "what is ten divided by three").
+GENERIC_REASONS = (
+    "Not a physics",
+    "Not answerable",
+    "Research-level",
+    "Needs unknowable",
+    "Unknowable",
+)
+_STOPWORDS = frozenset(
+    [
+        "about",
+        "all",
+        "and",
+        "are",
+        "but",
+        "can",
+        "for",
+        "has",
+        "how",
+        "its",
+        "not",
+        "the",
+        "was",
+        "who",
+        "why",
+        "you",
+        "also",
+        "been",
+        "could",
+        "does",
+        "from",
+        "have",
+        "into",
+        "just",
+        "like",
+        "many",
+        "more",
+        "most",
+        "much",
+        "only",
+        "over",
+        "should",
+        "some",
+        "than",
+        "that",
+        "their",
+        "them",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "those",
+        "very",
+        "were",
+        "what",
+        "when",
+        "where",
+        "which",
+        "while",
+        "will",
+        "with",
+        "would",
+        "your",
+    ]
+)
 SIG_FIGS = 6
 
 
@@ -326,7 +397,7 @@ def explain(
         )
     except AskPhysicsError:
         explanation = ""
-    if not explanation.strip():
+    if not readable(explanation):
         explained_by = "template"
         explanation = f"Using {', '.join(p.equation_ids)}, {result.target} = {value} {result.unit}."
     return Answer(
@@ -345,20 +416,66 @@ def explain(
     )
 
 
+def readable(text: str) -> bool:
+    """Whether model-written prose is fit to show: real words, no loops.
+
+    Rejects text with fewer than three words, a word repeated back to back ("roughly
+    roughly"), or long text that is mostly the same few words over and over.
+    """
+    # Whitespace-separated words, letters only: "[orbital_speed] (Speed" is two words.
+    words = [w for w in (re.sub(r"[^a-z']", "", t.lower()) for t in text.split()) if w]
+    if len(words) < 3:
+        return False
+    # A loop writes the same token twice with nothing between ("roughly roughly");
+    # "point charges; charges at rest" is fine.
+    raw = text.lower().split()
+    if any(a == b and a.isalpha() and len(a) >= 3 for a, b in pairwise(raw)):
+        return False
+    return len(words) < 8 or len(set(words)) / len(words) >= 0.5
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]+", text.lower()) if len(w) >= 3} - _STOPWORDS
+
+
+def refusal_reason(question: str, reasoning: str) -> str:
+    """The classifier's reason for refusing, if it is readable and about this question."""
+    if readable(reasoning) and (
+        reasoning.startswith(GENERIC_REASONS)
+        or _content_words(question) & _content_words(reasoning)
+    ):
+        return reasoning
+    return FALLBACK_REFUSAL
+
+
+def usable_redirect(text: str | None) -> str | None:
+    """The suggested answerable question, if it reads as one; else nothing."""
+    if text is None:
+        return None
+    text = text.strip()
+    if not (readable(text) and text.endswith("?") and len(text.split()) >= 4):
+        return None
+    return text
+
+
 def refuse(question: Question, classification: Classification) -> Answer:
-    """Answer an out-of-scope question: say why, and offer the closest answerable version."""
-    explanation = f"This can't be answered as asked. {classification.reasoning}"
-    if classification.closest_answerable:
-        explanation += (
-            f" A close question that can be answered: {classification.closest_answerable}"
-        )
+    """Answer an out-of-scope question: say why, and offer the closest answerable version.
+
+    The reason and the redirect are model-written, so each is checked (``refusal_reason``,
+    ``usable_redirect``) and replaced or dropped rather than shown as word salad.
+    """
+    reason = refusal_reason(question.text, classification.reasoning)
+    redirect = usable_redirect(classification.closest_answerable)
+    explanation = f"This can't be answered as asked. {reason}"
+    if redirect:
+        explanation += f" A close question that can be answered: {redirect}"
     return Answer(
         question=question.text,
         status="refused",
         category="out_of_scope",
         confidence=Confidence(label="low", score=0.0),
         explanation=explanation,
-        redirect=classification.closest_answerable,
+        redirect=redirect,
     )
 
 

@@ -25,6 +25,7 @@ from askphysics.lm.generate import (
     Decoder,
     ValueOption,
     assignable_options,
+    assumption_options,
     decode_classification,
     decode_explanation,
     decode_plan,
@@ -34,6 +35,7 @@ from askphysics.lm.generate import (
     locked_options,
     number_guard_ok,
     quantity_locks,
+    repeats,
     target_options,
 )
 from askphysics.lm.model import FermiLM
@@ -117,6 +119,9 @@ def test_random_weights_still_produce_valid_plans(
     assert {k.symbol for k in plan.known_values} | set(plan.unknowns) == symbols
     for text in [*plan.assumptions, plan.strategy]:
         assert set(extract_numbers(text)) <= set(plan_numbers(QUESTION, consts))
+    # Standard plans pick whole reviewed assumptions instead of writing their own.
+    chosen = [store.equations[e] for e in plan.equation_ids]
+    assert set(plan.assumptions) <= set(assumption_options(chosen))
 
     # The decoder's text is exactly the canonical training format.
     prompt = plan_prompt(QUESTION, "standard", eqs, consts)
@@ -271,6 +276,9 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
         q = payload["question"]
         assert gold.equation_ids[0] in equation_options(eqs, q), q
         assert gold.target in target_options(list(variables.values()), q, consts), q
+        assert set(gold.assumptions) <= set(
+            assumption_options([eq_gold := store.equations[gold.equation_ids[0]]])
+        ), (q, eq_gold.id)
         gold_by_symbol = {k.symbol: k for k in gold.known_values}
         order = [s for s in variables if s not in gold.unknowns]
         unused = stated_quantities(q)
@@ -410,3 +418,30 @@ def test_the_ask_picks_the_equation(store: DataStore) -> None:
     eqs = [store.equations["work_constant_force"], store.equations["gravitational_pe"]]
     q = "I'm studying for a test. Lifting a book by 5.3 m took 207 J of work. What is its mass?"
     assert equation_options(eqs, q) == ["gravitational_pe"]
+
+
+def test_repeats_blocks_loops_but_not_units() -> None:
+    text = {
+        1: " roughly",
+        2: " a",
+        3: " device",
+        4: " that",
+        5: " draws",
+        6: " power",
+        7: " m/s",
+        8: " 3",
+    }
+    assert repeats([1], 1, text)  # "roughly roughly"
+    assert not repeats([2], 3, text)
+    loop = [2, 3, 4, 5, 6, 2]
+    assert not repeats(loop[:-1], 2, text)
+    assert repeats([*loop, 3, 4, 5, 6], 2, text)  # the same six words again
+    assert not repeats([8, 7, 8], 7, text)  # "3 m/s 3 m/s" has no word tokens
+
+
+def test_assumptions_come_from_the_equation_and_its_scenarios(store: DataStore) -> None:
+    eq = store.equations["kin_v_squared"]
+    options = assumption_options([eq])
+    assert options[: len(eq.assumptions)] == list(eq.assumptions)
+    assert "Air resistance is negligible" in options
+    assert len(options) == len(set(options))

@@ -92,6 +92,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the words after "what is" or "find" pick the unknown and the equation
   ("What is its mass?" can't be answered with W = Fd). tellus had swapped
   labelled values and solved for the wrong unknown.
+- No more word salad from the models. Plans pick assumptions from each
+  equation's reviewed list instead of writing their own ("The mass or
+  spherically symmetric bodies"), free text can't loop ("roughly roughly
+  roughly..."), and a refusal's reason or suggested question is replaced
+  or dropped when it is unreadable or about something else.
+- `askphysics ask` no longer needs quotes around the question.
 - The plan decoder no longer picks an equation that has nowhere to put a
   quantity the question states. tellus answered "a thing at 4.1 m/s carries
   620 J, what is its mass?" with KE = p²/2m and an assumed p = 0.

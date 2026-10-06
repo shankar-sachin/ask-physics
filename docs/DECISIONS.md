@@ -501,6 +501,18 @@ value, and they pin the equation 85% of the time and the target 99%. They
 fixed five of the six misses in tellus's 110-equation eval without
 retraining.
 
+Model-written text is held to the same standard. A standard plan's
+assumptions are picked whole from the equation's own list and its
+scenarios' (`assumption_options`), the exact sentences the data factory
+trains on, so a small model can't garble them. Free text (reasons,
+redirects, strategies, explanations) can't repeat a word back to back or
+repeat a run of six words, which stops greedy loops; on 13,000 factory
+texts this never blocked a gold one. Afterwards the pipeline checks what it
+shows (`readable`, `refusal_reason`, `usable_redirect`): looping or
+off-topic text is replaced with a plain sentence, and a redirect that
+isn't a question is dropped. On 6,047 factory explanations and 2,601
+refusals these checks rejected nothing.
+
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable
 would have it forced into the plan; the data factory never writes one, and

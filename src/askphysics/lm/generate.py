@@ -27,8 +27,10 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from askphysics.errors import AskPhysicsError, LLMError
+from askphysics.lm import templates as tpl
 from askphysics.lm.formats import (
     classify_prompt,
+    dumps,
     explain_numbers,
     explain_prompt,
     extract_numbers,
@@ -76,6 +78,9 @@ FILLER_NUMBERS = ("0",)
 MAX_EQUATIONS = 3
 MAX_DOMAINS = 3
 MAX_ASSUMPTIONS = 6
+# Free text may not repeat a run of this many words, so a small model can't loop
+# ("roughly roughly roughly ...").
+NO_REPEAT_WORDS = 6
 
 _TRAILING_RUN = re.compile(r"(?<![A-Za-z_0-9.^*])(?<!\*\* )(\d+(?:\.\d*)?)$")
 _TRAILING_EXPONENT = re.compile(r"(\^|\*\*\s?)\d*$")
@@ -110,6 +115,28 @@ def _common_prefix(a: Sequence[int], b: Sequence[int]) -> int:
             break
         n += 1
     return n
+
+
+def repeats(history: Sequence[int], token: int, text: Mapping[int, str]) -> bool:
+    """Whether writing ``token`` after ``history`` would start a loop.
+
+    A word token may not follow itself ("roughly roughly"), and a run of
+    ``NO_REPEAT_WORDS`` word tokens may not appear twice. Tokens with digits or symbols are
+    exempt, so "3 m/s and 4 m/s" is fine.
+    """
+
+    def word(t: int) -> bool:
+        return text.get(t, "").strip().isalpha()
+
+    if not word(token):
+        return False
+    if history and history[-1] == token and len(text[token].strip()) >= 3:
+        return True
+    n = NO_REPEAT_WORDS
+    gram = (*history[len(history) - (n - 1) :], token) if len(history) >= n - 1 else ()
+    if not gram or not all(word(t) for t in gram):
+        return False
+    return any(tuple(history[i : i + n]) == gram for i in range(len(history) - n + 1))
 
 
 def number_guard_ok(prefix: str, piece: str, allowed: Sequence[str]) -> bool:
@@ -324,6 +351,7 @@ class Decoder:
     ) -> str:
         """Generate text for a JSON string (stops before a quote) or for prose (stops at END)."""
         written = ""
+        history: list[int] = []
         allowed = self._prose_safe if until_end_token else self._string_safe
         for _ in range(self.max_slot_tokens):
             logits = self._state.logits
@@ -333,7 +361,7 @@ class Decoder:
                 stop_score = float(logits[self.tokenizer.end_id])
             else:
                 stop_score = float(logits.float().masked_fill(~self._quote_start, -1e9).max())
-            choice = self._pick(masked, written, allowed_numbers, temperature, generator)
+            choice = self._pick(masked, written, history, allowed_numbers, temperature, generator)
             run = _TRAILING_RUN.search(written)
             number_open = bool(run) and run.group(1).rstrip(".") not in [  # type: ignore[union-attr]
                 a.lstrip("-") for a in allowed_numbers
@@ -344,6 +372,7 @@ class Decoder:
                 break
             piece = self._text[choice]
             written += piece
+            history.append(choice)
             self._state.past, self._state.logits = self._feed(self._state.past, [choice])
             self._state.ids.append(choice)
             self._state.text += piece
@@ -355,22 +384,29 @@ class Decoder:
         self,
         masked: Tensor,
         written: str,
+        history: Sequence[int],
         allowed_numbers: Sequence[str],
         temperature: float,
         generator: torch.Generator | None,
     ) -> int | None:
+        def ok(token: int) -> bool:
+            piece = self._text.get(token, "")
+            return number_guard_ok(written, piece, allowed_numbers) and not repeats(
+                history, token, self._text
+            )
+
         if temperature > 0:
             probs = F.softmax(masked / temperature, dim=-1)
             for _ in range(8):
                 token = int(torch.multinomial(probs, 1, generator=generator))
-                if number_guard_ok(written, self._text.get(token, ""), allowed_numbers):
+                if ok(token):
                     return token
         order = torch.argsort(masked, descending=True)
         for token_t in order[:256]:
             token = int(token_t)
             if masked[token] == float("-inf"):
                 return None
-            if number_guard_ok(written, self._text[token], allowed_numbers):
+            if ok(token):
                 return token
         return None
 
@@ -703,7 +739,11 @@ def decode_plan(
     decoder.emit('], "assumptions": [')
 
     assumptions: list[str] = []
-    picked = decoder.choose(["]", '"'])
+    if dimensional:
+        assumptions = _choose_assumptions(decoder, assumption_options([by_id[e] for e in chosen]))
+        picked = "]"
+    else:
+        picked = decoder.choose(["]", '"'])
     while picked != "]":
         assumptions.append(decoder.free_text(numbers))
         if len(assumptions) >= MAX_ASSUMPTIONS:
@@ -725,6 +765,40 @@ def decode_plan(
             "strategy": strategy,
         }
     )
+
+
+def assumption_options(equations: Sequence[Equation]) -> list[str]:
+    """The assumptions a standard plan may list: the equations' own, and their scenarios'.
+
+    These are exactly the phrasings the data factory writes (``Equation.assumptions`` and
+    ``Scenario.assumptions``), so a plan picks whole reviewed sentences instead of writing
+    its own: a small model can't garble "Point masses or spherically symmetric bodies".
+    """
+    ids = {eq.id for eq in equations}
+    out: list[str] = []
+    for text in [
+        *(a for eq in equations for a in eq.assumptions),
+        *(a for sc in tpl.SCENARIOS if sc.equation in ids for a in sc.assumptions),
+    ]:
+        if text not in out:
+            out.append(text)
+    return out
+
+
+def _choose_assumptions(decoder: Decoder, options: Sequence[str]) -> list[str]:
+    """Pick assumptions one at a time from ``options``, each at most once, then close the list."""
+    chosen: list[str] = []
+    remaining = list(options)
+    while remaining and len(chosen) < MAX_ASSUMPTIONS:
+        lead = ", " if chosen else ""
+        by_text = {lead + dumps(a): a for a in remaining}
+        picked = decoder.choose(["]", *by_text])
+        if picked == "]":
+            return chosen
+        chosen.append(by_text[picked])
+        remaining.remove(by_text[picked])
+    decoder.emit("]")
+    return chosen
 
 
 def decode_explanation(
@@ -752,6 +826,7 @@ __all__ = [
     "Decoder",
     "ValueOption",
     "assignable_options",
+    "assumption_options",
     "decode_classification",
     "decode_explanation",
     "decode_plan",
@@ -761,5 +836,6 @@ __all__ = [
     "locked_options",
     "number_guard_ok",
     "quantity_locks",
+    "repeats",
     "target_options",
 ]

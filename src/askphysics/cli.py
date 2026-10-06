@@ -48,7 +48,10 @@ def _fail(message: str) -> typer.Exit:
 
 @app.command()
 def ask(
-    question: Annotated[str, typer.Argument(help="The physics question, in quotes.")],
+    words: Annotated[
+        list[str],
+        typer.Argument(help="The physics question. Quotes are optional.", metavar="QUESTION"),
+    ],
     json_output: Annotated[
         bool, typer.Option("--json", help="Print the Answer as JSON instead of a card.")
     ] = False,
@@ -62,6 +65,7 @@ def ask(
     ] = None,
 ) -> None:
     """Answer a physics question."""
+    question = " ".join(words)
     try:
         settings = Settings.from_env()
         if llm is not None:
