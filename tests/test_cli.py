@@ -83,3 +83,10 @@ def test_ask_without_models_names_the_fix() -> None:
 def test_ask_card_shows_the_models() -> None:
     result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
     assert "fake classified · fake planned · fake explained" in result.output
+
+
+def test_ask_takes_an_unquoted_question() -> None:
+    words = DEMO_QUESTION.split()
+    result = runner.invoke(cli.app, ["ask", *words])
+    assert result.exit_code == 0, result.output
+    assert "19.8057" in result.output

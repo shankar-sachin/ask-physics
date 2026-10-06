@@ -25,13 +25,17 @@ from askphysics.lm.generate import (
     Decoder,
     ValueOption,
     assignable_options,
+    assumption_options,
     decode_classification,
     decode_explanation,
     decode_plan,
     encode_task,
     equation_options,
     known_value_options,
+    locked_options,
     number_guard_ok,
+    quantity_locks,
+    repeats,
     target_options,
 )
 from askphysics.lm.model import FermiLM
@@ -115,6 +119,9 @@ def test_random_weights_still_produce_valid_plans(
     assert {k.symbol for k in plan.known_values} | set(plan.unknowns) == symbols
     for text in [*plan.assumptions, plan.strategy]:
         assert set(extract_numbers(text)) <= set(plan_numbers(QUESTION, consts))
+    # Standard plans pick whole reviewed assumptions instead of writing their own.
+    chosen = [store.equations[e] for e in plan.equation_ids]
+    assert set(plan.assumptions) <= set(assumption_options(chosen))
 
     # The decoder's text is exactly the canonical training format.
     prompt = plan_prompt(QUESTION, "standard", eqs, consts)
@@ -244,9 +251,11 @@ def test_target_is_what_the_question_leaves_open(store: DataStore) -> None:
     momentum = store.equations["momentum"].variables
     q = "An object moving at 69.0 m/s has 4.6 kg*m/s of momentum. What's its mass?"
     assert target_options(momentum, q, consts) == ["m"]
-    # From rest, nothing pins down which speed is unknown, so both stay open.
+    # From rest, the counts can't tell which speed is unknown, but the ask can.
     kin = store.equations["kin_v_at"].variables
     q = "A car starts from rest and accelerates at 3 m/s^2 for 4 s. Final speed?"
+    assert target_options(kin, q, consts) == ["v"]
+    q = "A car starts from rest and accelerates at 3 m/s^2 for 4 s. How fast?"
     assert set(target_options(kin, q, consts)) == {"v", "v0"}
     # The gas constant is a table constant, never a target.
     gas = store.equations["ideal_gas_law"].variables
@@ -267,16 +276,26 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
         q = payload["question"]
         assert gold.equation_ids[0] in equation_options(eqs, q), q
         assert gold.target in target_options(list(variables.values()), q, consts), q
+        assert set(gold.assumptions) <= set(
+            assumption_options([eq_gold := store.equations[gold.equation_ids[0]]])
+        ), (q, eq_gold.id)
         gold_by_symbol = {k.symbol: k for k in gold.known_values}
         order = [s for s in variables if s not in gold.unknowns]
         unused = stated_quantities(q)
+        locks = quantity_locks(q, list(variables.values()))
         for i, symbol in enumerate(order):  # in the order the decoder writes them
             k = gold_by_symbol[symbol]
-            options = assignable_options(
-                known_value_options(variables[symbol], q, consts),
-                variables[symbol],
+            options = locked_options(
+                assignable_options(
+                    known_value_options(variables[symbol], q, consts),
+                    variables[symbol],
+                    unused,
+                    [variables[x] for x in order[i:]],
+                ),
+                symbol,
+                locks,
                 unused,
-                [variables[x] for x in order[i:]],
+                order[i:],
             )
             key = (format_number(k.value), k.unit, k.origin)
             assert any((o.number, o.unit, o.origin) == key for o in options), (q, k)
@@ -379,3 +398,50 @@ def test_equations_need_room_for_every_stated_quantity(store: DataStore) -> None
     ]
     # Bare numbers are labels as often as values, so they never rule an equation out.
     assert "kinetic_energy" in equation_options(eqs, "Ball 2 moves at 4 m/s with 8 J.")
+
+
+def test_labels_and_the_ask_pin_the_plan(store: DataStore) -> None:
+    eq = store.equations["doppler_approaching"]
+    q = "Assuming fs is 758 Hz, v = 43 m/s and 2800 Hz for the heard frequency, find vs."
+    assert target_options(eq.variables, q, []) == ["vs"]
+    locks = quantity_locks(q, eq.variables)
+    assert locks == {"fs": ("758", "Hz"), "v": ("43", "m/s")}
+    unused = stated_quantities(q)
+    pending = [eq.variable(s) for s in ("f", "fs", "v")]
+    f = assignable_options(known_value_options(pending[0], q, []), pending[0], unused, pending)
+    assert [o.number for o in locked_options(f, "f", locks, unused, ["f", "fs", "v"])] == ["2800"]
+    fs = known_value_options(eq.variable("fs"), q, [])
+    assert [o.number for o in locked_options(fs, "fs", locks, unused, ["fs", "v"])] == ["758"]
+
+
+def test_the_ask_picks_the_equation(store: DataStore) -> None:
+    eqs = [store.equations["work_constant_force"], store.equations["gravitational_pe"]]
+    q = "I'm studying for a test. Lifting a book by 5.3 m took 207 J of work. What is its mass?"
+    assert equation_options(eqs, q) == ["gravitational_pe"]
+
+
+def test_repeats_blocks_loops_but_not_units() -> None:
+    text = {
+        1: " roughly",
+        2: " a",
+        3: " device",
+        4: " that",
+        5: " draws",
+        6: " power",
+        7: " m/s",
+        8: " 3",
+    }
+    assert repeats([1], 1, text)  # "roughly roughly"
+    assert not repeats([2], 3, text)
+    loop = [2, 3, 4, 5, 6, 2]
+    assert not repeats(loop[:-1], 2, text)
+    assert repeats([*loop, 3, 4, 5, 6], 2, text)  # the same six words again
+    assert not repeats([8, 7, 8], 7, text)  # "3 m/s 3 m/s" has no word tokens
+
+
+def test_assumptions_come_from_the_equation_and_its_scenarios(store: DataStore) -> None:
+    eq = store.equations["kin_v_squared"]
+    options = assumption_options([eq])
+    assert options[: len(eq.assumptions)] == list(eq.assumptions)
+    assert "Air resistance is negligible" in options
+    assert len(options) == len(set(options))

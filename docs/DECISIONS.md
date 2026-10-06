@@ -485,6 +485,37 @@ the speed unused, and assume p = 0. Bare numbers don't count, since "the
 resistance 2" is a label. If no retrieved equation has room, every one
 stays on offer.
 
+Two facts the question states outright are read by rules, not the model
+(`lm/reading.py`), and the decoder narrows its options to agree:
+- **Labels.** "fs is 758 Hz", "di = 1.8 m", or "1.8 m (di)" lock that
+  quantity to that symbol. A locked symbol can't be the target, and no
+  other variable can take its quantity. A symbol labelled with two values
+  is not locked.
+- **The ask.** The words after "what is", "find", "solve for", and the like
+  name the unknown, matched against each variable's names (the database
+  name and the factory's synonyms). The name that starts earliest wins,
+  then the longest, so "the mass of the planet" means M and not m, and
+  names compete across the retrieved equations, so "what is its mass?"
+  rules out W = Fd. A symbol counts only when it is the whole ask ("Solve
+  for vs"), because "do" and "a" are also words.
+Both rules only narrow, and are ignored when they would leave nothing. On
+20,227 generated plans they never ruled out the gold equation, target, or
+value, and they pin the equation 85% of the time and the target 99%. They
+fixed five of the six misses in tellus's 110-equation eval without
+retraining.
+
+Model-written text is held to the same standard. A standard plan's
+assumptions are picked whole from the equation's own list and its
+scenarios' (`assumption_options`), the exact sentences the data factory
+trains on, so a small model can't garble them. Free text (reasons,
+redirects, strategies, explanations) can't repeat a word back to back or
+repeat a run of six words, which stops greedy loops; on 13,000 factory
+texts this never blocked a gold one. Afterwards the pipeline checks what it
+shows (`readable`, `refusal_reason`, `usable_redirect`): looping or
+off-topic text is replaced with a plain sentence, and a redirect that
+isn't a question is dropped. On 6,047 factory explanations and 2,601
+refusals these checks rejected nothing.
+
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable
 would have it forced into the plan; the data factory never writes one, and
