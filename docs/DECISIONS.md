@@ -516,6 +516,18 @@ off-topic text is replaced with a plain sentence, and a redirect that
 isn't a question is dropped. On 6,047 factory explanations and 2,601
 refusals these checks rejected nothing.
 
+Classifications go further: their reasoning and redirect are never free
+text. The reason is picked from the factory's reviewed sentences
+(`reason_options`): standard and Fermi from their lists, and out-of-scope
+ones with their slot ("{emotion}", "{abstract}") filled by a run of words
+copied from the question. A fixed sentence that names something ("a dream
+is an experience") is only offered when it shares a word with the
+question. The redirect comes from the same template as the chosen reason
+(`redirect_options`), so a math refusal suggests the math redirect. Pure
+math questions ("slope of a curve", "ten divided by three") got their own
+out-of-scope templates, since nothing in the bank fit them. On 10,665
+factory classifications, the gold reason and redirect were always options.
+
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable
 would have it forced into the plan; the data factory never writes one, and

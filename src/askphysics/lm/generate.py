@@ -21,6 +21,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from string import Formatter
 
 import torch
 import torch.nn.functional as F
@@ -33,7 +34,6 @@ from askphysics.lm.formats import (
     dumps,
     explain_numbers,
     explain_prompt,
-    extract_numbers,
     format_number,
     plan_numbers,
     plan_prompt,
@@ -53,6 +53,7 @@ from askphysics.models import (
     Plan,
     Variable,
 )
+from askphysics.prose import GENERIC_REASONS, content_words
 from askphysics.solver.units import check_dimensions, quantity
 
 CATEGORIES = ("standard", "fermi", "out_of_scope")
@@ -416,7 +417,6 @@ class Decoder:
 
 def decode_classification(decoder: Decoder, question: str) -> Classification:
     """Classify a question; output is always a valid ``Classification``."""
-    numbers = extract_numbers(question)
     decoder.start(classify_prompt(question))
     decoder.emit('{"category": "')
     category = decoder.choose(CATEGORIES, closer='"')
@@ -432,12 +432,12 @@ def decode_classification(decoder: Decoder, question: str) -> Classification:
     else:
         decoder.emit("]")
     decoder.emit(', "reasoning": "')
-    reasoning = decoder.free_text(numbers)
+    reasoning = _choose_text(decoder, reason_options(category, question))
     decoder.emit('", "closest_answerable": ')
     closest: str | None = None
     if category == "out_of_scope":
         decoder.emit('"')
-        closest = decoder.free_text(numbers)
+        closest = _choose_text(decoder, redirect_options(question, reasoning))
         decoder.emit('"')
     else:
         decoder.emit("null")
@@ -450,6 +450,136 @@ def decode_classification(decoder: Decoder, question: str) -> Classification:
             "closest_answerable": closest,
         }
     )
+
+
+MAX_SLOT_WORDS = 4  # the longest slot filler in the data factory is four words
+# A slot filler is a noun phrase: it can't start with these, or end with them.
+_NOT_FIRST = frozenset(
+    (
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "do",
+        "does",
+        "did",
+        "how",
+        "what",
+        "who",
+        "why",
+        "when",
+        "where",
+        "which",
+        "if",
+        "and",
+        "or",
+        "of",
+        "to",
+        "in",
+        "on",
+        "for",
+        "at",
+        "by",
+        "with",
+        "find",
+    )
+)
+_NOT_LAST = _NOT_FIRST | frozenset(
+    (
+        "a",
+        "an",
+        "the",
+        "my",
+        "your",
+        "its",
+        "this",
+        "that",
+        "i",
+        "you",
+        "me",
+        "it",
+    )
+)
+
+
+def question_spans(question: str) -> list[str]:
+    """Runs of one to four words from ``question``, punctuation trimmed, digits excluded.
+
+    These are what a reason or redirect slot may be filled with ("Category error: {emotion}
+    is a feeling"), so a refusal can only name things the question names.
+    """
+    words = [w.strip("?.!,:;\"'()") for w in question.split()]
+    spans: list[str] = []
+    for i in range(len(words)):
+        for j in range(i + 1, min(i + MAX_SLOT_WORDS, len(words)) + 1):
+            run = words[i:j]
+            if not all(run) or any(ch.isdigit() for w in run for ch in w):
+                continue
+            if run[0].lower() not in _NOT_FIRST and run[-1].lower() not in _NOT_LAST:
+                span = " ".join(run)
+                if span not in spans:
+                    spans.append(span)
+    return spans
+
+
+def _fill(templates: Iterable[str], spans: Sequence[str]) -> list[str]:
+    """Each template as-is, or once per span if it has one slot."""
+    out: list[str] = []
+    for text in dict.fromkeys(templates):
+        fields = {f for _, f, _, _ in Formatter().parse(text) if f}
+        if not fields:
+            out.append(text)
+        elif len(fields) == 1:
+            (name,) = fields
+            out.extend(text.format(**{name: span}) for span in spans)
+    return out
+
+
+def reason_options(category: str, question: str) -> list[str]:
+    """The reasons a classification may give: reviewed sentences, never free writing.
+
+    Standard and Fermi reasons come from the data factory's lists. Out-of-scope reasons are
+    its reviewed sentences with their slot ("{emotion}", "{abstract}") filled by words
+    copied from the question, so a refusal can't loop or name something the question
+    didn't ("anxiety is a feeling" for "what is ten divided by three").
+    """
+    if category == "standard":
+        return [r.format(domain=d) for d in DOMAINS for r in tpl.STANDARD_REASONING]
+    if category == "fermi":
+        return list(tpl.FERMI_REASONING)
+    spans = question_spans(question)
+    words = content_words(question)
+    out: list[str] = []
+    for reason in dict.fromkeys(r for _, r, _ in tpl.OUT_OF_SCOPE):
+        if "{" in reason:
+            out.extend(_fill([reason], spans))
+        # A fixed sentence that names something ("a dream is an experience") must be about
+        # this question; a generic one ("Not a physics question; it is history.") always fits.
+        elif reason.startswith(GENERIC_REASONS) or content_words(reason) & words:
+            out.append(reason)
+    return out
+
+
+def redirect_options(question: str, reason: str | None = None) -> list[str]:
+    """The answerable questions a refusal may suggest, slots filled from the question.
+
+    Given the chosen ``reason``, only the redirects written for that reason are offered,
+    so a math refusal suggests the math redirect and not one about the human brain.
+    """
+    spans = question_spans(question)
+    pairs = [(r, c) for _, r, c in tpl.OUT_OF_SCOPE]
+    if reason is not None:
+        paired = [c for r, c in pairs if reason in _fill([r], spans)]
+        if paired:
+            return _fill(paired, spans)
+    return _fill((c for _, c in pairs), spans)
+
+
+def _choose_text(decoder: Decoder, options: Sequence[str]) -> str:
+    """Write one of ``options`` inside a JSON string and return it unescaped."""
+    by_escaped = {dumps(o)[1:-1]: o for o in options}
+    return by_escaped[decoder.choose(list(by_escaped), closer='"')]
 
 
 def _fits(unit: str, variable: Variable) -> bool:
@@ -836,6 +966,9 @@ __all__ = [
     "locked_options",
     "number_guard_ok",
     "quantity_locks",
+    "question_spans",
+    "reason_options",
+    "redirect_options",
     "repeats",
     "target_options",
 ]

@@ -24,6 +24,7 @@ from askphysics.lm.formats import (
 from askphysics.lm.generate import (
     Decoder,
     ValueOption,
+    _choose_text,
     assignable_options,
     assumption_options,
     decode_classification,
@@ -35,12 +36,15 @@ from askphysics.lm.generate import (
     locked_options,
     number_guard_ok,
     quantity_locks,
+    question_spans,
+    reason_options,
+    redirect_options,
     repeats,
     target_options,
 )
 from askphysics.lm.model import FermiLM
-from askphysics.lm.tokenizer import END, PLAN, Tokenizer
-from askphysics.models import Plan
+from askphysics.lm.tokenizer import CLASSIFY, END, PLAN, Tokenizer
+from askphysics.models import Classification, Plan
 from askphysics.solver.units import check_dimensions, quantity
 
 QUESTION = "How fast does a ball dropped from 20 m hit the ground?"
@@ -138,6 +142,51 @@ def test_random_weights_still_produce_valid_classifications(
     assert (c.closest_answerable is not None) == (c.category == "out_of_scope")
     assert decoder.text == classify_prompt(QUESTION) + serialize_classification(c)[: -len(END)]
     json.loads(serialize_classification(c)[: -len(END)])
+    assert c.reasoning in reason_options(c.category, QUESTION)
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_random_weights_only_refuse_with_reviewed_sentences(
+    tokenizer: Tokenizer, seed: int
+) -> None:
+    question = "how do you find the slope of a curve?"
+    decoder = _decoder(tokenizer, seed)
+    decoder.start(classify_prompt(question))
+    decoder.emit('{"category": "out_of_scope", "domains": [], "reasoning": "')
+    reason = _choose_text(decoder, reason_options("out_of_scope", question))
+    assert reason in reason_options("out_of_scope", question)
+
+
+def test_refusals_can_only_name_what_the_question_names() -> None:
+    question = "how do you find the slope of a curve?"
+    reasons = reason_options("out_of_scope", question)
+    assert "Not a physics question; it is pure math." in reasons
+    assert "Category error: a curve is an idea, not an object with mass." in reasons
+    assert not any("anxiety" in r or "dream" in r for r in reasons)
+    assert not any("Category error: of " in r or "slope of is" in r for r in reasons)
+    math = "Not a physics question; it is pure math."
+    assert redirect_options(question, math) == [
+        "How fast is a dropped rock moving after falling for a while?"
+    ]
+    assert "How much does the human brain weigh?" in redirect_options(
+        "How much does a dream weigh?"
+    )
+    assert question_spans("Who was the first ruler of Lima?")[-1] == "Lima"
+    assert not any(ch.isdigit() for span in question_spans("Is 91 a prime number?") for ch in span)
+
+
+def test_gold_classifications_are_always_options(store: DataStore) -> None:
+    checked = 0
+    for e in DataFactory(store, seed=8).examples(1500):
+        if e.task != "classify":
+            continue
+        gold = Classification.model_validate_json(e.target[: -len(END)])
+        question = json.loads(e.prompt[len(CLASSIFY) :])["question"]
+        assert gold.reasoning in reason_options(gold.category, question), question
+        if gold.category == "out_of_scope":
+            assert gold.closest_answerable in redirect_options(question, gold.reasoning), question
+        checked += 1
+    assert checked > 300
 
 
 def test_explanation_numbers_are_constrained(store: DataStore, tokenizer: Tokenizer) -> None:
