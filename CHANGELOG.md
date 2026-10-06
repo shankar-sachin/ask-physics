@@ -6,6 +6,21 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Every answer v0.3's eval caught confidently wrong is fixed by rules, for
+  any model: a value labelled by a variable's name ("primary turns: 61000",
+  "the speed at the end comes out to 160 mph") is locked to that variable;
+  "how fast", "how far", "what height", and "how long does it take" pick the
+  kind of quantity asked for; and an answer of exactly 0 that only an
+  assumed 0 produced is rejected and retried instead of shown.
+- A refusal's slot is filled only by the words in that slot's position of a
+  matching template, so tellus can't write "a dropped ball take does not
+  move", and every question a refusal suggests is trained as answerable.
+- Spelled-out numbers before a unit are read as digits ("an eight kilogram
+  ball" is "an 8 kilogram ball"), and the training data has arithmetic with
+  digits too, so number words no longer mean "math question".
+
 ## [0.3.0] - 2026-10-06
 
 ### Added

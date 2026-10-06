@@ -66,3 +66,20 @@ def test_normalizing_twice_changes_nothing() -> None:
 def test_the_pipeline_answers_with_the_normalized_question(pipeline: Pipeline) -> None:
     answer = pipeline.run("A ball is dropped from 2,000 cm. How fast does it hit the ground?")
     assert "2000 cm" in answer.question
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("an eight kilogram ball", "an 8 kilogram ball"),
+        ("twenty-five meters", "25 meters"),
+        ("three hundred kg", "300 kg"),
+        ("what is ten divided by three", "what is ten divided by three"),
+        ("one in a million", "one in a million"),
+        ("the time for one cycle", "the time for one cycle"),
+        ("the mass of one molecule", "the mass of one molecule"),
+        ("one meter", "one meter"),
+    ],
+)
+def test_number_words_before_units_become_digits(text: str, expected: str) -> None:
+    assert normalize_question(text) == expected

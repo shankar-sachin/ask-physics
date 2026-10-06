@@ -296,3 +296,16 @@ def test_out_of_scope_look_alikes_mirror_physics_phrasing() -> None:
     fermi = {t.text.split(" {")[0] for t in tpl.FERMI}
     assert "How much energy is stored in a" in fermi
     assert {"How much does", "How much force does", "What is the momentum of"} <= oos
+
+
+def test_every_suggested_question_is_trained_as_answerable(store: DataStore) -> None:
+    redirects = {closest.split(" {")[0] for _, _, closest in tpl.OUT_OF_SCOPE}
+    seen = Counter()
+    for e in DataFactory(store, seed=21).examples(4000):
+        if e.task == "classify" and e.template.startswith("redirect_"):
+            c = Classification.model_validate_json(e.target[: -len(END)])
+            question = json.loads(e.prompt[len(CLASSIFY) :])["question"]
+            assert c.category == "fermi" and c.closest_answerable is None
+            assert any(r.split(" {")[0][:20].lower() in question.lower() for r in redirects)
+            seen[c.category] += 1
+    assert seen["fermi"] > 50

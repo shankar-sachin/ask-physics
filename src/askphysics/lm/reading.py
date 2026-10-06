@@ -93,6 +93,76 @@ def labelled_quantities(text: str) -> list[tuple[str, str, str]]:
     return out
 
 
+# A name labels the quantity right after it: "primary turns: 61000", "the speed at the end
+# comes out to 160 mph", "a mass of 5 kg". Searched back only to the start of the clause.
+_NAME_CONNECTOR = re.compile(
+    r"\s*(?:=|:|\bis\b|\bequals\b|\bwas measured at\b|\bwas\b|\bcomes? out to\b|\bof\b)\s*$",
+    re.IGNORECASE,
+)
+_CLAUSE_START = re.compile(r"[,;.!?]|\b(?:and|when|if|given|that|where|while)\b", re.IGNORECASE)
+# ... or the quantity comes first: "110 m for the distance to the object".
+_FOR_NAME = re.compile(r"^\s*for\s+(?:the\s+)?(?P<rest>[^,;.!?]*)", re.IGNORECASE)
+
+
+def _named(segment: str, variables: Sequence[Variable], *, suffix: bool) -> Variable | None:
+    """The variable whose name ends (or starts) ``segment``, longest name first; None if tied.
+
+    A trailing symbol is allowed after the name: "the image distance di is 1.8 m".
+    """
+    words = segment.split()
+    if suffix and words and any(words[-1] == v.symbol for v in variables):
+        words = words[:-1]
+    text = " ".join(words).lower()
+    best, picked = 0, []
+    for v in variables:
+        for name in names_for(v):
+            hit = (
+                text == name or text.endswith(" " + name)
+                if suffix
+                else text == name or text.startswith(name + " ")
+            )
+            if hit and len(name) > best:
+                best, picked = len(name), [v]
+            elif hit and len(name) == best and v not in picked:
+                picked.append(v)
+    return picked[0] if len(picked) == 1 else None
+
+
+def name_labels(text: str, variables: Sequence[Variable]) -> list[tuple[str, str, str]]:
+    """Quantities the question labels with a variable's name: (symbol, number, unit).
+
+    "primary turns: 61000" gives Np, "the speed at the end comes out to 160 mph" gives v,
+    "110 m for the distance to the object" gives do. These are the data factory's own
+    ways of stating a value, and the way people write them too.
+    """
+    variables = list(variables)
+    out: list[tuple[str, str, str]] = []
+    for match in _QUANTITY.finditer(text):
+        found = _quantity(match)
+        if found is None:
+            continue
+        labels: set[str] = set()
+        before = text[: match.start()]
+        connector = _NAME_CONNECTOR.search(before)
+        if connector is not None:
+            head = before[: connector.start()]
+            start = max((c.end() for c in _CLAUSE_START.finditer(head)), default=0)
+            clause = head[start:]
+            # "Find the heat out: 0.0052 kJ for the work output": that name is the ask.
+            if not _ASK.search(clause + " "):
+                v = _named(clause, variables, suffix=True)
+                if v is not None:
+                    labels.add(v.symbol)
+        after = _FOR_NAME.match(text[match.end() :])
+        if after is not None:
+            v = _named(after.group("rest"), variables, suffix=False)
+            if v is not None:
+                labels.add(v.symbol)
+        if len(labels) == 1:  # a value claimed by two names is not locked to either
+            out.append((labels.pop(), *found))
+    return out
+
+
 def names_for(variable: Variable) -> list[str]:
     """Every phrase the data factory may call ``variable``, lowercase."""
     return [n.lower() for n in (variable.name, *VAR_SYNONYMS.get(variable.name, ()))]
@@ -155,7 +225,52 @@ def asked_variables(text: str, variables: Iterable[Variable]) -> list[Variable]:
                     elif rank == best and v not in picked:
                         picked.append(v)
         found += [v for v in picked if v not in found]
+    if not found:
+        found = idiom_variables(text, variables)
     return found
+
+
+# Asks that name a kind of quantity rather than a variable: "how fast", "how far". Each maps
+# to words a variable's name must contain, and words it must not: "how fast does it hit
+# the floor" wants a final speed, not the initial one, unless the start is what's asked.
+_IDIOMS: tuple[tuple[re.Pattern[str], tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        re.compile(r"\bhow fast\b[^.?!]*\b(?:start|initial|launch|thrown|throw|begin)", re.I),
+        ("initial", "starting", "launch"),
+        (),
+    ),
+    (re.compile(r"\bhow fast\b", re.I), ("speed", "velocity"), ("initial", "starting", "launch")),
+    (re.compile(r"\bhow far\b", re.I), ("distance", "displacement", "height", "range"), ()),
+    (
+        re.compile(r"\b(?:how high|what height)\b", re.I),
+        ("height", "displacement", "distance", "depth"),
+        (),
+    ),
+    (re.compile(r"\bhow heavy\b", re.I), ("mass", "weight"), ()),
+    (
+        re.compile(r"\bhow long (?:does|will|did|would|until)\b|\bhow much time\b", re.I),
+        ("time", "duration", "period"),
+        (),
+    ),
+)
+
+
+def idiom_variables(text: str, variables: Iterable[Variable]) -> list[Variable]:
+    """Variables an idiomatic ask ("how fast", "how far", "what height") points at.
+
+    Only the first idiom that matches counts, so "how fast was it at the start" means the
+    initial speed and nothing else.
+    """
+    variables = list(variables)
+    for pattern, include, exclude in _IDIOMS:
+        if not pattern.search(text):
+            continue
+
+        def words(v: Variable) -> set[str]:
+            return {w for name in names_for(v) for w in name.split()}
+
+        return [v for v in variables if words(v) & set(include) and not words(v) & set(exclude)]
+    return []
 
 
 def asked_symbols(text: str, variables: Iterable[Variable]) -> set[str]:
@@ -166,12 +281,13 @@ def asked_symbols(text: str, variables: Iterable[Variable]) -> set[str]:
 def symbol_locks(text: str, variables: Sequence[Variable]) -> dict[str, tuple[str, str]]:
     """Symbol -> (number, unit) for labels that name exactly one quantity.
 
-    A symbol labelled with two different quantities is dropped as ambiguous.
+    A label is the variable's symbol ("fs is 758 Hz") or one of its names ("primary
+    turns: 61000"). A symbol labelled with two different quantities is dropped as ambiguous.
     """
     symbols = {v.symbol for v in variables}
     locks: dict[str, tuple[str, str]] = {}
     clashes: set[str] = set()
-    for symbol, number, unit in labelled_quantities(text):
+    for symbol, number, unit in [*labelled_quantities(text), *name_labels(text, variables)]:
         if symbol not in symbols:
             continue
         if symbol in locks and locks[symbol] != (number, unit):

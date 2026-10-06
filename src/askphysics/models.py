@@ -226,15 +226,19 @@ class SanityReport(_Model):
     issues: list[str] = Field(default_factory=list)
     # False when the result is negative but the quantity can't be (a negative mass).
     sign_ok: bool = True
+    # True when the result is exactly 0 only because the plan assumed a 0 ("v = 0" for a
+    # rock that hits the floor): the plan answered a different, trivial question.
+    trivial: bool = False
 
     @property
     def passed(self) -> bool:
-        return self.dimensions_ok and self.sign_ok and self.magnitude_ok is not False
+        return self.possible and self.magnitude_ok is not False
 
     @property
     def possible(self) -> bool:
-        """Whether the result could be physically right: dimensions and sign check out."""
-        return self.dimensions_ok and self.sign_ok
+        """Whether the result could be physically right: dimensions and sign check out,
+        and it isn't a zero the plan's own assumption produced."""
+        return self.dimensions_ok and self.sign_ok and not self.trivial
 
 
 class EquationRef(_Model):

@@ -454,7 +454,7 @@ class DataFactory:
             )
             template_id = p.template
             question = p.question
-        elif roll < 0.75:
+        elif roll < 0.68:
             template = self.rng.choice(tpl.FERMI)
             question = self._dress(
                 template.text.format(**{k: self.rng.choice(v) for k, v in tpl.FERMI_SLOTS.items()})
@@ -464,6 +464,18 @@ class DataFactory:
                 category="fermi", reasoning=self.rng.choice(tpl.FERMI_REASONING), domains=domains
             )
             template_id = template.id
+        elif roll < 0.75:
+            # Every question a refusal suggests must itself be answerable: tellus once
+            # refused "How long does a dropped ball take to fall from a table?", which our
+            # own math refusal had just suggested.
+            template, _, closest = self.rng.choice(tpl.OUT_OF_SCOPE)
+            slots = {k: self.rng.choice(v) for k, v in tpl.OOS_SLOTS.items()}
+            question = self._dress(closest.format(**slots))
+            domains = ["energy"] if "energy" in question else []
+            c = Classification(
+                category="fermi", reasoning=self.rng.choice(tpl.FERMI_REASONING), domains=domains
+            )
+            template_id = f"redirect_{template.id}"
         else:
             template, reason, closest = self.rng.choice(tpl.OUT_OF_SCOPE)
             slots = {k: self.rng.choice(v) for k, v in tpl.OOS_SLOTS.items()}

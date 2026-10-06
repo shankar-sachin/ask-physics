@@ -6,6 +6,7 @@ from askphysics.lm.reading import (
     asked_symbols,
     asked_variables,
     labelled_quantities,
+    name_labels,
     symbol_locks,
 )
 
@@ -80,3 +81,66 @@ def test_longer_names_win_across_equations(store: DataStore) -> None:
     text = "Determine the value of the time to reach the top given v0 = 16 m/s."
     picked = asked_variables(text, variables)
     assert picked == [store.equations["vertical_launch_time"].variable("t")]
+
+
+@pytest.mark.parametrize(
+    ("equation", "text", "expected"),
+    [
+        (
+            "ideal_transformer",
+            "Vs is 46 volts; primary turns: 61000; the turns on the secondary is 455, find Vp.",
+            {("Np", "61000", "dimensionless"), ("Ns", "455", "dimensionless")},
+        ),
+        (
+            "first_law",
+            "The internal energy change is 0.0045 kJ. The thermal energy is 190 kilojoules.",
+            {("dU", "0.0045", "kJ"), ("Q", "190", "kilojoules")},
+        ),
+        (
+            "recoil",
+            "the first mass comes out to 23 kg, the velocity 1 comes out to 66.3 km/h and "
+            "the second velocity comes out to 35 m/s",
+            {("m1", "23", "kg"), ("v1", "66.3", "km/h"), ("v2", "35", "m/s")},
+        ),
+        (
+            "impulse_momentum",
+            "the speed at the end comes out to 160 mph and the starting velocity comes out "
+            "to 23.1 m/s",
+            {("v", "160", "mph"), ("v0", "23.1", "m/s")},
+        ),
+        ("lens_magnification", "110 m for the distance to the object.", {("do", "110", "m")}),
+        ("newton_second_law", "a mass of 5 kg", {("m", "5", "kg")}),
+        # The name before the colon is the ask, not a label.
+        (
+            "heat_engine_work",
+            "Find the heat out: 0.0052kJ for the work output.",
+            {("W", "0.0052", "kJ")},
+        ),
+    ],
+)
+def test_name_labels(
+    store: DataStore, equation: str, text: str, expected: set[tuple[str, str, str]]
+) -> None:
+    assert set(name_labels(text, store.equations[equation].variables)) == expected
+
+
+def test_a_value_claimed_by_two_names_is_not_locked(store: DataStore) -> None:
+    eq = store.equations["heat_engine_work"]
+    assert name_labels("the heat out is 5 kJ for the work output", eq.variables) == []
+
+
+@pytest.mark.parametrize(
+    ("equation", "text", "asked"),
+    [
+        ("kin_v_squared", "How fast does a rock hit the floor after falling 7.4 m?", {"v"}),
+        ("kin_v_at", "It ends at 9 m/s after 2 s. How fast was it at the start?", {"v0"}),
+        ("kin_v_squared", "From what height would a plant fall to land at 16 m/s?", {"d"}),
+        ("kin_x_at", "How far does a car travel in 4 s at 3 m/s^2?", {"x"}),
+        ("kin_x_at", "How long does it take to cover 20 m from rest at 2 m/s^2?", {"t"}),
+        ("kin_x_at", "How fast does a rock hit the floor after falling 7.4 m?", set()),
+    ],
+)
+def test_idioms_name_a_kind_of_quantity(
+    store: DataStore, equation: str, text: str, asked: set[str]
+) -> None:
+    assert asked_symbols(text, store.equations[equation].variables) == asked

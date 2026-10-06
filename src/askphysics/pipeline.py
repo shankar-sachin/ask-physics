@@ -270,6 +270,17 @@ def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityRe
             f"{target_var.name} can't be: the givens are probably in the wrong slots"
         )
 
+    # The data factory never asks a question whose answer is 0, and a plan that assumes a
+    # 0 (v = 0, t = 0) and then computes exactly 0 has answered a trivial question instead.
+    trivial = result.value == 0 and any(
+        k.origin == "assumption" and k.value == 0 for k in p.known_values
+    )
+    if trivial:
+        issues.append(
+            f"{result.target} = 0 {result.unit} only because the plan assumed a zero; "
+            "it probably put the unknown in the wrong slot"
+        )
+
     magnitude_ok: bool | None = None
     if target_var.typical_range is not None:
         low, high = target_var.typical_range
@@ -288,6 +299,7 @@ def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityRe
         limit_cases_checked=False,
         issues=issues,
         sign_ok=sign_ok,
+        trivial=trivial,
     )
 
 
@@ -310,6 +322,7 @@ def score_confidence(
     n_assumptions: int,
     category: Category,
     sign_ok: bool = True,
+    trivial: bool = False,
 ) -> Confidence:
     """The crude, documented confidence formula from ``PLAN.md`` section 7."""
     r = min(max(retrieval_score, 0.0), 1.0)
@@ -317,7 +330,7 @@ def score_confidence(
     s = {True: 1.0, None: 0.5, False: 0.0}[magnitude_ok]
     a = 1.0 / (1.0 + 0.25 * n_assumptions)
     score = 0.35 * r + 0.30 * d + 0.20 * s + 0.15 * a
-    if not dimensions_ok or not sign_ok:
+    if not dimensions_ok or not sign_ok or trivial:
         score = min(score, 0.2)
     if category == "fermi":
         score = min(score, 0.6)
@@ -349,6 +362,7 @@ def explain(
         n_assumptions=len(p.assumptions),
         category=classification.category,
         sign_ok=sanity.sign_ok,
+        trivial=sanity.trivial,
     )
     equations = [data.equations[eid] for eid in p.equation_ids]
     explained_by = client_name(llm)
@@ -566,7 +580,8 @@ class Pipeline:
         """Plan and compute, one planner per attempt, until Noether accepts a plan.
 
         A plan is rejected when it fails validation, when compute fails, or when its
-        result is impossible: wrong dimensions, or negative where it can't be (ADR-010).
+        result is impossible: wrong dimensions, negative where it can't be, or a zero that
+        only an assumed zero produced (ADR-010).
         If every attempt is rejected, the first plan that computed at all is kept (its
         sanity report lowers confidence); with none, the last failure becomes the degraded
         answer.

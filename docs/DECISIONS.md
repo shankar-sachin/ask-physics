@@ -285,7 +285,10 @@ installed, without loading weights; `llm/fermi_client.py` wraps each one.
   it, or when the result is impossible: the wrong dimensions, or negative
   for a quantity that can't be (a mass, a resistance, a frequency, an
   absolute temperature; `never_negative`). R1 = R - R2 with the givens in
-  the wrong equation gives a negative resistor, and the retry fixes it. If every attempt is
+  the wrong equation gives a negative resistor, and the retry fixes it. A
+  result of exactly 0 is also rejected when the plan assumed a 0 (`trivial`):
+  "how fast does a rock hit the floor?" solved for the acceleration with
+  v = 0 answers a question nobody asked. A zero from stated values stands. If every attempt is
   rejected, the first plan that computed at all is kept (its sanity report
   lowers confidence); with none, the answer degrades.
 - Plans decode greedily, so a seed changes nothing. Each retry rotates the
@@ -527,6 +530,19 @@ question. The redirect comes from the same template as the chosen reason
 math questions ("slope of a curve", "ten divided by three") got their own
 out-of-scope templates, since nothing in the bank fit them. On 10,665
 factory classifications, the gold reason and redirect were always options.
+
+Labels and asks were widened after the v0.3 evals, where every confidently
+wrong answer was a swap or a misread ask. A variable's *name* labels a value
+the way its symbol does ("primary turns: 61000", "the speed at the end comes
+out to 160 mph", "110 m for the distance to the object"), unless that clause
+is the ask ("Find the heat out: ...") or two names claim the same value. Asks
+that name a kind of quantity map to variables by the words in their names:
+"how fast" to a speed or velocity that isn't the initial one (unless the
+start is asked about), "how far" and "what height" to a distance or height,
+"how long does it take" to a time. Refusal slots are only filled from the
+question's match against that refusal's template, never from an arbitrary
+run of words. On 10,669 generated plans and 10,665 classifications, none of
+these ruled out a gold answer.
 
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable

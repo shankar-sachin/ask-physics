@@ -336,3 +336,37 @@ def test_a_negative_resistance_fails_the_sign_check(store: DataStore) -> None:
     report = sanity_check(p, result, data=store)
     assert not report.sign_ok and not report.possible and not report.passed
     assert any("negative" in i for i in report.issues)
+
+
+def _kin_plan(target: str, knowns: list[tuple[str, float, str, str]]) -> Plan:
+    return Plan.model_validate(
+        {
+            "equation_ids": ["kin_v_squared"],
+            "target": target,
+            "unknowns": [target],
+            "known_values": [
+                {"symbol": s, "value": v, "unit": u, "origin": o} for s, v, u, o in knowns
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )
+
+
+def test_a_zero_from_an_assumed_zero_is_trivial(store: DataStore) -> None:
+    # tellus solved "How fast does a rock hit the floor after falling 7.4 m?" for a, with v = 0.
+    p = _kin_plan(
+        "a",
+        [("v", 0, "m/s", "assumption"), ("v0", 0, "m/s", "assumption"), ("d", 7.4, "m", "given")],
+    )
+    report = sanity_check(p, compute(p, data=store), data=store)
+    assert report.trivial and not report.possible and not report.passed
+    assert any("assumed a zero" in i for i in report.issues)
+
+
+def test_a_stated_zero_answer_is_not_trivial(store: DataStore) -> None:
+    p = _kin_plan(
+        "a", [("v", 0, "m/s", "given"), ("v0", 0, "m/s", "given"), ("d", 7.4, "m", "given")]
+    )
+    report = sanity_check(p, compute(p, data=store), data=store)
+    assert not report.trivial and report.possible
