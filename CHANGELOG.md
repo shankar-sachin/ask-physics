@@ -94,6 +94,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Refusals are built from reviewed sentences. The classifier picks the
+  reason, with its slot filled by words from the question, and a
+  "try instead" written for that reason, so tellus can no longer answer
+  "how do you find the slope of a curve?" with "a dream is an experience
+  ... taste taste taste". Pure math questions have their own refusal ("Not
+  a physics question; it is pure math.") in the training data.
 - The plan decoder reads what a question states outright. A symbol written
   next to a value ("fs is 758 Hz", "di = 1.8 m") locks that value to it, and
   the words after "what is" or "find" pick the unknown and the equation

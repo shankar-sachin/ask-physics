@@ -1405,6 +1405,42 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
         "Category error: {emotion} is a feeling, not a device that draws power.",
         "How much power does a laptop use?",
     ),
+    # Pure math: no physical quantity at all, however much it looks like a homework problem.
+    (
+        Template("oos_math_01", "What is {num_a} divided by {num_b}?"),
+        "Not a physics question; it is arithmetic.",
+        "How long does a dropped ball take to fall from a table?",
+    ),
+    (
+        Template("oos_math_02", "What is the slope of {curve}?"),
+        "Not a physics question; it is pure math.",
+        "How fast is a dropped rock moving after falling for a while?",
+    ),
+    (
+        Template("oos_math_03_h", "How do you find the slope of {curve}?"),
+        "Not a physics question; it is pure math.",
+        "How fast is a dropped rock moving after falling for a while?",
+    ),
+    (
+        Template("oos_math_04", "What is the derivative of {func}?"),
+        "Not a physics question; it is calculus.",
+        "How does the speed of a falling ball change with time?",
+    ),
+    (
+        Template("oos_math_05", "What is the integral of {func}?"),
+        "Not a physics question; it is calculus.",
+        "How far does a car travel while it speeds up?",
+    ),
+    (
+        Template("oos_math_06", "Solve for x: {equation}"),
+        "Not a physics question; it is algebra.",
+        "How much force does it take to accelerate a shopping cart?",
+    ),
+    (
+        Template("oos_math_07", "Is {integer} a prime number?"),
+        "Not a physics question; it is number theory.",
+        "How many atoms are in a grain of sand, roughly?",
+    ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "abstract": (
@@ -1420,6 +1456,12 @@ OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "company": ("Acme", "a tech giant", "my favorite company", "an airline"),
     "topic_a": ("cats", "summer", "jazz", "basketball"),
     "topic_b": ("dogs", "winter", "rock music", "soccer"),
+    "num_a": ("ten", "seven", "twelve", "a hundred", "fifty"),
+    "num_b": ("three", "four", "nine", "eleven"),
+    "curve": ("a curve", "a parabola", "a straight line", "the line y = 2x + 1", "a circle"),
+    "func": ("x squared", "sin x", "e to the x", "the natural log of x", "x cubed"),
+    "equation": ("2x + 3 = 11", "x squared = 49", "5x - 4 = 21", "3x = 12"),
+    "integer": ("91", "1001", "221", "97"),
 }  # fmt: skip
 
 # --------------------------------------------------------------------------- explanations
