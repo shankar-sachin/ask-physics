@@ -590,3 +590,17 @@ reviews them. CC BY attribution travels with every artifact that contains
 or was trained on the text. This is a careful reading of the licenses, not
 legal advice; a lawyer should review `THIRD_PARTY_LICENSES.md`, this ADR,
 and the model cards before any commercial launch.
+
+**Implementation (v0.3), use (3).** `scripts/extract_openstax.py` pulls
+the body prose from the book's source at a pinned commit, refusing anything
+whose `LICENSE` isn't CC BY 4.0. It keeps prose paragraphs, including the
+worked examples and boxed features OpenStax wrote, and drops figures,
+captions, media, tables, exercises, display equations, the preface, and all
+teacher-support material (it quotes state standards that aren't OpenStax's
+to license). Inline math is written as text and figure references as "the
+figure". The result, about 1,650 paragraphs and 118,000 words, is in
+`third_party/openstax-physics/` with the book's `LICENSE` and an
+`ATTRIBUTION.md`. `askphysics model train --prose ... --prose-steps N
+--prose-share F` trains on it alone for N steps and mixes it into a share F
+of later batches; the tokenizer can learn from it too. Uses (1) and (2),
+the real-question eval and the exercises as classify examples, come next.

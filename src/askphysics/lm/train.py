@@ -59,6 +59,10 @@ class TrainConfig:
     seed: int = 0
     device: str | None = None
     pad_multiple: int = 64  # batch widths come in a few fixed sizes (see make_batch)
+    # Real prose (ADR-016): the first ``prose_steps`` steps train on it alone, then a
+    # ``prose_share`` of later batches keep it from fading. Both need ``prose`` texts.
+    prose_steps: int = 0
+    prose_share: float = 0.0
 
 
 @dataclass
@@ -244,8 +248,14 @@ def train(
     *,
     resume: bool = False,
     on_log: Callable[[dict[str, Any]], None] | None = None,
+    prose: Sequence[str] = (),
 ) -> list[dict[str, Any]]:
-    """Train ``config`` on the factory data in ``data_dir``, saving to ``out_dir``."""
+    """Train ``config`` on the factory data in ``data_dir``, saving to ``out_dir``.
+
+    With ``prose`` paragraphs, the first ``cfg.prose_steps`` steps are a language-modeling
+    stage on them, and ``cfg.prose_share`` of later batches mix them back in (ADR-016).
+    Their held-out paragraphs are reported as ``val_loss_prose``, apart from ``val_loss``.
+    """
     if tokenizer.vocab_size > config.vocab_size:
         raise ValueError(
             f"tokenizer has {tokenizer.vocab_size} tokens; {config.name} only {config.vocab_size}"
@@ -261,6 +271,15 @@ def train(
     val_samples = val_sample(val_set, cfg.eval_batches * cfg.batch_size, cfg.seed)
     if not train_set.rows:
         raise ValueError(f"no training examples fit the context in {data_dir / 'train'}")
+    prose_train, prose_val = TokenizedSet(), TokenizedSet()
+    if prose:
+        from askphysics.lm.corpus import split_prose, tokenize_prose
+
+        train_texts, val_texts = split_prose(prose)
+        prose_train = tokenize_prose(train_texts, tokenizer, config.context_length)
+        prose_val = tokenize_prose(val_texts, tokenizer, config.context_length)
+    elif cfg.prose_steps or cfg.prose_share:
+        raise ValueError("prose_steps and prose_share need prose texts")
 
     model = FermiLM(config).to(device)
     opt = _optimizer(model, cfg)
@@ -295,11 +314,14 @@ def train(
         _save_optimizer(opt, step, out_dir)
 
     for step in range(start, cfg.steps):
-        if cursor + cfg.batch_size > len(order):
-            rng.shuffle(order)
-            cursor = 0
-        rows = [train_set.rows[i] for i in order[cursor : cursor + cfg.batch_size]]
-        cursor += cfg.batch_size
+        if prose_train.rows and (step < cfg.prose_steps or rng.random() < cfg.prose_share):
+            rows = rng.sample(prose_train.rows, min(cfg.batch_size, len(prose_train.rows)))
+        else:
+            if cursor + cfg.batch_size > len(order):
+                rng.shuffle(order)
+                cursor = 0
+            rows = [train_set.rows[i] for i in order[cursor : cursor + cfg.batch_size]]
+            cursor += cfg.batch_size
         inputs, labels = make_batch(
             rows,
             tokenizer.pad_id,
@@ -325,6 +347,9 @@ def train(
                  "target_tokens_per_s": round(tokens_seen / elapsed, 1)})  # fmt: skip
         if val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
             scores = evaluate_by_task(model, val_samples, cfg, tokenizer.pad_id, device)
+            if prose_val.rows:
+                prose_loss = evaluate(model, prose_val, cfg, tokenizer.pad_id, device)
+                scores["val_loss_prose"] = round(prose_loss, 4)
             log({"step": done, **scores})
             _release_cached_memory(device)
         if done % cfg.checkpoint_every == 0 and done != cfg.steps:
@@ -334,18 +359,22 @@ def train(
     checkpoint(cfg.steps)
     summary = {"config": config.name, "train_examples": len(train_set),
                "skipped_too_long": train_set.skipped, "val_examples": len(val_set),
+               "prose_paragraphs": len(prose), "prose_rows": len(prose_train),
                "device": device.type, "train": asdict(cfg) | {"device": device.type}}  # fmt: skip
     (out_dir / "training_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return metrics
 
 
-def train_tokenizer(data_dir: Path, vocab_size: int, max_examples: int = 50_000) -> Tokenizer:
-    """Train the BPE tokenizer on the prompts and targets of the training split."""
-    texts: list[str] = []
+def train_tokenizer(
+    data_dir: Path, vocab_size: int, max_examples: int = 50_000, prose: Sequence[str] = ()
+) -> Tokenizer:
+    """Train the BPE tokenizer on the prompts and targets of the training split, plus any
+    ``prose`` paragraphs, so real English words get tokens of their own."""
+    texts: list[str] = list(prose)
     for i, e in enumerate(read_examples(data_dir / "train")):
         if i >= max_examples:
             break
         texts += [e.prompt, e.target]
-    if not texts:
+    if len(texts) == len(prose):
         raise ValueError(f"no training examples in {data_dir / 'train'}")
     return Tokenizer.train(texts, vocab_size=vocab_size)

@@ -174,12 +174,20 @@ def train_tokenizer_cmd(
     ),
     vocab_size: Annotated[int, typer.Option(min=262, help="Vocabulary size.")] = 8192,
     max_examples: Annotated[int, typer.Option(min=1, help="Training examples to read.")] = 50_000,
+    prose: Annotated[
+        Path | None,
+        typer.Option(
+            help="Real prose to learn words from, e.g. third_party/openstax-physics/prose.jsonl."
+        ),
+    ] = None,
 ) -> None:
     """Train the byte-level BPE tokenizer on the dataset's training split."""
+    from askphysics.lm.corpus import read_prose
     from askphysics.lm.train import train_tokenizer
 
+    texts = read_prose(prose) if prose else []
     with console.status(f"[muted]learning up to {vocab_size:,} tokens from {safe(str(data))}"):
-        tokenizer = train_tokenizer(data, vocab_size, max_examples)
+        tokenizer = train_tokenizer(data, vocab_size, max_examples, prose=texts)
     out.parent.mkdir(parents=True, exist_ok=True)
     tokenizer.save(out)
     console.print(f"[ok]✓[/] tokenizer with {tokenizer.vocab_size:,} tokens → {safe(str(out))}")
@@ -205,8 +213,18 @@ def train_cmd(
     device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu (default: best).")] = None,
     seed: Annotated[int, typer.Option()] = 0,
     resume: Annotated[bool, typer.Option(help="Continue from a checkpoint in --out.")] = False,
+    prose: Annotated[
+        Path | None,
+        typer.Option(help="Real prose (prose.jsonl) for a language-modeling stage (ADR-016)."),
+    ] = None,
+    prose_steps: Annotated[
+        int, typer.Option(min=0, help="Steps of prose alone before the tasks.")
+    ] = 0,
+    prose_share: Annotated[
+        float, typer.Option(min=0.0, max=1.0, help="Share of later batches that are prose.")
+    ] = 0.0,
 ) -> None:
-    """Train a Fermi model from scratch on factory data."""
+    """Train a Fermi model from scratch on factory data, optionally after real prose."""
     from askphysics.lm.checkpoints import default_model_dir
     from askphysics.lm.config import get_config
     from askphysics.lm.tokenizer import Tokenizer
@@ -227,7 +245,14 @@ def train_cmd(
         log_every=max(1, min(50, steps // 100)),
         seed=seed,
         device=device,
+        prose_steps=prose_steps,
+        prose_share=prose_share,
     )
+    if (prose_steps or prose_share) and prose is None:
+        raise _fail("--prose-steps and --prose-share need --prose")
+    from askphysics.lm.corpus import read_prose
+
+    texts = read_prose(prose) if prose else []
     head = banner()
     head.append(f"\n  training {config.name}", style="value")
     head.append(
@@ -251,7 +276,16 @@ def train_cmd(
                     speed=f"{entry['target_tokens_per_s']:,.0f} tok/s",
                 )
 
-        train(config, Tokenizer.load(tokenizer), data, out_dir, cfg, resume=resume, on_log=show)
+        train(
+            config,
+            Tokenizer.load(tokenizer),
+            data,
+            out_dir,
+            cfg,
+            resume=resume,
+            on_log=show,
+            prose=texts,
+        )
         progress.update(task, completed=steps)
     by_task = [
         f"{key.removeprefix('val_loss_')} {value:.3f}"
