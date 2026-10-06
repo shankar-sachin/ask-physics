@@ -5,6 +5,12 @@ free prose it can never predict exactly. This module scores what the
 pipeline actually needs: the right category, and plans that compute the
 right answer. Each example is decoded with the same constrained decoder the
 pipeline uses, then compared with the gold target from the data factory.
+
+Plans are also run through the router the way ``askphysics ask`` runs them
+(retries until Noether accepts a plan, ADR-010) and sorted three ways: the
+right answer, a wrong answer the sanity checks flag, and a wrong answer that
+passes every check. The last, "confidently wrong", is the number that decides
+whether an answer can be trusted, and it should be as close to zero as possible.
 """
 
 from __future__ import annotations
@@ -25,6 +31,7 @@ from askphysics.lm.formats import format_number
 from askphysics.lm.generate import Decoder, decode_classification, decode_plan
 from askphysics.lm.tokenizer import CLASSIFY, END, PLAN
 from askphysics.models import Classification, Plan
+from askphysics.pipeline import compute, sanity_check
 from askphysics.solver.symbolic import solve_for
 from askphysics.solver.units import Quantity, quantity
 
@@ -52,7 +59,13 @@ class EvalReport:
     target_accuracy: float = 0.0
     knowns_accuracy: float = 0.0
     valid_plan_rate: float = 0.0
+    attempts: int = 1  # plan attempts the router may make per question
+    routed_right_rate: float = 0.0  # right answer after the router's retries
+    flagged_wrong_rate: float = 0.0  # wrong, but degraded or flagged by a sanity check
+    confidently_wrong_rate: float = 0.0  # wrong, and every check passed
+    mean_tries: float = 0.0
     failures: list[dict[str, Any]] = field(default_factory=list)
+    confidently_wrong: list[dict[str, Any]] = field(default_factory=list)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2)
@@ -102,6 +115,60 @@ def score_plan(predicted: Plan, gold: Plan, store: DataStore) -> PlanScore:
     )
 
 
+@dataclass(frozen=True)
+class Routed:
+    """What the router would answer for one plan example."""
+
+    plan: Plan | None  # the accepted plan, or the first that computed, or None
+    answer: Quantity | None
+    possible: bool  # dimensions and sign check out
+    passed: bool  # every sanity check passed: the answer would look trustworthy
+    tries: int
+
+
+def route_plan(
+    decoder: Decoder,
+    payload: dict[str, Any],
+    store: DataStore,
+    attempts: int,
+    first: Plan | None = None,
+) -> Routed:
+    """Plan like ``Pipeline._plan_and_compute``: retry with the equations rotated until
+    a plan computes a possible result. ``first`` reuses an already-decoded first attempt.
+    """
+    equations = [store.equations[eq["id"]] for eq in payload["equations"]]
+    constants = [store.constants[c["name"]] for c in payload["constants"]]
+    kept: Routed | None = None
+    for attempt in range(attempts):
+        if attempt == 0 and first is not None:
+            p = first
+        else:
+            shift = attempt % len(equations)
+            order = equations[shift:] + equations[:shift]
+            try:
+                p = decode_plan(decoder, payload["question"], payload["category"], order, constants)
+            except AskPhysicsError:
+                continue
+        try:
+            result = compute(p, data=store)
+        except (AskPhysicsError, NotImplementedError, ValueError, ArithmeticError):
+            continue
+        sanity = sanity_check(p, result, data=store)
+        routed = Routed(
+            plan=p,
+            answer=quantity(result.value, result.unit),
+            possible=sanity.possible,
+            passed=sanity.passed,
+            tries=attempt + 1,
+        )
+        if sanity.possible:
+            return routed
+        kept = kept or routed
+    if kept is not None:
+        return Routed(kept.plan, kept.answer, kept.possible, kept.passed, attempts)
+    return Routed(plan=None, answer=None, possible=False, passed=False, tries=attempts)
+
+
 def score_classification(predicted: Classification, gold: Classification) -> bool:
     return predicted.category == gold.category
 
@@ -124,13 +191,19 @@ def evaluate_tasks(
     examples: Iterable[Example],
     store: DataStore,
     *,
+    attempts: int = 1,
     max_failures: int = 10,
     on_progress: Callable[[int], None] | None = None,
 ) -> EvalReport:
-    """Decode every example and score it against its gold target."""
-    report = EvalReport()
+    """Decode every example and score it against its gold target.
+
+    ``attempts`` above 1 also runs each plan through the router (``route_plan``) and
+    sorts the answers into right, flagged wrong, and confidently wrong.
+    """
+    report = EvalReport(attempts=attempts)
     category_hits = 0
     plan_hits = {"equation": 0, "target": 0, "knowns": 0, "answer": 0}
+    routed_hits = {"right": 0, "flagged": 0, "confident": 0, "tries": 0}
     for done, e in enumerate(examples, start=1):
         if e.task == "classify":
             question = _payload(e.prompt, CLASSIFY)["question"]
@@ -161,6 +234,30 @@ def evaluate_tasks(
             report.plan_examples += 1
             for key in plan_hits:
                 plan_hits[key] += int(getattr(score, key))
+            routed = route_plan(decoder, payload, store, attempts, first=predicted_p)
+            want = _answer(gold_p, store)
+            right = (
+                want is not None
+                and routed.answer is not None
+                and routed.possible
+                and _same_quantity(routed.answer, want)
+            )
+            routed_hits["tries"] += routed.tries
+            if right:
+                routed_hits["right"] += 1
+            elif routed.passed:
+                routed_hits["confident"] += 1
+                if len(report.confidently_wrong) < max_failures:
+                    report.confidently_wrong.append(
+                        {
+                            "template": e.template,
+                            "question": payload["question"],
+                            "expected": _summary(gold_p),
+                            "got": _summary(routed.plan) if routed.plan else "-",
+                        }
+                    )
+            else:
+                routed_hits["flagged"] += 1
             if not score.answer and len(report.failures) < max_failures:
                 report.failures.append(
                     {
@@ -181,6 +278,10 @@ def evaluate_tasks(
         report.target_accuracy = plan_hits["target"] / n
         report.knowns_accuracy = plan_hits["knowns"] / n
         report.valid_plan_rate = plan_hits["answer"] / n
+        report.routed_right_rate = routed_hits["right"] / n
+        report.flagged_wrong_rate = routed_hits["flagged"] / n
+        report.confidently_wrong_rate = routed_hits["confident"] / n
+        report.mean_tries = routed_hits["tries"] / n
     return report
 
 

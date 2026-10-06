@@ -107,6 +107,23 @@ def test_evaluate_runs_an_untrained_model(store: DataStore, dataset: Path) -> No
     for rate in (report.category_accuracy, report.equation_accuracy, report.valid_plan_rate):
         assert 0.0 <= rate <= 1.0
     assert json.loads(report.to_json())["plan_examples"] == 2
+    routed = (report.routed_right_rate, report.flagged_wrong_rate, report.confidently_wrong_rate)
+    assert sum(routed) == pytest.approx(1.0)
+    assert report.mean_tries == pytest.approx(1.0)  # one attempt by default
+
+
+def test_the_router_retries_in_the_eval(store: DataStore, dataset: Path) -> None:
+    torch.manual_seed(0)
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    decoder = Decoder(FermiLM(LUNA).eval(), tokenizer, max_slot_tokens=8)
+    picked = [
+        e for e in sample_examples(read_examples(dataset / "val"), per_task=3) if e.task == "plan"
+    ]
+    report = evaluate_tasks(decoder, picked, store, attempts=3)
+    assert report.attempts == 3
+    assert 1.0 <= report.mean_tries <= 3.0
+    routed = (report.routed_right_rate, report.flagged_wrong_rate, report.confidently_wrong_rate)
+    assert sum(routed) == pytest.approx(1.0)
 
 
 def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
@@ -131,6 +148,7 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
     )
     assert r.exit_code == 0, r.output
     assert "valid plan" in r.output
+    assert "confidently wrong" in r.output
     assert json.loads((tmp_path / "luna" / "eval.json").read_text())["plan_examples"] == 1
     r = CliRunner().invoke(cli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
     assert r.exit_code == 1

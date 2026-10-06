@@ -275,8 +275,12 @@ def eval_cmd(
     ] = None,
     device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu (default: best).")] = None,
     seed: Annotated[int, typer.Option()] = 0,
+    attempts: Annotated[
+        int, typer.Option(min=1, help="Plan attempts per question, as `ask` makes them.")
+    ] = Settings().plan_attempts,
 ) -> None:
-    """Score a model on held-out questions: right category, and plans that compute right."""
+    """Score a model on held-out questions: right category, plans that compute right, and
+    how often the answer `ask` would give is wrong while passing every check."""
     from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 
     from askphysics.lm.checkpoints import default_model_dir, load_model
@@ -303,7 +307,11 @@ def eval_cmd(
     ) as progress:
         task = progress.add_task("eval", total=len(picked))
         report = evaluate_tasks(
-            decoder, picked, store, on_progress=lambda n: progress.update(task, completed=n)
+            decoder,
+            picked,
+            store,
+            attempts=attempts,
+            on_progress=lambda n: progress.update(task, completed=n),
         )
     (model_dir / "eval.json").write_text(report.to_json(), encoding="utf-8")
 
@@ -324,7 +332,18 @@ def eval_cmd(
     ]
     for label, score in rows:
         table.add_row(label, f"{score:.1%}")
+    table.add_section()
+    tries = f"up to {attempts} tries, {report.mean_tries:.2f} on average"
+    table.add_row(
+        f"[accent]right answer as ask gives it[/] ({tries})", f"{report.routed_right_rate:.1%}"
+    )
+    table.add_row("wrong, but flagged or refused", f"{report.flagged_wrong_rate:.1%}")
+    table.add_row("[bad]confidently wrong[/]", f"{report.confidently_wrong_rate:.1%}")
     console.print(table)
+    for f in report.confidently_wrong[:5]:
+        console.print(f"  [bad]confidently wrong:[/] {safe(f['question'])}")
+        console.print(f"    [muted]expected[/] {safe(str(f['expected']))}")
+        console.print(f"    [muted]got     [/] {safe(str(f['got']))}")
     for f in report.failures[:5]:
         console.print(f"  [muted]{f['task']} miss:[/] {safe(f['question'])}")
         console.print(f"    [muted]expected[/] {safe(str(f['expected']))}")

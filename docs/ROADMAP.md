@@ -81,6 +81,9 @@ tested on `fermi-luna-1`, without needing a GPU.
   least a third of solem's failures.
 - Zero invented equation ids or numbers (guaranteed by constraints, verified
   by tests).
+- At most 0.1% of held-out questions answered confidently wrong (`model
+  eval`: wrong, with every sanity check passing). Wrong answers that are
+  flagged or degraded don't count against this: saying "not sure" is fine.
 - The valid plan rate on the real-question eval is measured and reported
   next to the template one.
 - `askphysics ask` with solem answers in under 2 seconds on an M5 Pro.

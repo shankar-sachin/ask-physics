@@ -129,3 +129,66 @@ def test_auto_ignores_a_lone_test_model(
 def test_the_website_path_never_imports_torch() -> None:
     code = "import sys, askphysics.web; assert 'torch' not in sys.modules"
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+RESISTORS = (
+    "Two resistors in parallel: the total resistance is 1.3 ohm and resistance 2 is "
+    "10.1 ohm. What is resistance 1?"
+)
+
+
+class ScriptedPlanner(FakeLLMClient):
+    """Returns the given plans in order, one per plan call."""
+
+    def __init__(self, plans: list[Plan]) -> None:
+        super().__init__()
+        self.name = "scripted"
+        self.plans = plans
+        self.calls_made = 0
+
+    def complete_json(self, *, system: str, user: str, schema: type[T]) -> T:
+        if schema is Plan:
+            plan = self.plans[min(self.calls_made, len(self.plans) - 1)]
+            self.calls_made += 1
+            return schema.model_validate(plan.model_dump())
+        return super().complete_json(system=system, user=user, schema=schema)
+
+
+def _resistor_plan(equation: str) -> Plan:
+    return Plan.model_validate(
+        {
+            "equation_ids": [equation],
+            "target": "R1",
+            "unknowns": ["R1"],
+            "known_values": [
+                {"symbol": "R", "value": 1.3, "unit": "ohm", "origin": "given"},
+                {"symbol": "R2", "value": 10.1, "unit": "ohm", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "Solve for R1.",
+        }
+    )
+
+
+def test_an_impossible_answer_is_retried(store: DataStore, retriever: KeywordRetriever) -> None:
+    # Series gives R1 = 1.3 - 10.1 = -8.8 ohm, which no resistor can be.
+    planner = ScriptedPlanner(
+        [_resistor_plan("series_resistors"), _resistor_plan("parallel_resistors")]
+    )
+    roster = Roster(classify=FakeLLMClient(), plan=(planner,) * 5, explain=FakeLLMClient())
+    answer = _pipeline(store, retriever, roster).run(RESISTORS)
+    assert answer.status == "answered"
+    assert answer.plan_attempts == 2
+    assert [e.id for e in answer.equations_used] == ["parallel_resistors"]
+    assert answer.final_value == pytest.approx(1.0 / (1 / 1.3 - 1 / 10.1), rel=1e-5)
+
+
+def test_an_impossible_answer_is_kept_only_as_a_last_resort(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    planner = ScriptedPlanner([_resistor_plan("series_resistors")])
+    roster = Roster(classify=FakeLLMClient(), plan=(planner,) * 2, explain=FakeLLMClient())
+    answer = _pipeline(store, retriever, roster).run(RESISTORS)
+    assert answer.final_value is not None and answer.final_value < 0
+    assert answer.confidence.score <= 0.2
+    assert any("negative" in c for c in answer.caveats)
