@@ -50,56 +50,56 @@ tested on `fermi-luna-1`, without needing a GPU.
 
 ---
 
-## v0.3.0 Fermi models trained and wired in (L)
+## v0.3.0 Fermi models wired in (L), done
 
 **Goal:** the CLI answers with our own models.
 
-**Deliverables**
-- Train `fermi-tellus-1`, `fermi-solem-1`, and `fermi-celeste-1` (~120M) on
-  the maintainer's M5 Pro, with the commands and configs committed.
-- `FermiClient` implementing `LLMClient`, with the ADR-010 router: tellus
-  classifies, solem plans and explains, up to 5 solem attempts, one
-  celeste escalation, tellus-only fallback when bigger weights are missing.
-- `Answer` records which model handled each stage.
-- `fermi` becomes the default provider once weights are installed; the fake
-  client stays for tests.
-- Model cards with measured throughput, training curves, and eval results.
-- Ship the trained weights (ADR-012): GitHub release assets pinned by a
-  checksum manifest, `askphysics model pull`, the installers and Homebrew
-  formula fetching tellus and solem, and celeste on first escalation.
-- The equation database grows from 12 to about 100 single-equation laws
-  across mechanics, rotation, gravitation, fluids, waves, thermodynamics,
-  electromagnetism, optics, and modern physics (pulled forward from v0.4),
-  each validated, solvable for every variable, and covered by the factory.
-- Real-phrasing data from OpenStax *Physics* (CC BY 4.0, ADR-016): an eval
-  of real questions with project-written gold plans, plus its questions and
-  prose in training.
+**Delivered:**
+- `fermi-tellus-1` trained on the maintainer's M5 Pro (98% right category,
+  89.5% valid plans on held-out templates before the decoder locks), with
+  the commands in `TRAINING.md`.
+- `FermiClient` and the ADR-010 router: tellus classifies, solem plans and
+  explains, up to 5 attempts, one celeste escalation, tellus alone when the
+  bigger weights are missing. `Answer` records the model behind each stage,
+  and `auto` makes the Fermi models the default once installed.
+- Decoder rules that read what the question states: dimension-aware values,
+  labelled values, the asked unknown, and equations with room for every
+  given (ADR-015).
+- Trust: impossible results are rejected and retried, model-written prose is
+  checked or built from reviewed sentences, and `model eval` reports
+  answers that are confidently wrong.
+- The equation database grew from 12 to 110 laws across mechanics, rotation,
+  gravitation, fluids, waves, thermodynamics, electromagnetism, optics, and
+  modern physics, each solvable for every variable.
+- The question normalizer, and OpenStax *Physics* prose (CC BY 4.0, ADR-016)
+  with a language-modeling stage in training.
 
-**Exit criteria**
-- On a held-out set of factory-style questions (unseen templates), solem
-  produces a valid plan for 90% or more, and celeste escalation recovers at
-  least a third of solem's failures.
-- Zero invented equation ids or numbers (guaranteed by constraints, verified
-  by tests).
-- At most 0.1% of held-out questions answered confidently wrong (`model
-  eval`: wrong, with every sanity check passing). Wrong answers that are
-  flagged or degraded don't count against this: saying "not sure" is fine.
-- The valid plan rate on the real-question eval is measured and reported
-  next to the template one.
-- `askphysics ask` with solem answers in under 2 seconds on an M5 Pro.
-- A fresh install on a clean machine answers with solem, with no training
-  and no manual download step.
+**Moved to v0.4** (the maintainer's call: v0.3 ships what's built): training
+solem and celeste, model cards, shipping the weights, the real-question eval,
+and the exit criteria that need them.
 
 ---
 
-## v0.4.0 Solver expansion (M)
+## v0.4.0 solem, weights, solver, and the wiki (L)
 
-**Goal:** Noether handles real intro problems.
+**Goal:** a fresh install answers real intro problems with solem, and
+explains itself in a wiki.
 
 **Deliverables**
+- Train `fermi-solem-1` with the prose stage, and `fermi-celeste-1` (~120M)
+  only if solem's held-out results leave room for it to help (Q16). Measure
+  each model's throughput.
+- Model cards with measured throughput, training curves, eval results, and
+  the OpenStax attribution.
+- Ship the trained weights (ADR-012): GitHub release assets pinned by a
+  checksum manifest, `askphysics model pull`, the installers and Homebrew
+  formula fetching tellus and solem, and celeste on first escalation.
+- Real-phrasing data from OpenStax *Physics* (ADR-016), uses (1) and (2): an
+  eval of real questions with project-written gold plans the maintainer
+  reviews, and its other questions as classify examples.
 - Multi-equation chaining: dependency order over the plan's unknowns.
 - Offset units (Celsius, Fahrenheit) converted before substitution.
-- 15+ worked examples (the equation expansion moved to v0.3).
+- 15+ worked examples.
 - Factory regenerated from the bigger database; models retrained.
 - **The Ask Physics Wiki**, one source with two homes:
   - Pages live in this repo under `docs/wiki/`: guides, FAQ, glossary, the
@@ -111,6 +111,17 @@ tested on `fermi-luna-1`, without needing a GPU.
     page).
 
 **Exit criteria**
+- On a held-out set of factory-style questions (unseen templates), solem
+  produces a valid plan for 90% or more, and celeste escalation recovers at
+  least a third of solem's failures.
+- At most 0.1% of held-out questions answered confidently wrong (`model
+  eval`: wrong, with every sanity check passing). Wrong answers that are
+  flagged or degraded don't count against this: saying "not sure" is fine.
+- The valid plan rate on the real-question eval is measured and reported
+  next to the template one.
+- `askphysics ask` with solem answers in under 2 seconds on an M5 Pro.
+- A fresh install on a clean machine answers with solem, with no training
+  and no manual download step.
 - 80% or more of standard eval questions within 2% with the correct unit.
 - Every worked example re-solves within 0.1%.
 

@@ -250,8 +250,8 @@ assumptions. v0.5 eval data will be used to fit the weights (see
 |---------|--------|--------|
 | v0.1 | `pytest`, `ruff`, `mypy` clean; CLI runs end to end with the fake LLM | Pass |
 | v0.2 | `fermi-luna-1` trains in CI with falling loss; constrained decoding property-tested | Pass |
-| v0.3 | solem valid-plan rate on held-out templates; celeste rescue rate | 90% or more; a third or more of solem failures |
-| v0.4 | Standard questions within 2% relative tolerance, correct unit | 80% or more |
+| v0.3 | tellus wired in through the router; no invented ids or numbers (constrained decoding, tested) | Pass |
+| v0.4 | solem valid-plan rate on held-out templates; celeste rescue rate; confidently wrong; standard questions within 2% with the correct unit | 90% or more; a third or more of solem failures; 0.1% or less; 80% or more |
 | v0.5 | Eval set size; automated scoring coverage | 100+ questions; 100% scored |
 | v0.6 | Recall@5 on the retrieval set; equations / examples with validated license | 90% or more; 500+ / 1000+ |
 | v0.7 | Fermi answers within one order of magnitude of reference | 70% or more |
@@ -286,8 +286,8 @@ The full register, with likelihood, impact, and owner, is in
 
 ## 10. Milestones
 
-v0.1 Skeleton -> v0.2 Fermi foundations -> v0.3 Fermi models trained and
-wired in -> v0.4 Solver expansion -> v0.5 Eval harness -> v0.6 Retrieval and
+v0.1 Skeleton -> v0.2 Fermi foundations -> v0.3 Fermi models wired in ->
+v0.4 solem, weights, solver, and the wiki -> v0.5 Eval harness -> v0.6 Retrieval and
 data expansion -> v0.7 Fermi engine -> v0.8 Self-verification -> v0.9
 Hardening -> v1.0 Release -> hosted API. (The in-browser website ships early,
 ADR-013.)

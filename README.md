@@ -100,7 +100,7 @@ brew install shankar-sachin/tap/askphysics
 
 The scripts install `askphysics` into its own isolated environment with
 [uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
-touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.2.0`.
+touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.3.0`.
 Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`).
 The installer URLs serve the scripts in this repo's `main` branch
 ([`install.sh`](install.sh), [`install.ps1`](install.ps1)); read them first if you like.
@@ -134,8 +134,9 @@ itself. Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quickstart
 
-Requires Python 3.11 or newer. No API keys, ever. Until the Fermi models are
-trained (v0.3), the default language model is a deterministic fake.
+Requires Python 3.11 or newer. No API keys, ever. Until you train a Fermi model
+(downloadable weights arrive in v0.4), the default language model is a
+deterministic fake.
 
 ```bash
 git clone https://github.com/shankar-sachin/ask-physics.git
@@ -174,7 +175,7 @@ plan for "dropped from a height" questions, on purpose. Ask it anything else
 and the pipeline tells you exactly which stage it couldn't complete, instead
 of making something up.
 
-## Project status: v0.2 released, v0.3 next
+## Project status: v0.3 released, v0.4 next
 
 | Area | Status |
 |------|--------|
@@ -188,7 +189,7 @@ of making something up.
 | Eval set (8 questions) with a validating loader | Works |
 | Fermi models: tokenizer, transformer, constrained decoding, data factory, training | Works |
 | Fermi models answering in the CLI (router: tellus, solem, celeste) | Works with locally trained weights |
-| Downloadable trained weights (`model pull`) | v0.3 |
+| Downloadable trained weights (`model pull`), solem | v0.4 |
 | Multi-equation chaining | Stub until v0.4 |
 | Eval scoring and runner | Stub until v0.5 |
 | Vector and hybrid retrieval | Stub until v0.6 |
@@ -200,8 +201,8 @@ implementation.
 
 ## Roadmap
 
-v0.2 Fermi model foundations, v0.3 Fermi models trained and wired in, v0.4
-solver expansion, v0.5 eval harness, v0.6 retrieval and data expansion, v0.7
+v0.2 Fermi model foundations, v0.3 Fermi models wired in, v0.4 solem,
+shipped weights, solver expansion, and the wiki, v0.5 eval harness, v0.6 retrieval and data expansion, v0.7
 Fermi engine, v0.8 self-verification, v0.9 hardening, v1.0 release. After
 v1.0 comes the hosted API. The CLI is the main interface, and
 [askphysics.vercel.app](https://askphysics.vercel.app) runs the same package in your browser (ADR-013). Details, deliverables, and exit criteria are in

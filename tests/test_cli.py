@@ -10,10 +10,10 @@ from askphysics.errors import DataValidationError
 runner = CliRunner()
 
 
-def test_version_prints_0_1_0() -> None:
+def test_version_prints_the_package_version() -> None:
     result = runner.invoke(cli.app, ["version"])
     assert result.exit_code == 0
-    assert "0.2.0" in result.output
+    assert "0.3.0" in result.output
 
 
 def test_validate_data_passes() -> None:

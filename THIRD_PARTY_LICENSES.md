@@ -16,7 +16,7 @@ How each part reaches you:
 - **Development tools** are used to build and test the project and are not
   part of what users install.
 
-Last reviewed for v0.2.0. When a dependency is added, add it here.
+Last reviewed for v0.3.0. When a dependency is added, add it here.
 
 ## Runtime libraries
 
