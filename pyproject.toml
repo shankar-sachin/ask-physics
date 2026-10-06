@@ -111,6 +111,8 @@ select = [
 "tests/*.py" = ["N802", "N803", "N806"]
 # `import torch.nn.functional as F` is the PyTorch convention.
 "src/askphysics/lm/*.py" = ["N812"]
+# A made-up OpenStax module, kept as one XML element per line so it reads like the real thing.
+"tests/test_scripts_extract_openstax.py" = ["N802", "N803", "N806", "E501"]
 # The terminal UI uses real typography on purpose (×, superscripts, box glyphs).
 "src/askphysics/ui.py" = ["RUF001", "RUF002", "RUF003"]
 "src/askphysics/pretty.py" = ["RUF001", "RUF002", "RUF003"]

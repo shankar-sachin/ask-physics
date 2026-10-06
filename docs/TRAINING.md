@@ -34,8 +34,16 @@ askphysics model train --model fermi-luna-1 --data build/smoke --tokenizer build
 
 ```bash
 askphysics model build-data --out build/data --examples 1000000 --workers 10
-askphysics model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192
+askphysics model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192 \
+  --prose third_party/openstax-physics/prose.jsonl
 ```
+
+- `--prose` adds about 1,650 paragraphs of real physics writing from OpenStax
+  *Physics* (CC BY 4.0, ADR-016) to what the tokenizer learns from, so
+  ordinary English words get tokens of their own. It is already in the
+  repository; `scripts/extract_openstax.py` rebuilds it from the pinned
+  OpenStax source. Anything trained on it carries the credit in
+  `third_party/openstax-physics/ATTRIBUTION.md`.
 
 - About 4 minutes and 1 GB *(estimate: ~600 examples/s per worker)*. Every
   example is solved by SymPy; the factory drops anything it can't solve and
@@ -85,6 +93,28 @@ caffeinate -dims askphysics model train --model fermi-tellus-1 \
 - Train tellus first and check it before spending hours on solem. Train
   celeste only if solem's held-out results leave room for it to help
   (open question Q16).
+
+### Real prose first (solem and celeste)
+
+Every task example is written by our templates, so on its own a model never
+reads real English, and its prose shows it. Give the models that write
+(solem, celeste) a language-modeling stage on the OpenStax text first:
+
+```bash
+caffeinate -dims askphysics model train --model fermi-solem-1 \
+  --data build/data --tokenizer build/tokenizer.json --steps 3000 --batch-size 32 \
+  --prose third_party/openstax-physics/prose.jsonl --prose-steps 200 --prose-share 0.05
+```
+
+- `--prose-steps 200` trains on the prose alone first: about 160k tokens, so
+  roughly six passes at batch 32. `--prose-share 0.05` keeps one batch in
+  twenty on prose afterwards, so it doesn't fade.
+- The eval lines gain `val_loss_prose` (held-out paragraphs), reported apart
+  from `val_loss` so task numbers stay comparable with earlier runs. If it
+  climbs while training loss falls, the model is memorizing the book: lower
+  `--prose-steps`.
+- tellus only classifies, so it can skip this stage. It can still use the
+  tokenizer trained with `--prose`; each model saves its own copy anyway.
 
 ## 6. Check the results
 

@@ -133,7 +133,10 @@ model:
 4. **Explanations** generated from plan plus computed result.
 5. **Real human phrasing (ADR-016):** questions and prose from OpenStax
    *Physics* (2020, CC BY 4.0, text only, attributed). Not *University
-   Physics* or *College Physics*, which are CC BY-NC-SA.
+   Physics* or *College Physics*, which are CC BY-NC-SA. The prose is in
+   `third_party/openstax-physics/` and trains as a language-modeling stage
+   before the tasks (`--prose`). A model card for weights trained with it
+   must repeat the credit in that directory's `ATTRIBUTION.md`.
 
 The factory never reads `evals/`, and a similarity check enforces it
 (`docs/EVALS.md`).

@@ -8,6 +8,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Real prose for the Fermi models: about 118,000 words of OpenStax
+  *Physics* (CC BY 4.0, attributed in `third_party/openstax-physics/`),
+  extracted by `scripts/extract_openstax.py` (ADR-016). `model train
+  --prose ... --prose-steps N --prose-share F` trains on it before and
+  alongside the tasks, reporting `val_loss_prose`, and `model
+  train-tokenizer --prose ...` learns its words.
 - `askphysics model eval` reports what `ask` would answer: the share right
   after the router's retries, wrong but flagged, and confidently wrong
   (wrong with every check passing), which is the number that has to stay

@@ -1,0 +1,205 @@
+"""Extract the body prose of OpenStax *Physics* (2020) for language-model training (ADR-016).
+
+    python scripts/extract_openstax.py [--source DIR] [--out third_party/openstax-physics]
+
+The book is CC BY 4.0 (its LICENSE file and collection metadata say so). Only prose
+paragraphs are kept: no figures, captions, media, tables, exercises, display equations, or
+teacher-support material (it quotes state standards that aren't OpenStax's to license).
+Inline math is written out as text ("v = d / t"), an auto-numbered reference to a figure
+or table reads "the figure" or "the table", and a paragraph that embeds an exercise or
+starts mid-sentence (after a display equation) is skipped. The output keeps the book's
+license and attribution; it is never relabelled MIT.
+
+Without ``--source`` the repository is cloned at the pinned commit below.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import tempfile
+import unicodedata
+import xml.etree.ElementTree as ET
+from collections.abc import Iterator
+from pathlib import Path
+
+REPO = "https://github.com/openstax/osbooks-physics.git"
+COMMIT = "dfdfd7a5356ecdd42e504de3df50d9153e33ea49"
+COLLECTION = "collections/physics.collection.xml"
+
+CNXML = "{http://cnx.rice.edu/cnxml}"
+COLXML = "{http://cnx.rice.edu/collxml}"
+MDML = "{http://cnx.rice.edu/mdml}"
+MATHML = "{http://www.w3.org/1998/Math/MathML}"
+
+# Containers whose paragraphs are not prose.
+SKIP = {
+    f"{CNXML}{tag}"
+    for tag in ("figure", "table", "exercise", "equation", "media", "footnote", "list", "glossary")
+}
+# The preface is author bios and course marketing, not physics.
+SKIP_CHAPTERS = ("Front matter",)
+# The decoder only writes printable ASCII, so the prose is folded to it.
+ASCII = str.maketrans(
+    {
+        "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2014": " - ",
+        "\u2013": "-", "\u2212": "-", "\u2026": "...", "\u00a0": " ", "\u00d7": "x",
+        "\u00b7": "*", "\u2248": "~", "\u2264": "<=", "\u2265": ">=", "\u00b0": " degrees",
+        "\u03c0": "pi", "\u03a9": "ohm", "\u03bc": "mu", "\u00b5": "mu", "\u0394": "delta",
+        "\u03b8": "theta", "\u03bb": "lambda", "\u03c9": "omega", "\u03c1": "rho",
+        "\u03b1": "alpha", "\u03b2": "beta", "\u03b3": "gamma", "\u03b5": "epsilon",
+        "\u03c4": "tau", "\u03c3": "sigma", "\u03a3": "sum", "\u2192": "->",
+    }
+)  # fmt: skip
+
+
+def to_ascii(text: str) -> str:
+    """Curly quotes, dashes, and Greek letters as ASCII; accents dropped (Schrodinger)."""
+    folded = unicodedata.normalize("NFKD", text.translate(ASCII))
+    return "".join(ch for ch in folded if ch.isascii() and not unicodedata.combining(ch))
+
+
+# Notes for teachers, and the section objectives (a list, not prose).
+SKIP_NOTES = ("teacher", "learning-objectives")
+REFERENCES = {"Figure": "the figure", "Table": "the table"}
+MIN_WORDS = 8
+
+
+def math_text(node: ET.Element) -> str:
+    """Inline MathML as plain text: "v = d / t", "x^2", "sqrt(2 g h)"."""
+    tag = node.tag.removeprefix(MATHML)
+    kids = [math_text(k) for k in node]
+    if tag in ("mi", "mn", "mo", "mtext"):
+        return (node.text or "").strip()
+    if tag == "msup" and len(kids) == 2:
+        return f"{kids[0]}^{kids[1]}"
+    if tag == "msub" and len(kids) == 2:
+        return f"{kids[0]}{kids[1]}"
+    if tag == "msubsup" and len(kids) == 3:
+        return f"{kids[0]}{kids[1]}^{kids[2]}"
+    if tag == "mfrac" and len(kids) == 2:
+        return f"{kids[0]} / {kids[1]}"
+    if tag == "msqrt":
+        return f"sqrt({' '.join(kids)})"
+    return " ".join(k for k in kids if k)
+
+
+def para_text(para: ET.Element) -> str | None:
+    """A paragraph as plain text, or None if it can't be read without its page."""
+    parts: list[str] = []
+
+    def walk(node: ET.Element) -> bool:
+        if node.tag == f"{MATHML}math":
+            parts.append(" " + math_text(node) + " ")
+            parts.append(node.tail or "")
+            return True
+        if node.tag == f"{CNXML}link" and not "".join(node.itertext()).strip():
+            target = node.attrib.get("target-id", "")
+            kind = next((v for k, v in REFERENCES.items() if target.startswith(k)), None)
+            if kind is None:
+                return False  # an embedded exercise or an unknown reference
+            parts.append(kind)
+            parts.append(node.tail or "")
+            return True
+        parts.append(node.text or "")
+        for child in node:
+            if not walk(child):
+                return False
+        if node is not para:
+            parts.append(node.tail or "")
+        return True
+
+    if not walk(para):
+        return None
+    text = re.sub(r"\s+", " ", to_ascii("".join(parts))).strip()
+    text = re.sub(r"\s+([.,;:!?)])", r"\1", text)
+    if not text or not (text[0].isupper() or text[0].isdigit() or text[0] in '"\u201c('):
+        return None  # starts mid-sentence, after a display equation
+    return text
+
+
+def clone(dest: Path) -> Path:
+    subprocess.run(["git", "init", "-q", str(dest)], check=True)
+    subprocess.run(
+        ["git", "-C", str(dest), "fetch", "-q", "--depth", "1", REPO, COMMIT], check=True
+    )
+    subprocess.run(["git", "-C", str(dest), "checkout", "-q", "FETCH_HEAD"], check=True)
+    return dest
+
+
+def modules(source: Path) -> Iterator[tuple[str, str]]:
+    """(chapter title, module id) in reading order."""
+    root = ET.parse(source / COLLECTION).getroot()
+
+    def walk(node: ET.Element, chapter: str) -> Iterator[tuple[str, str]]:
+        for child in node:
+            if child.tag == f"{COLXML}module":
+                yield chapter, child.attrib["document"]
+            elif child.tag == f"{COLXML}subcollection":
+                title = child.findtext(f"{MDML}title") or chapter
+                content = child.find(f"{COLXML}content")
+                if content is not None:
+                    yield from walk(content, title)
+
+    content = root.find(f"{COLXML}content")
+    if content is not None:
+        yield from walk(content, "Front matter")
+
+
+def paragraphs(path: Path) -> Iterator[str]:
+    """Body paragraphs of one module, as plain text."""
+    content = ET.parse(path).getroot().find(f"{CNXML}content")
+    if content is None:
+        return
+
+    def walk(node: ET.Element) -> Iterator[ET.Element]:
+        for child in node:
+            if child.tag in SKIP:
+                continue
+            if child.tag == f"{CNXML}note" and any(
+                c in child.attrib.get("class", "") for c in SKIP_NOTES
+            ):
+                continue
+            if child.tag == f"{CNXML}para":
+                yield child
+            else:
+                yield from walk(child)
+
+    for para in walk(content):
+        text = para_text(para)
+        if text is not None and len(text.split()) >= MIN_WORDS:
+            yield text
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--source", type=Path, help="A local clone of osbooks-physics.")
+    parser.add_argument("--out", type=Path, default=Path("third_party/openstax-physics"))
+    args = parser.parse_args()
+    with tempfile.TemporaryDirectory() as tmp:
+        source = args.source or clone(Path(tmp) / "osbooks-physics")
+        license_text = (source / "LICENSE").read_text(encoding="utf-8")
+        if not license_text.startswith("Attribution 4.0 International"):
+            raise SystemExit("the source LICENSE is not CC BY 4.0; refusing to extract")
+        args.out.mkdir(parents=True, exist_ok=True)
+        rows = 0
+        words = 0
+        with (args.out / "prose.jsonl").open("w", encoding="utf-8") as f:
+            for chapter, module in modules(source):
+                if chapter in SKIP_CHAPTERS:
+                    continue
+                for text in paragraphs(source / "modules" / module / "index.cnxml"):
+                    f.write(
+                        json.dumps({"module": module, "chapter": to_ascii(chapter), "text": text})
+                        + "\n"
+                    )
+                    rows += 1
+                    words += len(text.split())
+        (args.out / "LICENSE").write_text(license_text, encoding="utf-8")
+    print(f"{rows} paragraphs, {words} words -> {args.out / 'prose.jsonl'}")
+
+
+if __name__ == "__main__":
+    main()
