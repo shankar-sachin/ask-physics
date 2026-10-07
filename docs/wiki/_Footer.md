@@ -1,0 +1,1 @@
+This wiki is built from [`docs/wiki/`](https://github.com/shankar-sachin/ask-physics/tree/main/docs/wiki) and the equation database by `scripts/build_wiki.py`. Edits made here are overwritten; change the repository instead.
