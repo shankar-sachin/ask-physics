@@ -66,6 +66,9 @@ askphysics model train-tokenizer --data build/data --out build/tokenizer.json --
 - About 4 minutes and 1 GB *(estimate: ~600 examples/s per worker)*. Every
   example is solved by SymPy; the factory drops anything it can't solve and
   anything too close to an eval question.
+- `build-data` also adds 180 real problems from OpenStax *Physics*
+  (`third_party/openstax-physics/questions.jsonl`) as classify examples, five
+  times each. The 49 in the real-question eval are never among them.
 - An example averages about 260 tokens *(measured on a 6,000-example sample
   with a small vocabulary; a full-size tokenizer makes them shorter)*.
 - The text is template-generated, so the tokenizer may stop short of 8,192
@@ -187,6 +190,14 @@ askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a
   Confidently wrong is the trust number: the target is at most 1 in 1,000.
   Those cases print first, because each one is a hole a rule or more data
   should close.
+- Then it asks 49 real textbook questions (OpenStax *Physics*, with gold
+  plans the project wrote) through the whole pipeline, the model doing every
+  stage, and prints a second table: classified standard, right equations
+  retrieved, right answer, flagged, confidently wrong, and where each miss
+  stopped. The factory never wrote these questions, so this is the first
+  number on how real people phrase things. Retrieval caps it at 85.7% for
+  now. `--real` points at another file; it is skipped when the file is
+  missing (outside a checkout).
 - Send the `model info` table, `metrics.jsonl`, and the `model eval` table;
   they feed the model cards and the v0.4 exit criteria (90% valid plans on
   unseen templates, 0.1% or less confidently wrong).

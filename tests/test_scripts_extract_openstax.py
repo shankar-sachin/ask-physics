@@ -37,6 +37,20 @@ CHAPTER = """<document xmlns="http://cnx.rice.edu/cnxml" xmlns:m="http://www.w3.
 <note class="os-teacher"><para>The student is expected to know the definition of science.</para></note>
 <note class="misconception"><para>Speed and velocity are not the same thing — velocity has a direction.</para></note>
 <figure><caption><para>A photo of a cheetah running fast across the open grassland.</para></caption></figure>
+<para>Light covers 3.00 &#215; 10<sup>8</sup> m every second, a fact known since the 19<sup>th</sup> century.</para>
+<section class="problems"><title>Problems</title>
+<exercise id="ex-coin"><problem>
+<para>A coin is plated with 15 mg of gold. What is the gold worth?</para>
+<list><item>$0.33</item><item>$0.69</item></list>
+</problem><solution><para>The correct answer is (b).</para></solution></exercise>
+<exercise id="ex-graph"><problem>
+<para>Using the graph below, what is the runner's speed?</para>
+<figure><media alt="a graph"/></figure>
+</problem></exercise>
+</section>
+<section class="snap-lab"><exercise id="ex-lab"><problem>
+<para>Drop a ball and time its fall with a stopwatch.</para>
+</problem></exercise></section>
 </content></document>"""
 
 
@@ -62,8 +76,22 @@ def test_extracts_only_clean_prose(tmp_path: Path) -> None:
         "The average speed is v = d / t for a trip of known length and duration.",
         "A falling apple speeds up steadily, as shown in the figure.",
         "Speed and velocity are not the same thing - velocity has a direction.",
+        "Light covers 3.00 x 10^8 m every second, a fact known since the 19th century.",
     ]
     assert {r["chapter"] for r in rows} == {"Motion"}
+    # Only the problem that needs no figure, with its options and solution; no labs.
+    questions = [json.loads(line) for line in (out / "questions.jsonl").read_text().splitlines()]
+    assert questions == [
+        {
+            "id": "ex-coin",
+            "module": "m2",
+            "chapter": "Motion",
+            "kind": "problems",
+            "text": "A coin is plated with 15 mg of gold. What is the gold worth?",
+            "options": ["$0.33", "$0.69"],
+            "solution": "The correct answer is (b).",
+        }
+    ]
     assert (out / "LICENSE").read_text().startswith("Attribution 4.0 International")
 
 

@@ -52,6 +52,7 @@ class FermiClient:
         temperature: float = 0.0,
         seed: int = 0,
         fetch: Callable[[], object] | None = None,
+        decoder: Decoder | None = None,
     ) -> None:
         self.name = name
         self.fetch = fetch  # downloads the weights when they aren't installed yet
@@ -60,7 +61,7 @@ class FermiClient:
         self.device = device
         self.temperature = temperature
         self.seed = seed
-        self._decoder: Decoder | None = None
+        self._decoder = decoder  # an already-loaded model (``model eval``), or None to load
 
     @property
     def decoder(self) -> Decoder:

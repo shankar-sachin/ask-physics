@@ -456,8 +456,10 @@ def test_an_unused_stated_value_is_flagged(store: DataStore) -> None:
     report = sanity_check(p, compute(p, data=store), data=store, question=q)
     assert report.unused == ["9 V"] and report.possible and not report.passed
     assert any("gives 9 V, but the plan doesn't use it" in i for i in report.issues)
-    # The same value stated twice must be used twice.
     q = "In parallel: total 3 ohm, resistance 2 is 5 ohm. Find resistance 1."
+    assert sanity_check(p, compute(p, data=store), data=store, question=q).passed
+    # A value the question repeats is one value, used once.
+    q = "In parallel: total 3 ohm, resistance 2 is 5 ohm. Find resistance 1 next to the 5 ohm."
     assert sanity_check(p, compute(p, data=store), data=store, question=q).passed
 
 
@@ -513,6 +515,25 @@ def test_a_borrowed_unitless_value_is_flagged(store: DataStore) -> None:
     report = sanity_check(p, compute(p, data=store), data=store)
     assert report.magnitude_ok is False and not report.passed
     assert any("eps = 1200 is far outside" in i for i in report.issues)
+
+
+def test_a_percentage_is_read_as_a_fraction(store: DataStore) -> None:
+    # "40.0 percent efficiency" (OpenStax Physics) is 0.4, well inside an efficiency's range.
+    p = Plan.model_validate(
+        {
+            "equation_ids": ["efficiency"],
+            "target": "Wout",
+            "unknowns": ["Wout"],
+            "known_values": [
+                {"symbol": "eta", "value": 40, "unit": "percent", "origin": "given"},
+                {"symbol": "Win", "value": 1.2e12, "unit": "J", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )
+    report = sanity_check(p, compute(p, data=store), data=store)
+    assert report.magnitude_ok is not False and not report.issues
 
 
 def test_celsius_is_converted_by_meaning(store: DataStore) -> None:

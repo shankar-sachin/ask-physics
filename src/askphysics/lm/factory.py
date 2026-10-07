@@ -17,7 +17,7 @@ import math
 import random
 import re
 from collections import Counter
-from collections.abc import Iterator, Sequence
+from collections.abc import Collection, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -34,13 +34,23 @@ from askphysics.lm.formats import (
     plan_numbers,
     plan_prompt,
     plan_units,
+    question_quantities,
     relevant_constants,
     serialize_classification,
     serialize_plan,
 )
 from askphysics.lm.reading import mentions, own_tags, twins
 from askphysics.lm.tokenizer import END
-from askphysics.models import Classification, Constant, Equation, KnownValue, Plan, Variable
+from askphysics.models import (
+    Classification,
+    Constant,
+    Domain,
+    Equation,
+    KnownValue,
+    Plan,
+    Variable,
+)
+from askphysics.normalize import normalize_question
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.symbolic import solve_for
 from askphysics.solver.units import check_dimensions, quantity, to_kelvin, unit_string
@@ -660,14 +670,94 @@ def _write_shard(args: tuple[Path, int, int, int, list[str]]) -> dict[str, Any]:
     return {"counts": dict(counts), "dropped": factory.dropped}
 
 
+# --------------------------------------------------------------------------- textbook questions
+
+# OpenStax Physics chapters (ADR-016) and the domain of their problems. "What is Physics?"
+# (units and uncertainty) has none.
+CHAPTER_DOMAINS: dict[str, Domain] = {
+    "Motion in One Dimension": "kinematics",
+    "Acceleration": "kinematics",
+    "Forces and Newton's Laws of Motion": "dynamics",
+    "Motion in Two Dimensions": "kinematics",
+    "Circular and Rotational Motion": "dynamics",
+    "Newton's Law of Gravitation": "gravitation",
+    "Momentum": "momentum",
+    "Work, Energy, and Simple Machines": "energy",
+    "Special Relativity": "modern",
+    "Thermal Energy, Heat, and Work": "thermodynamics",
+    "Thermodynamics": "thermodynamics",
+    "Waves and Their Properties": "waves",
+    "Sound": "waves",
+    "Light": "optics",
+    "Mirrors and Lenses": "optics",
+    "Diffraction and Interference": "optics",
+    "Static Electricity": "electromagnetism",
+    "Electrical Circuits": "electromagnetism",
+    "Magnetism": "electromagnetism",
+    "The Quantum Nature of Light": "modern",
+    "The Atom": "modern",
+    "Particle Physics": "modern",
+}
+# Sections of problems to solve; "concept" and "critical-thinking" ask for explanations.
+PROBLEM_KINDS = frozenset(
+    ("practice-problems", "problems", "short-answer", "extended-response", "multiple-choice")
+)
+# A question that points at a picture we don't have, or asks why, is not a calculation.
+_NOT_A_CALCULATION = re.compile(
+    r"\b(?:graphs?|figures?|diagrams?|images?|pictures?|tables?|shown|below|above|explain|why"
+    r"|true or false)\b",
+    re.IGNORECASE,
+)
+# Each textbook question appears this many times, with different reasoning, so a few
+# hundred real phrasings still count among tens of thousands of factory examples.
+TEXTBOOK_REPEATS = 5
+
+
+def textbook_examples(
+    path: Path, exclude: Collection[str] = (), seed: int = 0, repeats: int = TEXTBOOK_REPEATS
+) -> list[Example]:
+    """Classify examples from real textbook problems (``questions.jsonl``, ADR-016).
+
+    A problem that states a quantity, needs no picture, and isn't one of the real-question
+    eval's (``exclude``, by id) is a standard question in its chapter's domain, written
+    ``repeats`` times (at most 8) with different reasoning. Conceptual questions are left
+    out: none of the three categories fits "why" (open question Q19).
+    """
+    rng = random.Random(seed)
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        row = json.loads(line)
+        domain = CHAPTER_DOMAINS.get(row["chapter"])
+        question = normalize_question(row["text"])
+        if (
+            row["id"] in exclude
+            or domain is None
+            or row["kind"] not in PROBLEM_KINDS
+            or _NOT_A_CALCULATION.search(question)
+            or not question_quantities(question)
+        ):
+            continue
+        for reasoning in rng.sample(tpl.STANDARD_REASONING, repeats):
+            c = Classification(
+                category="standard", reasoning=reasoning.format(domain=domain), domains=[domain]
+            )
+            prompt, target = classify_prompt(question), serialize_classification(c)
+            out.append(Example("classify", "train", "openstax", prompt, target))
+    return out
+
+
 def build_dataset(
     out_dir: Path,
     examples: int,
     seed: int = 0,
     workers: int = 1,
     blocklist: Sequence[str] = (),
+    extra: Sequence[Example] = (),
 ) -> dict[str, Any]:
-    """Write ``examples`` examples as JSONL shards in ``out_dir/{train,val}/``, plus a manifest."""
+    """Write ``examples`` examples as JSONL shards in ``out_dir/{train,val}/``, plus a manifest.
+
+    ``extra`` examples (``textbook_examples``) go to the training split as they are.
+    """
     workers = max(1, workers)
     per = [examples // workers + (1 if i < examples % workers else 0) for i in range(workers)]
     jobs = [(out_dir, i, n, seed * 1000 + i, list(blocklist)) for i, n in enumerate(per) if n]
@@ -679,6 +769,11 @@ def build_dataset(
     counts: Counter[str] = Counter()
     for r in results:
         counts.update(r["counts"])
+    if extra:
+        with (out_dir / "train" / "textbook.jsonl").open("w", encoding="utf-8") as f:
+            for example in extra:
+                f.write(example.to_json() + "\n")
+                counts[f"{example.split}/{example.task}"] += 1
     manifest = {
         "format_version": FORMAT_VERSION,
         "seed": seed,
@@ -687,6 +782,7 @@ def build_dataset(
         "counts": dict(sorted(counts.items())),
         "dropped": sum(r["dropped"] for r in results),
         "blocklist_size": len(blocklist),
+        "textbook_examples": len(extra),
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

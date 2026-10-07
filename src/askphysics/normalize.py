@@ -20,6 +20,7 @@ from askphysics.solver.units import is_valid_unit, quantity
 _SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺", "0123456789-+")
 _SUPERSCRIPT_RUN = re.compile(r"([A-Za-zµΩ)])([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)")
 _MINUS = str.maketrans({"−": "-", "–": "-", "‒": "-"})  # unicode minus, en dash, figure dash
+_DETACHED_MINUS = re.compile(r"([(=]\s*)-\s+(?=\d)")  # "Q = - 25 nC", "(- 3 N)"
 _UNIT_DOT = re.compile(r"(?<=[A-Za-zµΩ])\s*[·⋅•∙]\s*(?=[A-Za-zµΩ])")
 _THOUSANDS = re.compile(r"(?<![\d.,])(\d{1,3}(?:,\d{3})+)(?![\d,])")
 _SUP = "[⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+"
@@ -29,6 +30,9 @@ _TIMES_TEN = re.compile(
 _TIMES_TEN_SUP = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(?:×|x|X|\*)\s*10(" + _SUP + ")")
 _POWER_OF_TEN = re.compile(r"(?<![\w.])10(" + _SUP + ")")
 _HYPHEN_UNIT = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)-([A-Za-zµΩ][A-Za-z0-9µΩ/^*]*)")
+_SPACED_SLASH = re.compile(
+    r"(?<![\w.])(\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*([A-Za-z]+)\s+/\s+([A-Za-z][A-Za-z0-9^]*)"
+)
 _PER = re.compile(
     r"(?<![\w.])(\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s+([A-Za-z]+)\s+per\s+([A-Za-z]+)(\s+squared)?\b"
 )
@@ -110,9 +114,12 @@ def _hyphen_unit(match: re.Match[str]) -> str:
 
 def _word_number(match: re.Match[str]) -> str:
     unit = match.group("unit")
+    word = unit.lower()
+    if word in _NOT_UNITS or word.removesuffix("s") in _NOT_UNITS:  # "two points"
+        return match.group()
     # Only units with dimensions: "the time for one cycle" names a variable, and a cycle,
     # like a radian, is dimensionless to Pint.
-    if unit.lower() in _NOT_UNITS or not is_valid_unit(unit) or quantity(1, unit).dimensionless:
+    if not is_valid_unit(unit) or quantity(1, unit).dimensionless:
         return match.group()
     # "One" is in too many names ("the mass of one molecule", "object one") to read as 1.
     if (match.group("ones") or "").lower() == "one" and not match.group("scale"):
@@ -128,6 +135,12 @@ def _word_number(match: re.Match[str]) -> str:
     return f"{value} {unit}"
 
 
+def _spaced_slash(match: re.Match[str]) -> str:
+    number, top, bottom = match.groups()
+    unit = f"{top}/{bottom}"
+    return f"{number} {unit}" if is_valid_unit(unit) else match.group()
+
+
 def _per(match: re.Match[str]) -> str:
     number, top, bottom, squared = match.groups()
     unit = f"{top}/{bottom}" + ("^2" if squared else "")
@@ -137,13 +150,15 @@ def _per(match: re.Match[str]) -> str:
 def normalize_question(text: str) -> str:
     """Canonical spellings of the quantities in ``text``; everything else is untouched.
 
-    - Unicode minus signs and dashes between digits become ``-``.
+    - Unicode minus signs and dashes between digits become ``-``, and a minus sign set
+      apart from its number after "=" or "(" joins it: "Q = - 25 nC" is "Q = -25 nC".
     - Thousands separators go: "2,000" is "2000".
     - Powers of ten become e-notation: "3.00 × 10^8", "3.00×10⁸" are "3.00e8", and
       "10⁻¹¹" is "1e-11".
     - Superscripts in units become exponents: "m/s²" is "m/s^2", "s⁻¹" is "s^-1".
     - A middle dot between units is a product: "kg·m/s" is "kg*m/s".
     - A hyphen between a number and a unit goes: "55-kg" is "55 kg".
+    - A slash between units loses its spaces: "10 m / s^2" is "10 m/s^2".
     - "per" between units is a slash: "20 meters per second" is "20 meters/second",
       "9.8 meters per second squared" is "9.8 meters/second^2".
     - Degree temperatures get Pint's names: "25 °C", "25 degrees Celsius", and "25 Celsius"
@@ -152,9 +167,11 @@ def normalize_question(text: str) -> str:
       "220 Ω" is "220 ohm", "4.7 kΩ" is "4.7 kohm".
     - A number spelled out before a unit becomes digits: "an eight kilogram ball" is "an
       8 kilogram ball", "twenty-five meters" is "25 meters". Without a unit after it, a
-      word stays a word ("ten divided by three").
+      word stays a word ("ten divided by three"), and so does one before an English word
+      Pint happens to know ("two points" are not typographic points).
     """
     text = text.translate(_MINUS)
+    text = _DETACHED_MINUS.sub(r"\1-", text)
     text = _WORD_NUMBER.sub(_word_number, text)
     text = _THOUSANDS.sub(lambda m: m.group(1).replace(",", ""), text)
     text = _TIMES_TEN.sub(_times_ten, text)
@@ -165,6 +182,7 @@ def normalize_question(text: str) -> str:
     text = _SUPERSCRIPT_RUN.sub(_superscript, text)
     text = _UNIT_DOT.sub("*", text)
     text = _HYPHEN_UNIT.sub(_hyphen_unit, text)
+    text = _SPACED_SLASH.sub(_spaced_slash, text)
     text = _PER.sub(_per, text)
     text = _DEGREES.sub(lambda m: f"{m.group(1)} deg{m.group(2)}", text)
     text = _DEGREE_WORDS.sub(_degree_words, text)

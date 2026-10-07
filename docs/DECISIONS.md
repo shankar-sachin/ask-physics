@@ -707,8 +707,21 @@ figure". The result, about 1,650 paragraphs and 118,000 words, is in
 `third_party/openstax-physics/` with the book's `LICENSE` and an
 `ATTRIBUTION.md`. `askphysics model train --prose ... --prose-steps N
 --prose-share F` trains on it alone for N steps and mixes it into a share F
-of later batches; the tokenizer can learn from it too. Uses (1) and (2),
-the real-question eval and the exercises as classify examples, come next.
+of later batches; the tokenizer can learn from it too.
+
+**Implementation (v0.4), uses (1) and (2).** The extractor also writes
+`questions.jsonl`: 969 exercises from the practice, end-of-chapter, and
+test-prep sections, with their answer options and any solution text,
+leaving out every exercise that needs a figure or table. The project wrote
+gold plans for 49 multiple-choice problems our equations can answer
+(`real_eval.jsonl`); a test checks each plan's answer is within 5% of the
+book's keyed option and of no other option (the book rounds to two
+figures). `askphysics model eval` asks them through `Pipeline.solve`, the
+model under test doing every stage, and reports classification, retrieval,
+and answers separately. Of the rest, 180 problems that state a quantity and
+need no picture become standard classify examples in their chapter's
+domain, five times each with different reasoning; the eval's 49 never do.
+Conceptual questions are left out for now (open question Q19).
 
 ---
 

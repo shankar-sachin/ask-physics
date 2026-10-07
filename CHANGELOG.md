@@ -59,8 +59,21 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   centigrade" all work, converted as a temperature or as a change in one by
   what the equation means, and a temperature asked in Celsius is answered in
   Celsius too.
+- A real-question eval: 49 problems from OpenStax *Physics* (CC BY 4.0) with
+  gold plans the project wrote, each checked against the book's own answer
+  key. `askphysics model eval` asks them through the whole pipeline, exactly
+  as `ask` would, and reports how many are classified, retrieved, and
+  answered right, and where each miss stopped. The book's other 180
+  calculation problems become classify examples in `model build-data`, so
+  the models learn how real questions are phrased.
 
 ### Fixed
+
+- Real textbook phrasings that read wrong: "two points" was two typographic
+  points, "10 m / s^2" was 10 m, "Q = - 25 nC" lost its sign, a value stated
+  twice ("for 5.0 s ... during the 5.0 s") had to be used twice, and a "40
+  percent" efficiency was flagged as 40. The OpenStax prose also wrote powers
+  of ten as plain digits ("3.00 x 108 m/s"); it now says "3.00 x 10^8 m/s".
 
 - `model train` refuses `--prose-steps` as large as `--steps`. Prose-only steps
   come first, so such a run reads prose all night and never trains on the

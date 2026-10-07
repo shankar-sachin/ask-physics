@@ -17,9 +17,11 @@ from askphysics.lm.factory import (
     load_blocklist,
     plain_name,
     read_examples,
+    textbook_examples,
     word_overlap,
 )
 from askphysics.lm.formats import (
+    classify_prompt,
     explain_numbers,
     extract_numbers,
     extract_units,
@@ -31,6 +33,7 @@ from askphysics.lm.formats import (
 from askphysics.lm.reading import mentions, own_tags, twins
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Plan
+from askphysics.normalize import normalize_question
 from askphysics.pipeline import compute
 from askphysics.solver.units import check_dimensions, quantity
 
@@ -267,6 +270,55 @@ def test_build_and_read_dataset(tmp_path: Path) -> None:
     val = list(read_examples(tmp_path / "val"))
     assert len(train) + len(val) == 120
     assert all(e.split == "train" for e in train)
+
+
+OPENSTAX = Path(__file__).resolve().parents[1] / "third_party" / "openstax-physics"
+
+
+def test_textbook_problems_become_standard_classify_examples(tmp_path: Path) -> None:
+    rows = [
+        {"id": "a", "chapter": "Acceleration", "kind": "problems",
+         "text": "A 2,000-kg car speeds up at 3 m/s² for 4 s. How fast is it going?"},
+        {"id": "b", "chapter": "Acceleration", "kind": "concept",
+         "text": "Why does a 2 kg ball fall as fast as a 4 kg one?"},
+        {"id": "c", "chapter": "Acceleration", "kind": "problems",
+         "text": "Using the graph, what is the acceleration at 4 s?"},
+        {"id": "d", "chapter": "What is Physics?", "kind": "problems",
+         "text": "A scale reads 65 kg with 3 percent uncertainty. What is the uncertainty?"},
+        {"id": "e", "chapter": "Momentum", "kind": "problems",
+         "text": "What is the momentum of a 2 kg ball moving at 3 m/s?"},
+        {"id": "f", "chapter": "Acceleration", "kind": "short-answer",
+         "text": "What is acceleration?"},
+    ]  # fmt: skip
+    path = tmp_path / "questions.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    examples = textbook_examples(path, exclude={"e"}, repeats=2)
+    assert len(examples) == 2 and len({e.target for e in examples}) == 2  # varied reasoning
+    for e in examples:
+        assert (e.task, e.split, e.template) == ("classify", "train", "openstax")
+        # The prompt is what the pipeline's classifier sees: the normalized question.
+        assert e.prompt == classify_prompt(
+            "A 2000 kg car speeds up at 3 m/s^2 for 4 s. How fast is it going?"
+        )
+        c = json.loads(e.target.removesuffix(END))
+        assert c["category"] == "standard" and c["domains"] == ["kinematics"]
+    build_dataset(tmp_path / "data", 20, seed=1, extra=examples)
+    manifest = json.loads((tmp_path / "data" / "manifest.json").read_text())
+    assert manifest["textbook_examples"] == 2
+    assert (
+        sum(1 for e in read_examples(tmp_path / "data" / "train") if e.template == "openstax") == 2
+    )
+
+
+def test_the_real_question_eval_never_becomes_training_data() -> None:
+    lines = (OPENSTAX / "real_eval.jsonl").read_text().splitlines()
+    held_out = {json.loads(line)["id"] for line in lines}
+    examples = textbook_examples(OPENSTAX / "questions.jsonl", exclude=held_out, repeats=1)
+    assert len(examples) > 100
+    prompts = {e.prompt for e in examples}
+    for line in lines:
+        question = normalize_question(json.loads(line)["question"])
+        assert classify_prompt(question) not in prompts
 
 
 def test_load_blocklist(tmp_path: Path) -> None:
