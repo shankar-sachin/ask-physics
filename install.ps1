@@ -69,6 +69,17 @@ if (-not (($env:Path -split ";") -contains $BinDir)) {
 Write-Host ""
 & (Join-Path $BinDir "askphysics.exe") version
 if ($LASTEXITCODE -ne 0) { Fail "installed, but askphysics did not start" }
+
+# 5. Models (tellus and solem, checked against the manifest the package pins)
+if ($env:ASKPHYSICS_SKIP_MODELS -eq "1") {
+    Info "Skipping the Fermi models (ASKPHYSICS_SKIP_MODELS=1)"
+} else {
+    Info "Downloading the Fermi models"
+    & (Join-Path $BinDir "askphysics.exe") model pull --if-published
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "    Couldn't download the models just now. Run later: askphysics model pull" -ForegroundColor DarkGray
+    }
+}
 Write-Host ""
 Write-Host "  Try it:"
 Write-Host '    askphysics ask "How fast does a ball dropped from 20 m hit the ground?"'

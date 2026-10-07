@@ -91,6 +91,15 @@ esac
 
 say ""
 "$bin_dir/askphysics" version || fail "installed, but askphysics did not start"
+
+# 5. Models (tellus and solem, checked against the manifest the package pins)
+if [ "${ASKPHYSICS_SKIP_MODELS:-}" = "1" ]; then
+  info "Skipping the Fermi models (ASKPHYSICS_SKIP_MODELS=1)"
+else
+  info "Downloading the Fermi models"
+  "$bin_dir/askphysics" model pull --if-published \
+    || say "    Couldn't download the models just now. Run later: askphysics model pull"
+fi
 say ""
 say "  Try it:"
 say "    askphysics ask \"How fast does a ball dropped from 20 m hit the ground?\""

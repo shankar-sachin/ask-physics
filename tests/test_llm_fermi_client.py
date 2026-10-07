@@ -104,3 +104,31 @@ def test_fermi_pipeline_answers_end_to_end(
     assert answer.status in ("answered", "degraded", "refused")
     assert set(answer.models.values()) <= {LUNA.name, "template"}
     assert answer.plan_attempts <= 2
+
+
+def test_weights_download_on_first_use(store: DataStore, models_dir: Path, tmp_path: Path) -> None:
+    calls: list[str] = []
+    target = tmp_path / LUNA.name
+
+    def fetch() -> None:
+        calls.append("fetch")
+        target.mkdir()
+        for f in (models_dir / LUNA.name).iterdir():
+            (target / f.name).write_bytes(f.read_bytes())
+
+    client = FermiClient(LUNA.name, store, directory=target, device="cpu", fetch=fetch)
+    assert calls == []  # building the client downloads nothing
+    client.complete_json(system="", user=json.dumps({"question": QUESTION}), schema=Classification)
+    client.complete_json(system="", user=json.dumps({"question": QUESTION}), schema=Classification)
+    assert calls == ["fetch"]
+
+
+def test_a_failed_download_is_an_llm_error(store: DataStore, tmp_path: Path) -> None:
+    def fetch() -> None:
+        raise ConfigError("no network")
+
+    client = FermiClient(LUNA.name, store, directory=tmp_path / "x", device="cpu", fetch=fetch)
+    with pytest.raises(LLMError, match="couldn't download"):
+        client.complete_json(
+            system="", user=json.dumps({"question": QUESTION}), schema=Classification
+        )

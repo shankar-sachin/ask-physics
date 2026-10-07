@@ -379,6 +379,33 @@ them the moment v0.3 wires the models in.
   maintainer chose to keep torch for inference rather than add a separate
   numpy engine.
 
+**Implementation (v0.4).**
+- `askphysics model package --model NAME --release TAG` (maintainers) writes
+  a bf16 copy of the model, a model card (`MODEL_CARD.md`: architecture,
+  training settings and curve, eval results, answering speed through the
+  pipeline, credit), and the prose attribution when `--attribution` is given.
+  It puts the release assets in `build/release/assets/` and pins each one in
+  `src/askphysics/lm/weights.json` by URL, size, and sha256. Loading casts
+  bf16 back to float32, so nothing else changes.
+- `askphysics model pull` (`lm/weights.py`, no torch) downloads tellus and
+  solem, or `--model NAME`, or `--all` for celeste too. Every file goes to a
+  staging directory and is checked against the manifest; the model directory
+  is replaced only when all of them match, so a failed or tampered download
+  never leaves a half-installed model. A locally trained model of the same
+  name is kept unless `--force`.
+- celeste is routed as *available* when it is published but not downloaded
+  (`Settings.auto_pull`, `ASKPHYSICS_AUTO_PULL=0` to turn it off). Its client
+  downloads the weights the first time a question reaches its escalation
+  try; a failed download fails that try like any other, so the answer
+  degrades instead of crashing.
+- The installers run `askphysics model pull --if-published` last, which
+  succeeds quietly while nothing is published (`ASKPHYSICS_SKIP_MODELS=1`
+  skips it). With no models installed, `ask` says how to get them.
+- Homebrew: a formula can't write to the user's home directory, so instead
+  of resources it prints a caveat to run `askphysics model pull`
+  (`docs/RELEASING.md`). A brew install needs the network once for the
+  models.
+
 ---
 
 ## ADR-013: An in-browser website, early

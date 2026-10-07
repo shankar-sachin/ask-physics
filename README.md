@@ -134,9 +134,9 @@ itself. Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quickstart
 
-Requires Python 3.11 or newer. No API keys, ever. Until you train a Fermi model
-(downloadable weights arrive in v0.4), the default language model is a
-deterministic fake.
+Requires Python 3.11 or newer. No API keys, ever. `askphysics model pull`
+downloads the Fermi models once their weights are published (v0.4); until you
+pull or train one, the default language model is a deterministic fake.
 
 ```bash
 git clone https://github.com/shankar-sachin/ask-physics.git
@@ -189,7 +189,7 @@ of making something up.
 | Eval set (8 questions) with a validating loader | Works |
 | Fermi models: tokenizer, transformer, constrained decoding, data factory, training | Works |
 | Fermi models answering in the CLI (router: tellus, solem, celeste) | Works with locally trained weights |
-| Downloadable trained weights (`model pull`), solem | v0.4 |
+| `askphysics model pull`: checksum-pinned downloads, installers fetch the models | Works; weights publish with v0.4 |
 | Multi-equation chaining | Stub until v0.4 |
 | Eval scoring and runner | Stub until v0.5 |
 | Vector and hybrid retrieval | Stub until v0.6 |

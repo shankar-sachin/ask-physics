@@ -13,6 +13,7 @@ never runs never loads its model.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -20,9 +21,9 @@ from pydantic import BaseModel, ValidationError
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import LLMError, LLMResponseFormatError
+from askphysics.errors import AskPhysicsError, LLMError, LLMResponseFormatError
 from askphysics.llm.base import Roster
-from askphysics.llm.routing import plan_route
+from askphysics.llm.routing import CELESTE, plan_route
 from askphysics.lm.checkpoints import load_model
 from askphysics.lm.device import select_device
 from askphysics.lm.generate import (
@@ -31,7 +32,8 @@ from askphysics.lm.generate import (
     decode_explanation,
     decode_plan,
 )
-from askphysics.lm.paths import default_model_dir, installed_models
+from askphysics.lm.paths import default_model_dir, installed_models, is_installed
+from askphysics.lm.weights import pull, read_manifest
 from askphysics.models import Classification, FermiAssumption, Plan
 
 T = TypeVar("T", bound=BaseModel)
@@ -49,8 +51,10 @@ class FermiClient:
         device: str | None = None,
         temperature: float = 0.0,
         seed: int = 0,
+        fetch: Callable[[], object] | None = None,
     ) -> None:
         self.name = name
+        self.fetch = fetch  # downloads the weights when they aren't installed yet
         self.data = data
         self.directory = directory or default_model_dir() / name
         self.device = device
@@ -64,8 +68,14 @@ class FermiClient:
 
         Raises:
             ConfigError: the weights are missing or were trained on another task format.
+            LLMError: the weights had to be downloaded and couldn't be.
         """
         if self._decoder is None:
+            if self.fetch is not None and not is_installed(self.directory):
+                try:
+                    self.fetch()
+                except AskPhysicsError as exc:
+                    raise LLMError(f"couldn't download {self.name}: {exc}") from exc
             model, tokenizer = load_model(self.directory, select_device(self.device))
             self._decoder = Decoder(model, tokenizer)
         return self._decoder
@@ -132,12 +142,22 @@ def build_roster(settings: Settings, data: DataStore, root: Path | None = None) 
         ConfigError: no usable models are installed (see ``plan_route``).
     """
     root = root or default_model_dir()
+    installed = installed_models(root)
+    # celeste is rarely needed, so it downloads on the first question that needs it.
+    available = [CELESTE] if settings.auto_pull and CELESTE in read_manifest() else []
     route = plan_route(
-        installed_models(root),
+        installed,
         forced=settings.model,
         attempts=settings.plan_attempts,
         escalations=settings.escalations,
+        available=available,
     )
+
+    def fetcher(name: str) -> Callable[[], object] | None:
+        if name in installed or name not in available:
+            return None
+        return lambda: pull([name], root)
+
     clients = {
         name: FermiClient(
             name,
@@ -145,6 +165,7 @@ def build_roster(settings: Settings, data: DataStore, root: Path | None = None) 
             directory=root / name,
             device=settings.device,
             temperature=settings.temperature,
+            fetch=fetcher(name),
         )
         for name in route.models
     }

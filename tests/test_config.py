@@ -47,3 +47,13 @@ def test_from_env_with_nothing_set_gives_defaults() -> None:
 def test_invalid_env_raises_config_error(env: dict[str, str]) -> None:
     with pytest.raises(ConfigError):
         Settings.from_env(env)
+
+
+@pytest.mark.parametrize(("value", "expected"), [("0", False), ("off", False), ("TRUE", True)])
+def test_auto_pull_reads_from_env(value: str, expected: bool) -> None:
+    assert Settings.from_env({"ASKPHYSICS_AUTO_PULL": value}).auto_pull is expected
+
+
+def test_auto_pull_rejects_nonsense() -> None:
+    with pytest.raises(ConfigError, match="AUTO_PULL"):
+        Settings.from_env({"ASKPHYSICS_AUTO_PULL": "maybe"})

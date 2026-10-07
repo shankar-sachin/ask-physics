@@ -40,3 +40,9 @@ def test_luna_is_never_picked_unless_forced() -> None:
         plan_route(["fermi-luna-1"])
     with pytest.raises(ConfigError, match="not installed"):
         plan_route([TELLUS], forced=SOLEM)
+
+
+def test_a_published_celeste_escalates_before_it_is_downloaded() -> None:
+    route = plan_route([TELLUS, SOLEM], available=[CELESTE])
+    assert route.plan == (SOLEM,) * 5 + (CELESTE,)
+    assert plan_route([TELLUS, SOLEM], available=[CELESTE], escalations=0).plan == (SOLEM,) * 5

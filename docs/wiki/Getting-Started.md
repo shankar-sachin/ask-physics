@@ -40,8 +40,20 @@ Quotes are optional. Useful options:
 | `--model fermi-tellus-1` | Use one Fermi model for every stage. |
 | `--llm fake` | Use the built-in fake model, which only knows "dropped from a height" questions. |
 
-Without trained models installed, `ask` uses the fake model. Trained weights ship with
-v0.4 (`askphysics model pull`); until then you can [train your own](Training-the-Models).
+## Get the models
+
+The installers download the Fermi models for you. To get them yourself, or after
+installing another way:
+
+```bash
+askphysics model pull          # tellus and solem, about 66 MB
+askphysics model pull --all    # celeste too, about 240 MB more
+```
+
+Every file is checked against the sizes and hashes this version of Ask Physics pins, and
+anything that doesn't match is refused. celeste downloads by itself the first time a
+question needs it; set `ASKPHYSICS_AUTO_PULL=0` to stop that. Without models, `ask` uses a
+stand-in that only knows "dropped from a height" questions, and says so.
 
 ## Other commands
 
