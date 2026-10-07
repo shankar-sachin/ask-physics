@@ -74,6 +74,8 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1200, height: 1600 } });
 if (local) {
   await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
+  // Offline, the wiki's KaTeX can't load either; its math then shows as plain LaTeX.
+  await context.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/katex@/, (route) => route.abort());
 }
 
 const page = await context.newPage();
@@ -82,7 +84,8 @@ page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 page.on("requestfailed", (request) => {
   const url = request.url();
   // Offline mode blocks web fonts on purpose; anything else failing is a bug.
-  if (!(local && /fonts\.(googleapis|gstatic)\.com/.test(url))) errors.push(`request failed: ${url}`);
+  const blocked = /fonts\.(googleapis|gstatic)\.com|cdn\.jsdelivr\.net\/npm\/katex@/;
+  if (!(local && blocked.test(url))) errors.push(`request failed: ${url}`);
 });
 page.on("console", (msg) => {
   // Failed loads are reported (with their URL) by the requestfailed handler.
@@ -121,6 +124,8 @@ try {
   const math = await card.$eval(".eq-math", (n) => n.textContent);
   check(math === "v² = v₀² + 2·a·d", `equation renders as one-line math (got "${math}")`);
   check((await card.$$(".input-row")).length === 3, "all three inputs are listed");
+  const wikiLink = await card.$eval("a.eq-id", (n) => n.getAttribute("href"));
+  check(wikiLink === "/wiki/kin_v_squared/", `the equation id links to its wiki page (${wikiLink})`);
   const engine = await page.textContent("#engine-text");
   check(engine.includes("Engine ready"), `engine reports ready (${engine})`);
   await page.screenshot({ path: "build/site-smoke.png", fullPage: false });
@@ -135,6 +140,44 @@ try {
   // Question text must render as text, never as markup.
   card = await ask("<img src=x onerror=alert(1)> dropped from 20 m, how fast?");
   check((await card.$$("img")).length === 0, "question HTML is escaped");
+
+  // The wiki: the home page, then the equation page the answer card linked to.
+  await page.goto(`${base}wiki/`);
+  check((await page.title()).startsWith("Ask Physics Wiki"), "the wiki home page loads");
+  await page.goto(`${base}wiki/kin_v_squared/`);
+  const heading = await page.textContent(".wiki-page h1");
+  check(heading.length > 0 && heading !== "kin_v_squared", `the equation page is titled by name (${heading})`);
+  if (local) {
+    check((await page.textContent(".math")).includes("v^2"), "offline, the formula shows as LaTeX");
+  } else {
+    await page.waitForSelector(".math .katex", { timeout: 30_000 });
+    check(true, "KaTeX typesets the formula");
+  }
+  check((await page.$$(".wiki-page table tbody tr")).length === 4, "the variables table lists all four");
+
+  // On a phone: nothing scrolls sideways, and every nav link, the wiki's included, is there.
+  const phone = await browser.newContext({
+    viewport: { width: 375, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+  });
+  if (local) {
+    await phone.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
+    await phone.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/katex@/, (route) => route.abort());
+  }
+  const small = await phone.newPage();
+  small.on("pageerror", (error) => errors.push(`phone pageerror: ${error.message}`));
+  const fits = () => small.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  await small.goto(base);
+  check(await fits(), "on a phone, the home page doesn't scroll sideways");
+  const navLinks = await small.$$eval(".nav nav a", (links) =>
+    links.filter((a) => a.offsetParent !== null).map((a) => a.textContent.trim()),
+  );
+  check(navLinks.length === 6 && navLinks.includes("Wiki"), `on a phone, the nav shows every link (${navLinks})`);
+  await small.click(".nav nav a[href='/wiki/']");
+  await small.waitForURL(/\/wiki\/$/);
+  check(await fits(), "on a phone, the wiki home doesn't scroll sideways");
+  await small.goto(`${base}wiki/kin_v_squared/`);
+  check(await fits(), "on a phone, an equation page doesn't scroll sideways");
+  await phone.close();
 
   check(errors.length === 0, `no page or console errors${errors.length ? `:\n${errors.join("\n")}` : ""}`);
 } finally {

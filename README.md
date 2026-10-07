@@ -211,7 +211,7 @@ v1.0 comes the hosted API. The CLI is the main interface, and
 
 ## Documentation
 
-- [The Ask Physics Wiki](https://github.com/shankar-sachin/ask-physics/wiki): guides, FAQ, and a page for every equation
+- The Ask Physics Wiki, [on GitHub](https://github.com/shankar-sachin/ask-physics/wiki) and [on the website](https://askphysics.vercel.app/wiki/): guides, FAQ, and a page for every equation
 - [`PLAN.md`](PLAN.md): vision, pipeline, Fermi and refusal policies, confidence model
 - [`docs/MODELS.md`](docs/MODELS.md): the Fermi model family, its architecture, data, training, and routing
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): modules, interfaces, one question traced through every stage
