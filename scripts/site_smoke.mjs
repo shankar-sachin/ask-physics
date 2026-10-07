@@ -155,6 +155,30 @@ try {
   }
   check((await page.$$(".wiki-page table tbody tr")).length === 4, "the variables table lists all four");
 
+  // On a phone: nothing scrolls sideways, and every nav link, the wiki's included, is there.
+  const phone = await browser.newContext({
+    viewport: { width: 375, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+  });
+  if (local) {
+    await phone.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
+    await phone.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/katex@/, (route) => route.abort());
+  }
+  const small = await phone.newPage();
+  small.on("pageerror", (error) => errors.push(`phone pageerror: ${error.message}`));
+  const fits = () => small.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  await small.goto(base);
+  check(await fits(), "on a phone, the home page doesn't scroll sideways");
+  const navLinks = await small.$$eval(".nav nav a", (links) =>
+    links.filter((a) => a.offsetParent !== null).map((a) => a.textContent.trim()),
+  );
+  check(navLinks.length === 6 && navLinks.includes("Wiki"), `on a phone, the nav shows every link (${navLinks})`);
+  await small.click(".nav nav a[href='/wiki/']");
+  await small.waitForURL(/\/wiki\/$/);
+  check(await fits(), "on a phone, the wiki home doesn't scroll sideways");
+  await small.goto(`${base}wiki/kin_v_squared/`);
+  check(await fits(), "on a phone, an equation page doesn't scroll sideways");
+  await phone.close();
+
   check(errors.length === 0, `no page or console errors${errors.length ? `:\n${errors.join("\n")}` : ""}`);
 } finally {
   await browser.close();

@@ -19,7 +19,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   margin: 0;
   background:
@@ -51,6 +51,7 @@ code { font-family: var(--mono); font-size: 0.9em; }
 
 main, footer { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
 section { padding: 72px 0 24px; }
+section[id] { scroll-margin-top: 64px; }
 h1, h2 { font-family: var(--display); letter-spacing: -0.02em; margin: 0 0 12px; }
 h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.02; }
 h2 { font-size: clamp(28px, 4vw, 40px); }
@@ -148,7 +149,7 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
 .stages span { color: var(--muted); font-size: 14px; }
 
 /* models */
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 40vw), 1fr)); gap: 16px; }
 .grid figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .grid img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
 .grid figcaption { padding: 10px 14px 14px; color: var(--muted); font-size: 14px; }
@@ -164,14 +165,30 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
 footer { border-top: 1px solid var(--line); margin-top: 72px; padding: 24px 16px 48px; color: var(--muted); font-size: 14px; }
 footer .credits { font-size: 12px; }
 
+/* Phones: every link stays in the nav, as a row under the logo that scrolls sideways. */
 @media (max-width: 640px) {
-  .nav nav { gap: 12px; font-size: 13px; }
-  .nav nav a:not(.gh) { display: none; }
+  .nav { flex-wrap: wrap; row-gap: 4px; padding-bottom: 4px; }
+  .nav nav {
+    width: 100%; flex-wrap: nowrap; gap: 14px; font-size: 13px;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .nav nav::-webkit-scrollbar { display: none; }
+  .nav nav a { white-space: nowrap; padding: 6px 0; }
+  section { padding-top: 48px; }
+  section[id] { scroll-margin-top: 100px; }
+  .hero { padding-top: 40px; }
+  .lede { font-size: 17px; }
   #ask-form { flex-direction: column; }
+  .examples button { text-align: left; }
+  .card { padding: 16px; }
   .rows { grid-template-columns: 1fr; gap: 4px; }
   .rows dt { text-align: left; margin-top: 8px; }
+  .grid { gap: 10px; }
+  .grid figcaption { padding: 8px 10px 10px; font-size: 13px; }
   .cmd { grid-template-columns: 1fr auto; }
   .cmd span { grid-column: 1 / -1; }
+  /* The whole command, wrapped, rather than a strip to scroll. */
+  .cmd code { white-space: normal; overflow-wrap: anywhere; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

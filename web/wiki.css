@@ -26,4 +26,8 @@
   .wiki { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-top: 20px; }
   /* On a phone the article comes first; the page list follows it. */
   .wiki-side { position: static; order: 2; border-top: 1px solid var(--line); padding-top: 8px; }
+  .wiki-page table { font-size: 13px; }
+  .wiki-page th, .wiki-page td { padding: 5px 8px; }
+  .wiki-side li { margin: 0; }
+  .wiki-side li a { display: block; padding: 6px 0; } /* a finger-sized target */
 }
