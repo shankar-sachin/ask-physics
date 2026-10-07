@@ -2,7 +2,9 @@
 
 tellus classifies every question. solem plans and explains, with up to
 ``plan_attempts`` tries, and celeste gets ``escalations`` more tries after that.
-A missing model is skipped: with only tellus installed, tellus does everything.
+A missing model is skipped: with only tellus installed, tellus does everything. celeste
+can also be *available*, published but not yet downloaded: its client fetches the weights
+the first time a question needs its try (ADR-012).
 """
 
 from __future__ import annotations
@@ -48,8 +50,9 @@ def plan_route(
     forced: str | None = None,
     attempts: int = 5,
     escalations: int = 1,
+    available: Sequence[str] = (),
 ) -> Route:
-    """The route for the installed models.
+    """The route for the installed models; ``available`` ones may escalate too.
 
     Raises:
         ConfigError: no usable model is installed, or ``forced`` isn't installed.
@@ -64,5 +67,6 @@ def plan_route(
     planner = next((m for m in PLANNERS if m in have), None)
     if classifier is None or planner is None:
         raise ConfigError(f"no Fermi models are installed; {hint}")
-    rescue = (CELESTE,) * escalations if CELESTE in have and planner != CELESTE else ()
+    can_rescue = CELESTE in have or CELESTE in available
+    rescue = (CELESTE,) * escalations if can_rescue and planner != CELESTE else ()
     return Route(classify=classifier, plan=(planner,) * attempts + rescue, explain=planner)

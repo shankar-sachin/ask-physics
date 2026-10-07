@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from tests.conftest import DEMO_QUESTION
@@ -90,3 +91,37 @@ def test_ask_takes_an_unquoted_question() -> None:
     result = runner.invoke(cli.app, ["ask", *words])
     assert result.exit_code == 0, result.output
     assert "19.8057" in result.output
+
+
+def test_pull_with_nothing_published_says_so() -> None:
+    result = runner.invoke(cli.app, ["model", "pull"])
+    assert result.exit_code == 1
+    assert "no trained weights are published" in result.output
+    quiet = runner.invoke(cli.app, ["model", "pull", "--if-published"])
+    assert quiet.exit_code == 0 and "no trained weights are published" in quiet.output
+
+
+def test_pull_downloads_and_verifies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import hashlib
+    import io
+
+    from askphysics.lm import weights
+
+    files = {"model.safetensors": b"w" * 10, "config.json": b"{}", "tokenizer.json": b"{}"}
+    pinned = weights.PinnedModel("fermi-tellus-1", "r", tuple(
+        weights.PinnedFile(n, f"https://example.test/{n}", len(b), hashlib.sha256(b).hexdigest())
+        for n, b in files.items()
+    ))  # fmt: skip
+    monkeypatch.setattr(weights, "read_manifest", lambda path=None: {pinned.name: pinned})
+    monkeypatch.setattr(weights, "_open", lambda url: io.BytesIO(files[url.rsplit("/", 1)[1]]))
+    result = runner.invoke(cli.app, ["model", "pull", "--directory", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "fermi-tellus-1 downloaded and verified" in result.output
+    assert (tmp_path / "fermi-tellus-1" / "model.safetensors").read_bytes() == files[
+        "model.safetensors"
+    ]
+
+
+def test_ask_without_models_says_how_to_get_them() -> None:
+    result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
+    assert "No Fermi models are installed" in result.output

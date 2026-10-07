@@ -36,6 +36,8 @@ class Settings:
         plan_attempts: Plans tried with the main planner before escalating (ADR-010).
         escalations: Extra plan attempts by celeste after those, when it is installed.
         device: Torch device for the Fermi models (mps, cuda, cpu); None picks the best.
+        auto_pull: Download celeste's published weights the first time a question needs
+            its escalation try (ADR-012). Off means celeste is used only when installed.
     """
 
     llm_provider: Provider = "auto"
@@ -45,6 +47,7 @@ class Settings:
     plan_attempts: int = 5
     escalations: int = 1
     device: str | None = None
+    auto_pull: bool = True
 
     def __post_init__(self) -> None:
         if self.llm_provider not in get_args(Provider):
@@ -88,4 +91,16 @@ class Settings:
             plan_attempts=int(number("plan_attempts", int, defaults.plan_attempts)),
             escalations=int(number("escalations", int, defaults.escalations)),
             device=raw("device") or defaults.device,
+            auto_pull=_flag(raw("auto_pull"), defaults.auto_pull, "auto_pull"),
         )
+
+
+def _flag(value: str | None, default: bool, name: str) -> bool:
+    if value is None:
+        return default
+    lowered = value.strip().lower()
+    if lowered in {"1", "true", "yes", "on"}:
+        return True
+    if lowered in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigError(f"invalid value for {ENV_PREFIX}{name.upper()}: {value!r}")

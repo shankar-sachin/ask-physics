@@ -84,6 +84,20 @@ def ask(
         typer.echo(answer.model_dump_json(indent=2))
     else:
         console.print(answer_card(answer, pipeline.data.equations))
+        if settings.llm_provider == "auto" and pipeline.roster is None:
+            console.print(_no_models_hint(), style="muted")
+
+
+def _no_models_hint() -> str:
+    """What to do when ``auto`` found no Fermi models and used the fake one."""
+    from askphysics.lm.weights import read_manifest
+
+    if read_manifest():
+        return "No Fermi models are installed, so a stand-in answered. Run: askphysics model pull"
+    return (
+        "No Fermi models are installed, so a stand-in answered. Trained weights aren't "
+        "published for this version yet; to train your own, see docs/TRAINING.md."
+    )
 
 
 @app.command()
@@ -383,6 +397,126 @@ def eval_cmd(
         console.print(f"    [muted]expected[/] {safe(str(f['expected']))}")
         console.print(f"    [muted]got     [/] {safe(str(f['got']))}")
     console.print(f"[ok]✓[/] full report in {safe(str(model_dir / 'eval.json'))}")
+
+
+@model_app.command("pull")
+def pull_cmd(
+    model: Annotated[
+        list[str] | None,
+        typer.Option(help="A model to download (repeatable). Default: tellus and solem."),
+    ] = None,
+    all_models: Annotated[
+        bool, typer.Option("--all", help="Also download celeste (about 240 MB).")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option(help="Replace a locally trained model of the same name.")
+    ] = False,
+    directory: Annotated[
+        Path | None, typer.Option(help="Models directory (default: the installed models dir).")
+    ] = None,
+    if_published: Annotated[
+        bool,
+        typer.Option(help="Succeed quietly when nothing is published yet (for installers)."),
+    ] = False,
+) -> None:
+    """Download the published Fermi models, checked against the pinned manifest (ADR-012)."""
+    from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn
+
+    from askphysics.llm.routing import CELESTE, SOLEM, TELLUS
+    from askphysics.lm.paths import default_model_dir
+    from askphysics.lm.weights import pull as pull_models
+    from askphysics.lm.weights import read_manifest
+
+    root = directory or default_model_dir()
+    try:
+        manifest = read_manifest()
+    except AskPhysicsError as exc:
+        raise _fail(str(exc)) from exc
+    if not manifest:
+        message = (
+            "no trained weights are published for this version of askphysics yet; "
+            "to train your own, see docs/TRAINING.md"
+        )
+        if if_published:
+            console.print(message, style="muted")
+            return
+        raise _fail(message)
+    names = list(model) if model else [n for n in (TELLUS, SOLEM) if n in manifest]
+    if all_models and CELESTE not in names:
+        names.append(CELESTE)
+    with Progress(
+        TextColumn("[brand]{task.description}"),
+        BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
+        DownloadColumn(),
+        console=console,
+    ) as progress:
+        tasks: dict[str, Any] = {}
+
+        def update(name: str, done: int, total: int) -> None:
+            if name not in tasks:
+                tasks[name] = progress.add_task(name, total=total)
+            progress.update(tasks[name], completed=done)
+
+        results: dict[str, bool] = {}
+        for name in names:
+            tasks.clear()
+            progress.console.print(f"[label]{name}[/]")
+            try:
+                results |= pull_models(
+                    [name], root, manifest=manifest, force=force, progress=update
+                )
+            except AskPhysicsError as exc:
+                raise _fail(str(exc)) from exc
+    for name, downloaded in results.items():
+        state = "downloaded and verified" if downloaded else "already up to date"
+        console.print(f"[ok]✓[/] {name} {state} in {safe(str(root / name))}")
+
+
+@model_app.command("package")
+def package_cmd(
+    model: Annotated[str, typer.Option(help="Installed model to package.")],
+    release: Annotated[
+        str, typer.Option(help="GitHub release tag the assets will be uploaded to.")
+    ],
+    out: Annotated[Path, typer.Option(help="Where to write the release files.")] = Path(
+        "build/release"
+    ),
+    attribution: Annotated[
+        Path | None,
+        typer.Option(help="ATTRIBUTION.md of the prose the model trained on, to ship with it."),
+    ] = None,
+    directory: Annotated[
+        Path | None, typer.Option(help="Model directory (default: the installed models dir).")
+    ] = None,
+    device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu (default: best).")] = None,
+    measure: Annotated[
+        bool, typer.Option(help="Time a few questions through the pipeline for the card.")
+    ] = True,
+) -> None:
+    """Maintainers: package a trained model for release (bf16 weights, model card, manifest)."""
+    from askphysics.lm.checkpoints import default_model_dir
+    from askphysics.lm.package import package
+    from askphysics.lm.weights import manifest_path
+
+    source = directory or default_model_dir() / model
+    try:
+        with console.status(f"[muted]packaging {model}"):
+            entry = package(
+                model,
+                source,
+                out,
+                release,
+                load_all(),
+                attribution=attribution,
+                device=device,
+                measure=measure,
+            )
+    except AskPhysicsError as exc:
+        raise _fail(str(exc)) from exc
+    size = sum(f["size"] for f in entry["files"].values()) / 1e6
+    console.print(f"[ok]✓[/] {model}: {len(entry['files'])} files, {size:.1f} MB")
+    console.print(f"  upload everything in {safe(str(out / 'assets'))} to the release {release}")
+    console.print(f"  then commit {safe(str(manifest_path()))}, which now pins them")
 
 
 @model_app.command("info")
