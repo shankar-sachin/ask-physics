@@ -1,0 +1,3 @@
+# Let shellcheck follow scripts/lib.sh, which the workflow scripts source.
+source-path=SCRIPTDIR
+external-sources=true
