@@ -1,16 +1,25 @@
 import json
+import math
+import re
 from pathlib import Path
+from typing import Any
 
+import pint
 import pytest
 import torch
 from typer.testing import CliRunner
 
 from askphysics import cli
+from askphysics.config import Settings
 from askphysics.data.loader import DataStore
+from askphysics.llm.base import Roster
 from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import LUNA
 from askphysics.lm.evaluate import (
+    RealQuestion,
+    evaluate_real,
     evaluate_tasks,
+    read_real_questions,
     route_plan,
     sample_examples,
     score_classification,
@@ -21,6 +30,12 @@ from askphysics.lm.generate import Decoder
 from askphysics.lm.model import FermiLM
 from askphysics.lm.train import train_tokenizer
 from askphysics.models import Classification, KnownValue, Plan
+from askphysics.normalize import normalize_question
+from askphysics.pipeline import Pipeline, compute, sanity_check
+from askphysics.retrieval.keyword import KeywordRetriever
+from askphysics.solver.units import Quantity, quantity
+
+OPENSTAX = Path(__file__).resolve().parents[1] / "third_party" / "openstax-physics"
 
 
 def _plan(**changes: object) -> Plan:
@@ -128,6 +143,8 @@ def test_the_router_retries_in_the_eval(store: DataStore, dataset: Path) -> None
 
 
 def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
+    real = tmp_path / "real.jsonl"
+    real.write_text((OPENSTAX / "real_eval.jsonl").read_text().splitlines()[0] + "\n")
     tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
     save_model(FermiLM(LUNA), tokenizer, tmp_path / "luna")
     r = CliRunner().invoke(
@@ -145,12 +162,18 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
             "1",
             "--device",
             "cpu",
+            "--attempts",
+            "1",
+            "--real",
+            str(real),
         ],
     )
     assert r.exit_code == 0, r.output
     assert "valid plan" in r.output
     assert "confidently wrong" in r.output
-    assert json.loads((tmp_path / "luna" / "eval.json").read_text())["plan_examples"] == 1
+    assert "1 real textbook questions" in r.output
+    report = json.loads((tmp_path / "luna" / "eval.json").read_text())
+    assert report["plan_examples"] == 1 and report["real"]["questions"] == 1
     r = CliRunner().invoke(cli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
     assert r.exit_code == 1
 
@@ -191,3 +214,138 @@ def test_the_eval_never_counts_an_impossible_answer(store: DataStore) -> None:
         ),
     )
     assert flagged.plan is not None and flagged.possible and not flagged.passed
+
+
+# --------------------------------------------------------------------------- real questions
+
+_OPTION = re.compile(
+    r"(-?\s?\d{1,3}(?:,\s?\d{3})+(?:\.\d+)?|-?\s?\d+(?:\.\d+)?)(?:\s*x\s*10\^(-?\d+))?"
+    r"\s*([A-Za-z][A-Za-z/^\-\d ]*?)?\s*(?:[,.]|$|or)"
+)
+
+
+def _option(text: str) -> Quantity | None:
+    """The first quantity in a book's answer option: "1.2 x 10^-4 N, and ..." is 1.2e-4 N."""
+    match = _OPTION.search(text)
+    if match is None:
+        return None
+    value = float(re.sub(r"[,\s]", "", match.group(1))) * 10 ** int(match.group(2) or 0)
+    try:
+        return quantity(value, (match.group(3) or "").strip() or "dimensionless")
+    except Exception:  # an option that is a sentence, not a quantity
+        return None
+
+
+def _distance(got: Quantity, option: Quantity | None, signed: bool) -> float:
+    """How far apart two quantities are, as |log ratio|; inf if they can't be compared."""
+    if option is None:
+        return math.inf
+    try:
+        x, y = float(got.to(option.units).magnitude), float(option.magnitude)
+    except pint.DimensionalityError:
+        return math.inf
+    if not signed:  # the book often gives a magnitude for a signed answer
+        x, y = abs(x), abs(y)
+    if x == 0 or y == 0 or (x > 0) != (y > 0):
+        return math.inf
+    return abs(math.log(x / y))
+
+
+def _real_rows() -> list[dict[str, Any]]:
+    lines = (OPENSTAX / "real_eval.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines]
+
+
+def test_every_gold_plan_picks_the_books_answer(store: DataStore) -> None:
+    """Each gold plan's answer is within 5% of the book's answer and of no other option.
+
+    5%, not 2%: the book rounds to two figures (225 V printed as 2.3 x 10^2 V).
+    """
+    rows = _real_rows()
+    assert len(rows) >= 40
+    book = {
+        q["id"]: q for q in map(json.loads, (OPENSTAX / "questions.jsonl").read_text().splitlines())
+    }
+    for row in rows:
+        source = book[row["id"]]
+        assert (row["question"], row["options"]) == (source["text"], source["options"])
+        result = compute(Plan.model_validate(row["plan"]), data=store)
+        got = quantity(result.value, result.unit)
+        options = [_option(o) for o in row["options"]]
+        for signed in (True, False):
+            near = sorted(range(len(options)), key=lambda i: _distance(got, options[i], signed))
+            if _distance(got, options[near[0]], signed) < math.log(1.05):
+                break
+        assert "abcd"[near[0]] == row["answer"], (row["id"], got, row["options"])
+        assert _distance(got, options[near[0]], signed) < math.log(1.05), row["id"]
+        assert _distance(got, options[near[1]], signed) >= math.log(1.05), row["id"]
+
+
+def test_gold_plans_pass_the_sanity_checks_ask_runs(store: DataStore) -> None:
+    """A right plan is never refused, and only a few are flagged (light's speed is far
+    outside a speed's everyday range; "deuterium (2 H)" reads as 2 henries)."""
+    flagged = []
+    for row in _real_rows():
+        p = Plan.model_validate(row["plan"])
+        question = normalize_question(row["question"])
+        report = sanity_check(p, compute(p, data=store), data=store, question=question)
+        assert report.possible, row["id"]
+        if not report.passed:
+            flagged.append(row["id"])
+    assert len(flagged) <= 3, flagged
+
+
+class _Scripted:
+    """Calls every question standard and plans it with the plan it was given."""
+
+    name = "scripted"
+
+    def __init__(self, plans: dict[str, Plan]) -> None:
+        self.plans = plans
+
+    def complete_json(self, *, system: str, user: str, schema: type[Any]) -> Any:
+        if schema is Classification:
+            return Classification(category="standard", reasoning="All values are given.")
+        return self.plans[json.loads(user)["question"]]
+
+    def complete_text(self, *, system: str, user: str) -> str:
+        return ""
+
+
+def _solve(store: DataStore, plans: dict[str, Plan]) -> Pipeline:
+    client = _Scripted({normalize_question(q): p for q, p in plans.items()})
+    return Pipeline(
+        llm=client,
+        retriever=KeywordRetriever(store.equations.values(), store.examples.values()),
+        data=store,
+        settings=Settings(),
+        roster=Roster(classify=client, plan=(client,), explain=client),
+    )
+
+
+def test_a_perfect_planner_is_held_back_only_by_retrieval(store: DataStore) -> None:
+    questions = read_real_questions(OPENSTAX / "real_eval.jsonl")
+    pipeline = _solve(store, {q.question: q.plan for q in questions})
+    report = evaluate_real(pipeline.solve, questions, store)
+    assert report.questions == len(questions) and report.standard_rate == 1.0
+    assert report.right_rate == report.retrieved_rate > 0.8
+    assert report.confidently_wrong_rate == 0.0
+    assert {m["stage"] for m in report.misses} <= {"retrieve"}
+
+
+def test_a_wrong_number_is_a_miss_with_its_stage(store: DataStore) -> None:
+    question = "A car starts from rest and accelerates at 2 m/s^2 for 10 s. What is its speed?"
+    gold = _plan()
+    wrong = _plan(
+        known_values=[
+            KnownValue(symbol="v0", value=0, unit="m/s", origin="assumption"),
+            KnownValue(symbol="a", value=2, unit="m/s^2", origin="given"),
+            KnownValue(symbol="t", value=1, unit="s", origin="given"),
+        ]
+    )
+    pipeline = _solve(store, {question: wrong})
+    report = evaluate_real(pipeline.solve, [RealQuestion("q1", question, gold)], store)
+    assert report.right_rate == 0.0 and report.retrieved_rate == 1.0
+    assert report.flagged_wrong_rate == 1.0  # "10 s" went unused, so it was flagged
+    assert report.misses[0]["stage"] == "wrong, flagged"
+    assert report.misses[0]["got"].endswith("t=1 s")

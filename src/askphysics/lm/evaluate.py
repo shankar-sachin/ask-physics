@@ -11,6 +11,10 @@ Plans are also run through the router the way ``askphysics ask`` runs them
 right answer, a wrong answer the sanity checks flag, and a wrong answer that
 passes every check. The last, "confidently wrong", is the number that decides
 whether an answer can be trusted, and it should be as close to zero as possible.
+
+``evaluate_real`` asks real textbook questions (OpenStax *Physics*, ADR-016) through the
+whole pipeline, exactly as ``askphysics ask`` would, and scores the answers against gold
+plans the project wrote. The factory never saw these phrasings.
 """
 
 from __future__ import annotations
@@ -18,9 +22,10 @@ from __future__ import annotations
 import json
 import math
 import random
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pint
 
@@ -33,6 +38,9 @@ from askphysics.lm.tokenizer import CLASSIFY, END, PLAN
 from askphysics.models import Classification, Plan
 from askphysics.pipeline import compute, sanity_check
 from askphysics.solver.units import Quantity, quantity
+
+if TYPE_CHECKING:
+    from askphysics.pipeline import Solved
 
 REL_TOLERANCE = 1e-6  # plans copy numbers exactly, so a right plan gives the same answer
 
@@ -49,7 +57,10 @@ class PlanScore:
 
 @dataclass
 class EvalReport:
-    """Accuracies over ``classify`` and ``plan`` examples, plus a few failures to read."""
+    """Accuracies over ``classify`` and ``plan`` examples, plus a few failures to read.
+
+    ``real`` is the real-question eval (``RealReport``), when it was run.
+    """
 
     classify_examples: int = 0
     category_accuracy: float = 0.0
@@ -65,6 +76,7 @@ class EvalReport:
     mean_tries: float = 0.0
     failures: list[dict[str, Any]] = field(default_factory=list)
     confidently_wrong: list[dict[str, Any]] = field(default_factory=list)
+    real: dict[str, Any] | None = None
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2)
@@ -291,3 +303,104 @@ def _summary(p: Plan) -> str:
     """A plan in one line: "kin_v_at -> v from v0=0 m/s, a=9.8 m/s^2"."""
     knowns = ", ".join(f"{k.symbol}={format_number(k.value)} {k.unit}" for k in p.known_values)
     return f"{'+'.join(p.equation_ids)} -> {p.target} from {knowns}"
+
+
+# --------------------------------------------------------------------------- real questions
+
+
+@dataclass(frozen=True)
+class RealQuestion:
+    """A question from a textbook, with the plan the project wrote to answer it."""
+
+    id: str
+    question: str
+    plan: Plan  # the gold plan
+
+
+def read_real_questions(path: Path) -> list[RealQuestion]:
+    """The questions in a real-question file (``third_party/openstax-physics/real_eval.jsonl``)."""
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            row = json.loads(line)
+            out.append(RealQuestion(row["id"], row["question"], Plan.model_validate(row["plan"])))
+    return out
+
+
+@dataclass
+class RealReport:
+    """How the pipeline answers real questions, and where the misses stop.
+
+    Every question is standard, and its gold plan's equations are all in the database, so
+    each stage has a right answer: classify as standard, retrieve every gold equation, and
+    answer with the gold value.
+    """
+
+    questions: int = 0
+    standard_rate: float = 0.0  # classified standard: not refused, not a Fermi estimate
+    retrieved_rate: float = 0.0  # the planner was shown every gold equation
+    right_rate: float = 0.0  # the answer ``ask`` gives is the gold answer
+    flagged_wrong_rate: float = 0.0  # no answer, or a wrong one the sanity checks flag
+    confidently_wrong_rate: float = 0.0  # wrong, and every check passed
+    misses: list[dict[str, Any]] = field(default_factory=list)
+
+
+def evaluate_real(
+    solve: Callable[[str], Solved],
+    questions: Sequence[RealQuestion],
+    store: DataStore,
+    *,
+    on_progress: Callable[[int], None] | None = None,
+) -> RealReport:
+    """Run each question through ``solve`` (``Pipeline.solve``) and score the answer.
+
+    A miss records the first stage that went wrong, so the report says whether real
+    phrasing trips the classifier, retrieval, or the planner.
+    """
+    report = RealReport(questions=len(questions))
+    hits = {"standard": 0, "retrieved": 0, "right": 0, "flagged": 0, "confident": 0}
+    for done, q in enumerate(questions, start=1):
+        solved = solve(q.question)
+        standard = solved.classification.category == "standard"
+        shown = set(solved.retrieval.equation_ids) if solved.retrieval else set()
+        retrieved = set(q.plan.equation_ids) <= shown
+        attempt = solved.attempt
+        got = quantity(attempt.result.value, attempt.result.unit) if attempt else None
+        want = _answer(q.plan, store)
+        right = got is not None and want is not None and _same_quantity(got, want)
+        hits["standard"] += standard
+        hits["retrieved"] += retrieved
+        if right:
+            hits["right"] += 1
+        elif attempt is not None and attempt.sanity.passed:
+            hits["confident"] += 1
+        else:
+            hits["flagged"] += 1
+        if not right:
+            if not standard:
+                stage = f"classified {solved.classification.category}"
+            elif not retrieved:
+                stage = "retrieve"
+            elif attempt is None:
+                stage = solved.failed_stage or "plan"
+            else:
+                stage = "confidently wrong" if attempt.sanity.passed else "wrong, flagged"
+            report.misses.append(
+                {
+                    "id": q.id,
+                    "question": q.question,
+                    "stage": stage,
+                    "expected": _summary(q.plan),
+                    "got": _summary(attempt.plan) if attempt else "-",
+                }
+            )
+        if on_progress:
+            on_progress(done)
+    if questions:
+        n = len(questions)
+        report.standard_rate = hits["standard"] / n
+        report.retrieved_rate = hits["retrieved"] / n
+        report.right_rate = hits["right"] / n
+        report.flagged_wrong_rate = hits["flagged"] / n
+        report.confidently_wrong_rate = hits["confident"] / n
+    return report

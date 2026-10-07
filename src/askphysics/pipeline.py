@@ -16,7 +16,7 @@ import contextlib
 import json
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 import pint
@@ -650,55 +650,36 @@ class Pipeline:
         The question is normalized first ("2,000-kg", "m/s²", powers of ten become forms the
         decoder reads), so every stage, and the answer card, see the same text.
         """
-        question = Question(text=normalize_question(text))
-        stages = self.stages
-        caveats: list[str] = []
-        models: dict[str, str] = {}
+        solved = self.solve(text)
+        question, classification = solved.question, solved.classification
 
         def finish(answer: Answer, attempts: int = 0) -> Answer:
             return answer.model_copy(
                 update={
-                    "caveats": [*caveats, *answer.caveats],
-                    "models": {**models, **answer.models},
+                    "caveats": [*solved.caveats, *answer.caveats],
+                    "models": {**solved.models, **answer.models},
                     "plan_attempts": attempts,
                 }
             )
 
-        try:
-            classification = classify(question, llm=stages.classify)
-            models["classify"] = client_name(stages.classify)
-        except AskPhysicsError as exc:
-            classification = Classification(
-                category="standard", reasoning="Classifier unavailable; assumed standard."
-            )
-            caveats.append(f"classify stage failed ({exc}); assumed a standard question")
-
         if classification.category == "out_of_scope":
             return finish(refuse(question, classification))
-
-        try:
-            retrieval = retrieve(
-                question, classification, self.settings.top_k, retriever=self.retriever
-            )
-        except AskPhysicsError as exc:
-            return finish(degraded(question, classification, "retrieve", exc))
-
-        attempted = self._plan_and_compute(question, retrieval, classification, stages.plan)
-        if isinstance(attempted, _Failure):
-            if attempted.attempts > 1:
-                caveats.append(
-                    f"All {attempted.attempts} plan attempts failed; the last one is below."
+        attempted = solved.attempt
+        if attempted is None or solved.retrieval is None:
+            failure = solved.outcome if isinstance(solved.outcome, _Failure) else _NO_ATTEMPT
+            if failure.attempts > 1:
+                solved.caveats.append(
+                    f"All {failure.attempts} plan attempts failed; the last one is below."
                 )
-            failed = degraded(question, classification, attempted.stage, attempted.error)
-            return finish(failed, attempted.attempts)
-        the_plan, result, sanity, attempts, planner = attempted
-        models["plan"] = planner
+            failed = degraded(question, classification, failure.stage, failure.error)
+            return finish(failed, failure.attempts)
+        the_plan, result, sanity, attempts, _ = attempted
 
         if classification.category == "fermi":
             try:
                 propagate_range(result.symbolic_solution, {})
             except NotImplementedError:
-                caveats.append(
+                solved.caveats.append(
                     "Range propagation is not implemented yet (v0.7); point estimate only."
                 )
 
@@ -707,12 +688,44 @@ class Pipeline:
             the_plan,
             result,
             sanity,
-            retrieval=retrieval,
+            retrieval=solved.retrieval,
             classification=classification,
-            llm=stages.explain,
+            llm=self.stages.explain,
             data=self.data,
         )
         return finish(answer, attempts)
+
+    def solve(self, text: str) -> Solved:
+        """Stages 1 to 5 for one question: everything ``run`` does except the explanation.
+
+        The real-question eval scores this, so it measures exactly what ``ask`` answers.
+        """
+        question = Question(text=normalize_question(text))
+        stages = self.stages
+        solved = Solved(question=question)
+        try:
+            solved.classification = classify(question, llm=stages.classify)
+            solved.models["classify"] = client_name(stages.classify)
+        except AskPhysicsError as exc:
+            solved.caveats.append(f"classify stage failed ({exc}); assumed a standard question")
+
+        if solved.classification.category == "out_of_scope":
+            return solved
+
+        try:
+            solved.retrieval = retrieve(
+                question, solved.classification, self.settings.top_k, retriever=self.retriever
+            )
+        except AskPhysicsError as exc:
+            solved.outcome = _Failure("retrieve", exc, 0)
+            return solved
+
+        solved.outcome = self._plan_and_compute(
+            question, solved.retrieval, solved.classification, stages.plan
+        )
+        if isinstance(solved.outcome, _Attempt):
+            solved.models["plan"] = solved.outcome.planner
+        return solved
 
     def _plan_and_compute(
         self,
@@ -731,7 +744,7 @@ class Pipeline:
         shown as an answer.
         """
         flagged: _Attempt | None = None
-        failure = _Failure("plan", PlanValidationError("no plan attempts were made"), 0)
+        failure = _NO_ATTEMPT
         for attempt, planner in enumerate(planners):
             try:
                 p = plan(
@@ -776,3 +789,32 @@ class _Failure(NamedTuple):
     stage: str
     error: BaseException
     attempts: int
+
+
+_NO_ATTEMPT = _Failure("plan", PlanValidationError("no plan attempts were made"), 0)
+
+
+@dataclass
+class Solved:
+    """What stages 1 to 5 made of a question (``Pipeline.solve``)."""
+
+    question: Question
+    classification: Classification = field(
+        default_factory=lambda: Classification(
+            category="standard", reasoning="Classifier unavailable; assumed standard."
+        )
+    )
+    retrieval: RetrievalResult | None = None  # None when refused or nothing matched
+    outcome: _Attempt | _Failure | None = None  # None when refused
+    caveats: list[str] = field(default_factory=list)
+    models: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def attempt(self) -> _Attempt | None:
+        """The accepted plan, its result, and its sanity report, if any plan computed."""
+        return self.outcome if isinstance(self.outcome, _Attempt) else None
+
+    @property
+    def failed_stage(self) -> str | None:
+        """The stage that stopped the question ("retrieve", "plan", ...), if one did."""
+        return self.outcome.stage if isinstance(self.outcome, _Failure) else None

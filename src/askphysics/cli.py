@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import typer
 from rich.table import Table
@@ -25,6 +25,12 @@ from askphysics.ui import (
     tolerate_narrow_encodings,
     training_progress,
 )
+
+if TYPE_CHECKING:
+    from askphysics.lm.evaluate import RealReport
+
+# OpenStax Physics questions with project-written gold plans (ADR-016), in a checkout.
+REAL_QUESTIONS = Path("third_party/openstax-physics/real_eval.jsonl")
 
 app = typer.Typer(
     name="askphysics",
@@ -332,14 +338,24 @@ def eval_cmd(
     attempts: Annotated[
         int, typer.Option(min=1, help="Plan attempts per question, as `ask` makes them.")
     ] = Settings().plan_attempts,
+    real: Annotated[
+        Path,
+        typer.Option(help="Real textbook questions with gold plans; skipped if missing."),
+    ] = REAL_QUESTIONS,
 ) -> None:
     """Score a model on held-out questions: right category, plans that compute right, and
-    how often the answer `ask` would give is wrong while passing every check."""
+    how often the answer `ask` would give is wrong while passing every check. Then ask the
+    real textbook questions through the whole pipeline, the model doing every stage."""
     from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 
     from askphysics.lm.checkpoints import default_model_dir, load_model
     from askphysics.lm.device import select_device
-    from askphysics.lm.evaluate import evaluate_tasks, sample_examples
+    from askphysics.lm.evaluate import (
+        evaluate_real,
+        evaluate_tasks,
+        read_real_questions,
+        sample_examples,
+    )
     from askphysics.lm.factory import read_examples
     from askphysics.lm.generate import Decoder
 
@@ -367,6 +383,35 @@ def eval_cmd(
             attempts=attempts,
             on_progress=lambda n: progress.update(task, completed=n),
         )
+    real_report = None
+    if real.exists():
+        from askphysics.llm.base import Roster
+        from askphysics.llm.fermi_client import FermiClient
+        from askphysics.retrieval.keyword import KeywordRetriever
+
+        questions = read_real_questions(real)
+        client = FermiClient(model, store, directory=model_dir, decoder=decoder)
+        pipeline = Pipeline(
+            llm=client,
+            retriever=KeywordRetriever(store.equations.values(), store.examples.values()),
+            data=store,
+            settings=Settings(),
+            roster=Roster(classify=client, plan=(client,) * attempts, explain=client),
+        )
+        with Progress(
+            TextColumn(f"[brand]asking {model} real questions"),
+            BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
+            MofNCompleteColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("real", total=len(questions))
+            real_report = evaluate_real(
+                pipeline.solve,
+                questions,
+                store,
+                on_progress=lambda n: progress.update(task, completed=n),
+            )
+        report.real = asdict(real_report)
     (model_dir / "eval.json").write_text(report.to_json(), encoding="utf-8")
 
     table = Table(
@@ -402,7 +447,31 @@ def eval_cmd(
         console.print(f"  [muted]{f['task']} miss:[/] {safe(f['question'])}")
         console.print(f"    [muted]expected[/] {safe(str(f['expected']))}")
         console.print(f"    [muted]got     [/] {safe(str(f['got']))}")
+    if real_report is not None:
+        _show_real(model, real_report, real)
     console.print(f"[ok]✓[/] full report in {safe(str(model_dir / 'eval.json'))}")
+
+
+def _show_real(model: str, report: RealReport, path: Path) -> None:
+    table = Table(
+        title=Text(f"{model} on {report.questions} real textbook questions", style="brand"),
+        title_justify="left",
+        border_style="muted",
+        header_style="label",
+    )
+    table.add_column("check")
+    table.add_column("score", justify="right")
+    table.add_row("classified standard", f"{report.standard_rate:.1%}")
+    table.add_row("right equations retrieved", f"{report.retrieved_rate:.1%}")
+    table.add_row("[accent]right answer as ask gives it[/]", f"{report.right_rate:.1%}")
+    table.add_row("no answer, or wrong but flagged", f"{report.flagged_wrong_rate:.1%}")
+    table.add_row("[bad]confidently wrong[/]", f"{report.confidently_wrong_rate:.1%}")
+    console.print(table)
+    for miss in report.misses[:5]:
+        console.print(f"  [muted]{safe(miss['stage'])}:[/] {safe(miss['question'])}")
+        console.print(f"    [muted]expected[/] {safe(miss['expected'])}")
+        console.print(f"    [muted]got     [/] {safe(miss['got'])}")
+    console.print(f"  [muted]questions from {safe(str(path))} (OpenStax Physics, CC BY 4.0)[/]")
 
 
 @model_app.command("pull")
