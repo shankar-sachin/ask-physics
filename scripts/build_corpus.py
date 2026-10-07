@@ -68,6 +68,11 @@ def citation(text: str) -> bool:
     return bool(_YEAR.search(text)) and len(_INITIALS.findall(text)) >= 2
 
 
+def progress(message: str) -> None:
+    """One line of progress on stderr, so a long, quiet step never looks frozen."""
+    print(message, file=sys.stderr, flush=True)
+
+
 def _key(text: str) -> str:
     return hashlib.sha256(re.sub(r"\W+", "", text.lower()).encode()).hexdigest()
 
@@ -109,14 +114,16 @@ def openstax_books(
     entries: list[dict[str, Any]], cache: Path
 ) -> Iterator[tuple[str, str, str, str]]:
     """(source id, title, paragraph, license text) for every pinned OpenStax book."""
-    for entry in entries:
+    for i, entry in enumerate(entries, 1):
         name = entry["repo"].split("/")[-1]
         source = cache / "openstax" / f"{name}@{entry['commit'][:12]}"
         if not (source / "LICENSE").exists():
+            progress(f"[OpenStax {i}/{len(entries)}] downloading {entry['repo']}")
             openstax.clone(source, f"https://github.com/{entry['repo']}.git", entry["commit"])
         collections = [f"collections/{b['collection']}" for b in entry["books"]]
         license_text = openstax.verify_cc_by(source, collections)
         for b, collection in zip(entry["books"], collections, strict=True):
+            progress(f"[OpenStax {i}/{len(entries)}] reading {b['title']}")
             for _, _, text in openstax.book(source, collection):
                 yield f"openstax:{b['slug']}", b["title"], text, license_text
 
@@ -127,7 +134,8 @@ def gutenberg_books(
     """Selected public-domain books and their downloaded files, in selection order."""
     if catalog is None:
         catalog = cache / "gutenberg" / "pg_catalog.csv"
-        if not offline:
+        if not offline and not catalog.exists():
+            progress("[Gutenberg] downloading the catalog")
             gutenberg.fetch(gutenberg.CATALOG_URL, catalog, delay=0)
     if not catalog.exists():
         print("no Gutenberg catalog; skipping public-domain books", file=sys.stderr)
@@ -138,11 +146,13 @@ def gutenberg_books(
         spec["latest_death"],
         spec.get("exclude_subjects", ()),
     )
+    progress(f"[Gutenberg] {len(books):,} public-domain books qualify; taking them in order")
     for book in books:
         path = cache / "gutenberg" / f"pg{book.id}.txt"
         if not path.exists():
             if offline:
                 continue
+            progress(f"[Gutenberg] downloading #{book.id} {book.title[:70]}")
             try:
                 gutenberg.fetch(gutenberg.TEXT_URL.format(id=book.id), path, delay=delay)
             except OSError as exc:
@@ -172,6 +182,7 @@ def build(
         for source, title, text, terms in openstax_books(spec["openstax"], cache):
             corpus.add(source, title, text)
             cc_by = terms
+        progress(f"[OpenStax] done: {corpus.words:,} words")
         lock["openstax"] = [{"repo": e["repo"], "commit": e["commit"]} for e in spec["openstax"]]
         pd = spec.get("gutenberg")
         if pd:
@@ -189,6 +200,7 @@ def build(
                     corpus.add(f"gutenberg:{book.id}", book.title, paragraph)
                 if corpus.words == before:
                     continue  # nothing new: every paragraph was already in
+                progress(f"[Gutenberg] {corpus.words:,} of {target:,} words")
                 lock["gutenberg"].append(
                     {
                         "id": book.id,

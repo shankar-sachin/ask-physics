@@ -113,6 +113,18 @@ def test_builds_a_deduplicated_attributed_corpus(
     assert (out / "LICENSE-CC-BY-4.0.txt").read_text().startswith("Attribution 4.0")
 
 
+def test_every_step_reports_progress(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Reading and downloading take minutes with nothing else printed; silence looks frozen.
+    cache = _cache(tmp_path / "cache")
+    build_corpus.build(
+        _sources(tmp_path / "s.json", 10_000), tmp_path / "out", cache,
+        catalog=cache / "gutenberg" / "pg_catalog.csv", offline=True, delay=0,
+    )  # fmt: skip
+    err = capsys.readouterr().err
+    assert "[OpenStax 1/1] reading" in err and "[OpenStax] done" in err
+    assert "[Gutenberg]" in err and "words" in err
+
+
 def test_stops_adding_books_at_the_word_target(tmp_path: Path) -> None:
     cache = _cache(tmp_path / "cache")
     lock = build_corpus.build(

@@ -132,7 +132,11 @@ def clone(dest: Path, repo: str = REPO, commit: str = COMMIT) -> Path:
     subprocess.run(
         [*git, "fetch", "-q", "--depth", "1", "--filter=blob:none", repo, commit], check=True
     )
-    subprocess.run([*git, "checkout", "-q", "FETCH_HEAD"], check=True)
+    # The checkout fetches the files lazily, and git prints the server's progress for each
+    # batch; keep it unless something fails.
+    done = subprocess.run([*git, "checkout", "-q", "FETCH_HEAD"], capture_output=True, text=True)
+    if done.returncode != 0:
+        raise SystemExit(f"git checkout of {repo} at {commit} failed:\n{done.stderr}")
     return dest
 
 
