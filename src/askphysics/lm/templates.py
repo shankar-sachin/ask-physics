@@ -84,10 +84,14 @@ FRIENDLY_RANGES: dict[str, tuple[float, float]] = {
 }
 
 # Alternative units a question may use; values are converted, the plan copies the unit as written.
+# Offset temperature scales: degrees per kelvin, for writing a temperature *change*.
+TEMPERATURE_SCALES = {"degC": 1.0, "degF": 1.8}
+
 ALT_UNITS: dict[str, tuple[str, ...]] = {
     "m": ("m", "m", "m", "cm", "km", "ft"),
     "m/s": ("m/s", "m/s", "m/s", "km/h", "mph"),
     "kg": ("kg", "kg", "kg", "g", "lb"),
+    "K": ("K", "K", "K", "K", "degC", "degC", "degF"),
     "s": ("s", "s", "s", "min"),
     "N": ("N", "N", "kN"),
     "J": ("J", "J", "kJ"),
@@ -1201,6 +1205,46 @@ STRATEGIES = (
     "Start from {eq}, then solve it for {sym}.",
     "{Eq} links the knowns to the {target}; solve it for {sym}.",
     "Substitute the givens into {eq} to get the {target}.",
+)
+
+# --------------------------------------------------------------------------- chained problems
+
+
+@dataclass(frozen=True)
+class Chain:
+    """A two-step problem: ``first`` gives ``via``, which ``then`` needs for ``target``.
+
+    The question states the values of both equations except ``via`` and ``target``, so no
+    single equation can answer it ("a 1500 kg car goes from 0 to 20 m/s in 8 s: what net
+    force?" needs the acceleration first).
+    """
+
+    first: str
+    via: str
+    then: str
+    target: str
+
+
+# Only chains no single equation in the database answers: "from rest to 20 m/s in 8 s,
+# what force?" is not here, because the impulse-momentum theorem answers it in one step,
+# and density then weight is the buoyant force's formula.
+CHAINS: tuple[Chain, ...] = (
+    Chain("newton_second_law", "a", "kin_x_at", "x"),
+    Chain("newton_second_law", "a", "kin_v_squared", "v"),
+    Chain("kin_v_squared", "v", "kinetic_energy", "KE"),
+    Chain("kin_v_squared", "v", "momentum", "p"),
+    Chain("kin_v_at", "v", "kinetic_energy", "KE"),
+    Chain("kin_v_at", "v", "momentum", "p"),
+    Chain("work_constant_force", "W", "power_work_time", "P"),
+    Chain("density", "m", "gravitational_pe", "U"),
+    Chain("density", "m", "kinetic_energy", "KE"),
+)
+
+CHAIN_STRATEGIES = (
+    "Find the {via} with {first}, then use it in {then} to get the {target}.",
+    "First solve {first} for {via_sym}; then {then} gives {sym}.",
+    "Get {via_sym} from {first}, then put it into {then} and solve for {sym}.",
+    "Two steps: {first} gives the {via}, and {then} turns it into the {target}.",
 )
 
 # --------------------------------------------------------------------------- Fermi questions

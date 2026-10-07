@@ -5,8 +5,9 @@ import torch
 
 from askphysics.data.loader import DataStore
 from askphysics.errors import LLMError
+from askphysics.lm import templates as tpl
 from askphysics.lm.config import LUNA, ModelConfig
-from askphysics.lm.factory import DataFactory
+from askphysics.lm.factory import DataFactory, Example
 from askphysics.lm.formats import (
     classify_prompt,
     explain_numbers,
@@ -45,7 +46,7 @@ from askphysics.lm.generate import (
 )
 from askphysics.lm.model import FermiLM
 from askphysics.lm.tokenizer import CLASSIFY, END, PLAN, Tokenizer
-from askphysics.models import Classification, Plan
+from askphysics.models import Classification, Plan, Variable
 from askphysics.solver.units import check_dimensions, quantity
 
 QUESTION = "How fast does a ball dropped from 20 m hit the ground?"
@@ -328,30 +329,29 @@ def test_target_is_what_the_question_leaves_open(store: DataStore) -> None:
     assert "R" not in target_options(gas, "Some gas.", consts)
 
 
-def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
-    factory = DataFactory(store, seed=4)
-    checked = 0
-    for e in factory.examples(1500):
-        if e.task != "plan":
-            continue
-        payload = json.loads(e.prompt[len(PLAN) :])
-        gold = Plan.model_validate_json(e.target[: -len(END)])
-        eqs = [store.equations[x["id"]] for x in payload["equations"]]
-        consts = relevant_constants(eqs, [store.constants[c["name"]] for c in payload["constants"]])
-        variables = {v.symbol: v for v in store.equations[gold.equation_ids[0]].variables}
-        q = payload["question"]
-        assert gold.equation_ids[0] in equation_options(eqs, q), q
-        assert gold.target in target_options(list(variables.values()), q, consts), q
-        assert set(gold.assumptions) <= set(
-            assumption_options([eq_gold := store.equations[gold.equation_ids[0]]])
-        ), (q, eq_gold.id)
-        gold_by_symbol = {k.symbol: k for k in gold.known_values}
-        order = [s for s in variables if s not in gold.unknowns]
-        unused = stated_quantities(q)
-        locks = quantity_locks(q, list(variables.values()))
-        for i, symbol in enumerate(order):  # in the order the decoder writes them
-            k = gold_by_symbol[symbol]
-            options = locked_options(
+def _assert_decodable(store: DataStore, e: Example) -> None:
+    """The decoder's constraints allow every choice the gold plan makes, in its order."""
+    payload = json.loads(e.prompt[len(PLAN) :])
+    gold = Plan.model_validate_json(e.target[: -len(END)])
+    eqs = [store.equations[x["id"]] for x in payload["equations"]]
+    consts = relevant_constants(eqs, [store.constants[c["name"]] for c in payload["constants"]])
+    cited = [store.equations[i] for i in gold.equation_ids]
+    variables: dict[str, Variable] = {}
+    for eq in cited:  # merged the way decode_plan merges them
+        for v in eq.variables:
+            variables.setdefault(v.symbol, v)
+    q = payload["question"]
+    assert gold.equation_ids[0] in equation_options(eqs, q), q
+    assert gold.target in target_options(list(variables.values()), q, consts), q
+    assert set(gold.assumptions) <= set(assumption_options(cited)), q
+    gold_by_symbol = {k.symbol: k for k in gold.known_values}
+    order = [s for s in variables if s not in gold.unknowns]
+    unused = stated_quantities(q)
+    locks = quantity_locks(q, list(variables.values()))
+    for i, symbol in enumerate(order):  # in the order the decoder writes them
+        k = gold_by_symbol[symbol]
+        options = ordered_options(
+            locked_options(
                 assignable_options(
                     known_value_options(variables[symbol], q, consts),
                     variables[symbol],
@@ -362,13 +362,42 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
                 locks,
                 unused,
                 order[i:],
-            )
-            key = (format_number(k.value), k.unit, k.origin)
-            assert any((o.number, o.unit, o.origin) == key for o in options), (q, k)
-            if k.origin == "given":
-                unused.remove(key[:2])
-        checked += 1
+            ),
+            symbol,
+            locks,
+            unused,
+            order[i:],
+        )
+        key = (format_number(k.value), k.unit, k.origin)
+        assert any((o.number, o.unit, o.origin) == key for o in options), (q, k)
+        if k.origin == "given":
+            unused.remove(key[:2])
+
+
+def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
+    factory = DataFactory(store, seed=4)
+    checked = 0
+    for e in factory.examples(1500):
+        if e.task == "plan":
+            _assert_decodable(store, e)
+            checked += 1
     assert checked > 400
+
+
+def test_chained_gold_plans_fit_the_constraints(store: DataStore) -> None:
+    factory = DataFactory(store, seed=5)
+    for chain in tpl.CHAINS:
+        made = 0
+        for _ in range(60):
+            p = factory.chained_problem(chain)
+            if p is None:
+                continue
+            prompt = plan_prompt(p.question, "standard", p.retrieved, p.constants)
+            _assert_decodable(
+                store, Example("plan", "train", p.template, prompt, serialize_plan(p.plan))
+            )
+            made += 1
+        assert made >= 10, chain
 
 
 def test_each_stated_quantity_fills_one_slot(store: DataStore) -> None:
@@ -547,3 +576,25 @@ def test_the_first_value_stated_goes_to_the_first_of_a_pair() -> None:
     assert ordered_options(options, "v1", {"v2": ("31", "mph")}, unused, ["v1", "v2"]) == options
     assert ordered_options(options, "v2", {}, unused, ["v2"]) == options
     assert ordered_options(options, "vf", {}, unused, ["vf"]) == options
+
+
+def test_a_unitless_variable_needs_a_value_or_an_ask(store: DataStore) -> None:
+    eqs = [store.equations["stefan_boltzmann"], store.equations["stefan_boltzmann_emissivity"]]
+    # solem once filled the emissivity with the area's 1200.
+    q = "I need the power radiated. I know the area is 1200 cm^2; the temperature is 610 kelvin."
+    assert equation_options(eqs, q) == ["stefan_boltzmann"]
+    q = "A 2 m^2 panel at 350 K radiates 40 W. What is its emissivity?"
+    assert equation_options(eqs, q) == ["stefan_boltzmann_emissivity"]
+
+
+def test_how_strongly_asks_for_a_force(store: DataStore) -> None:
+    eqs = [store.equations["newton_gravitation"], store.equations["gravitational_pe_universal"]]
+    q = "Two boulders of 2500 kg and 1900 kg sit 24 m apart. How strongly do they attract?"
+    assert equation_options(eqs, q) == ["newton_gravitation"]
+
+
+def test_a_chain_starts_from_the_equation_with_the_ask(store: DataStore) -> None:
+    eqs = [store.equations["impulse_momentum"], store.equations["kin_x_at"],
+           store.equations["newton_second_law"]]  # fmt: skip
+    q = "A 3 kg cart starts at 2 m/s and is pushed with 12 N for 4 s. Work out x."
+    assert equation_options(eqs, q) == ["kin_x_at"]

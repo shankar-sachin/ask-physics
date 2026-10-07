@@ -57,6 +57,12 @@ class Variable(_Model):
             raise ValueError(f"typical_range low {v[0]} is greater than high {v[1]}")
         return v
 
+    @property
+    def is_change(self) -> bool:
+        """Whether this is a change or difference in something ("temperature change")."""
+        name = self.name.lower()
+        return "change" in name or "difference" in name
+
 
 class Equation(_Model):
     id: str = Field(pattern=ID_PATTERN)
@@ -210,6 +216,16 @@ class Plan(_Model):
         return self
 
 
+class ComputeStep(_Model):
+    """One equation solved on the way to the answer: "a = 2.5 m/s^2 from kin_v_at"."""
+
+    equation_id: str
+    symbol: str
+    value: float
+    unit: str
+    symbolic_solution: str
+
+
 class ComputeResult(_Model):
     target: str
     value: float
@@ -217,6 +233,9 @@ class ComputeResult(_Model):
     symbolic_solution: str
     substitutions: dict[str, str]
     notes: list[str] = Field(default_factory=list)
+    # Every equation solved, in order; the last step is the answer. One step for a
+    # single-equation plan.
+    steps: list[ComputeStep] = Field(default_factory=list)
 
 
 class SanityReport(_Model):
@@ -275,6 +294,8 @@ class Answer(_Model):
     value_range: ValueRange | None = None
     equations_used: list[EquationRef] = Field(default_factory=list)
     inputs: list[KnownValue] = Field(default_factory=list)
+    # Values found along the way when the plan chains equations, in the order solved.
+    steps: list[ComputeStep] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     confidence: Confidence
     caveats: list[str] = Field(default_factory=list)

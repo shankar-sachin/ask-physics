@@ -233,3 +233,34 @@ def test_a_flagged_plan_is_the_fallback(store: DataStore, retriever: KeywordRetr
     assert answer.plan_attempts == 3  # every attempt was spent looking for a better plan
     assert answer.confidence.score <= 0.4
     assert any("gives 2 m/s, but the plan doesn't use it" in c for c in answer.caveats)
+
+
+def test_a_chained_plan_answers_with_its_steps(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    plan = Plan.model_validate(
+        {
+            "equation_ids": ["newton_second_law", "kin_v_at"],
+            "target": "F",
+            "unknowns": ["F", "a"],
+            "known_values": [
+                {"symbol": "m", "value": 1500, "unit": "kg", "origin": "given"},
+                {"symbol": "v", "value": 20, "unit": "m/s", "origin": "given"},
+                {"symbol": "v0", "value": 0, "unit": "m/s", "origin": "assumption"},
+                {"symbol": "t", "value": 8, "unit": "s", "origin": "given"},
+            ],
+            "assumptions": ["Starts from rest"],
+            "strategy": "Find the acceleration, then the force.",
+        }
+    )
+    roster = Roster(
+        classify=FakeLLMClient(), plan=(ScriptedPlanner([plan]),), explain=FakeLLMClient()
+    )
+    answer = _pipeline(store, retriever, roster).run(
+        "A 1500 kg car accelerates from rest to 20 m/s in 8 s. What net force acts on it?"
+    )
+    assert answer.status == "answered", answer.caveats
+    assert answer.final_value == pytest.approx(3750) and answer.unit == "newton"
+    assert [(s.equation_id, s.symbol) for s in answer.steps] == [("kin_v_at", "a")]
+    assert answer.steps[0].value == pytest.approx(2.5)
+    assert {e.id for e in answer.equations_used} == {"newton_second_law", "kin_v_at"}

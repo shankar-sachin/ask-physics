@@ -24,6 +24,7 @@ from askphysics.errors import (
     AskPhysicsError,
     PlanValidationError,
     RetrievalEmptyError,
+    SolverError,
 )
 from askphysics.llm.base import LLMClient, Roster, client_name
 from askphysics.llm.fake import FakeLLMClient
@@ -36,6 +37,7 @@ from askphysics.models import (
     Category,
     Classification,
     ComputeResult,
+    ComputeStep,
     Confidence,
     Equation,
     EquationRef,
@@ -55,7 +57,14 @@ from askphysics.retrieval.base import Retriever
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.fermi import propagate_range
 from askphysics.solver.symbolic import solve_for
-from askphysics.solver.units import check_dimensions, is_valid_unit, quantity, unit_string
+from askphysics.solver.units import (
+    Quantity,
+    check_dimensions,
+    is_valid_unit,
+    quantity,
+    to_kelvin,
+    unit_string,
+)
 
 # Placeholder system prompts. The full drafts, with hardening rules, are in
 # docs/PROMPTS.md. From v0.3 the Fermi models use the task formats there instead.
@@ -208,26 +217,92 @@ def validate_plan(p: Plan, retrieval: RetrievalResult) -> None:
 def compute(p: Plan, *, data: DataStore) -> ComputeResult:
     """Stage 4: solve and evaluate with SymPy and Pint only.
 
-    v0.1 supports single-equation plans.
+    A plan with several equations is chained: any equation with exactly one value still
+    missing is solved for it, and that value feeds the next, until the target is found.
+    A symbol shared between equations must mean the same kind of quantity in each, so
+    weight W (newtons) never stands in for work W (joules).
 
     Raises:
-        SolverError, UnitError: the equation can't be solved or units don't combine.
+        SolverError: no order of the equations reaches the target, a shared symbol means
+            different quantities, or an equation can't be solved.
+        UnitError: units don't combine.
     """
-    if len(p.equation_ids) != 1:
-        # TODO: Chain multiple equations by building a dependency order over the plan's
-        # unknowns, solving intermediates first and feeding them forward (v0.4).
-        raise NotImplementedError("multi-equation plans land in v0.4")
-    equation = data.equations[p.equation_ids[0]]
-    knowns = {k.symbol: quantity(k.value, k.unit) for k in p.known_values}
-    outcome = solve_for(equation, p.target, knowns)
+    equations = [data.equations[eid] for eid in p.equation_ids]
+    _check_shared_symbols(equations)
+    variables = {v.symbol: v for eq in equations for v in eq.variables}
+    knowns = {
+        k.symbol: _substitutable(quantity(k.value, k.unit), variables.get(k.symbol))
+        for k in p.known_values
+    }
+    found = dict(knowns)
+    pending = list(equations)
+    steps: list[ComputeStep] = []
+    notes: list[str] = []
+    while p.target not in found:
+        ready = next(
+            (eq for eq in pending if len({v.symbol for v in eq.variables} - set(found)) == 1),
+            None,
+        )
+        if ready is None:
+            missing = sorted({v.symbol for eq in pending for v in eq.variables} - set(found))
+            raise SolverError(
+                f"can't reach {p.target} from the plan's values: still missing "
+                f"{', '.join(missing)} in {', '.join(eq.id for eq in pending)}"
+            )
+        symbol = next(v.symbol for v in ready.variables if v.symbol not in found)
+        used = {v.symbol: found[v.symbol] for v in ready.variables if v.symbol in found}
+        outcome = solve_for(ready, symbol, used)
+        found[symbol] = outcome.value
+        pending.remove(ready)
+        notes.extend(outcome.notes)
+        steps.append(
+            ComputeStep(
+                equation_id=ready.id,
+                symbol=symbol,
+                value=float(outcome.value.magnitude),
+                unit=unit_string(outcome.value.units),
+                symbolic_solution=outcome.symbolic_solution,
+            )
+        )
+    final = steps[-1]
+    scales = {str(quantity(k.value, k.unit).units) for k in p.known_values}
+    target_var = variables[p.target]
+    if target_var.unit == "K" and not target_var.is_change:
+        # Asked in Celsius or Fahrenheit: say the answer on that scale too.
+        for scale, symbol in (("degree_Celsius", "degC"), ("degree_Fahrenheit", "degF")):
+            if scale in scales:
+                shown = quantity(final.value, "K").to(symbol).magnitude
+                notes.append(f"That is {shown:.4g} {symbol}.")
+    substitutions = {s: f"{q.magnitude} {q.units}" for s, q in found.items() if s != p.target}
     return ComputeResult(
         target=p.target,
-        value=float(outcome.value.magnitude),
-        unit=unit_string(outcome.value.units),
-        symbolic_solution=outcome.symbolic_solution,
-        substitutions={s: f"{q.magnitude} {q.units}" for s, q in knowns.items()},
-        notes=outcome.notes,
+        value=final.value,
+        unit=final.unit,
+        symbolic_solution=final.symbolic_solution,
+        substitutions=substitutions,
+        notes=notes,
+        steps=steps,
     )
+
+
+def _substitutable(q: Quantity, variable: Variable | None) -> Quantity:
+    """``q`` ready to substitute: Celsius and Fahrenheit become kelvin, as a temperature or
+    as a change in one, by what the variable means."""
+    return to_kelvin(q, change=variable is not None and variable.is_change)
+
+
+def _check_shared_symbols(equations: Sequence[Equation]) -> None:
+    """Raise when one symbol is a different kind of quantity in two of ``equations``."""
+    seen: dict[str, tuple[Any, str]] = {}
+    for eq in equations:
+        for v in eq.variables:
+            dims = quantity(1, v.unit).dimensionality
+            if v.symbol in seen and seen[v.symbol][0] != dims:
+                raise SolverError(
+                    f"{v.symbol} means different quantities in {seen[v.symbol][1]} and "
+                    f"{eq.id}, so they can't be chained"
+                )
+            seen.setdefault(v.symbol, (dims, eq.id))
 
 
 # --------------------------------------------------------------------------- 5. sanity_check
@@ -236,7 +311,7 @@ def compute(p: Plan, *, data: DataStore) -> ComputeResult:
 def never_negative(variable: Variable) -> bool:
     """Whether ``variable`` can't be negative: a mass or a resistance, not a change in one."""
     name = variable.name.lower()
-    if "change" in name or "difference" in name:
+    if variable.is_change:
         return False
     if "temperature" in name:
         return variable.unit == "K"  # absolute temperature; degrees Celsius go negative
@@ -252,15 +327,19 @@ def sanity_check(
 
     Failures here never block the answer; they lower confidence and add caveats.
     """
-    equation = data.equations[p.equation_ids[0]]
+    equations = [data.equations[eid] for eid in p.equation_ids]
+    # The equation that produced the answer: the last one solved in a chain.
+    final_id = result.steps[-1].equation_id if result.steps else p.equation_ids[0]
+    equation = data.equations[final_id]
+    variables = {v.symbol: v for eq in equations for v in eq.variables}
     issues: list[str] = []
 
     dimensions_ok = True
     for known in p.known_values:
-        try:
-            var = equation.variable(known.symbol)
-        except KeyError:
-            issues.append(f"Known value {known.symbol!r} is not a variable of {equation.id}")
+        var = variables.get(known.symbol)
+        if var is None:
+            cited = ", ".join(p.equation_ids)
+            issues.append(f"Known value {known.symbol!r} is not a variable of {cited}")
             continue
         if not check_dimensions(quantity(known.value, known.unit), var.unit):
             dimensions_ok = False
@@ -305,13 +384,14 @@ def sanity_check(
                 f"The question gives {', '.join(unused)}, but the plan doesn't use "
                 f"{'it' if len(unused) == 1 else 'them'}"
             )
-        for twin in twins(equation, data.equations.values()):
-            if not mentions(question, own_tags(equation, twin)):
-                ambiguous = True
-                issues.append(
-                    f"The question doesn't say whether {equation.name.lower()} or "
-                    f"{twin.name.lower()} applies"
-                )
+        for eq in equations:
+            for twin in twins(eq, data.equations.values()):
+                if not mentions(question, own_tags(eq, twin)):
+                    ambiguous = True
+                    issues.append(
+                        f"The question doesn't say whether {eq.name.lower()} or "
+                        f"{twin.name.lower()} applies"
+                    )
 
     magnitude_ok: bool | None = None
     if target_var.typical_range is not None:
@@ -321,6 +401,19 @@ def sanity_check(
             issues.append(
                 f"{result.target} = {result.value:.3g} {result.unit} is outside the typical "
                 f"range {low:g} to {high:g} {target_var.unit} by more than 10x"
+            )
+    # A unitless input far outside its range was almost certainly borrowed from another
+    # quantity ("an emissivity of 1200" copied from "1200 cm^2").
+    for known in p.known_values:
+        var = variables.get(known.symbol)
+        if var is None or var.unit != "dimensionless" or var.typical_range is None:
+            continue
+        low, high = var.typical_range
+        if not low / 10 <= abs(known.value) <= high * 10:
+            magnitude_ok = False
+            issues.append(
+                f"{known.symbol} = {known.value:g} is far outside the usual range for a "
+                f"{var.name} ({low:g} to {high:g})"
             )
 
     # TODO: Call check_limit_cases(equation) once it exists and set
@@ -423,7 +516,12 @@ def explain(
         explanation = ""
     if not readable(explanation):
         explained_by = "template"
-        explanation = f"Using {', '.join(p.equation_ids)}, {result.target} = {value} {result.unit}."
+        first = "".join(
+            f"From {s.equation_id}, {s.symbol} = {_round(s.value)} {s.unit}. "
+            for s in result.steps[:-1]
+        )
+        last = result.steps[-1].equation_id if result.steps else ", ".join(p.equation_ids)
+        explanation = f"{first}Using {last}, {result.target} = {value} {result.unit}."
     return Answer(
         question=question.text,
         status="answered",
@@ -432,6 +530,7 @@ def explain(
         unit=result.unit,
         equations_used=[EquationRef(id=e.id, name=e.name) for e in equations],
         inputs=p.known_values,
+        steps=result.steps[:-1],
         assumptions=p.assumptions,
         confidence=confidence,
         caveats=caveats,

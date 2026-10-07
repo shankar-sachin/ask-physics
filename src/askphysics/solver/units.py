@@ -81,6 +81,32 @@ def convert(q: Quantity, unit: str) -> Quantity:
         raise UnitMismatchError(f"cannot convert {q.units} to {target}: {exc}") from exc
 
 
+# Temperature scales whose zero isn't absolute zero, and the unit for a change on each.
+_OFFSET_SCALES = {
+    "degree_Celsius": "delta_degree_Celsius",
+    "degree_Fahrenheit": "delta_degree_Fahrenheit",
+}
+
+
+def is_offset(q: Quantity) -> bool:
+    """Whether ``q`` is on a scale with a shifted zero (Celsius, Fahrenheit)."""
+    return str(q.units) in _OFFSET_SCALES
+
+
+def to_kelvin(q: Quantity, *, change: bool) -> Quantity:
+    """An offset temperature in kelvin, ready for the math; anything else unchanged.
+
+    The meaning decides the conversion: "water at 20 °C" is 293.15 K, but "heated by
+    20 °C" is a change of 20 K. Equations multiply and divide, which a Celsius or
+    Fahrenheit value can't do, so every one is converted before substitution.
+    """
+    if not is_offset(q):
+        return q
+    if change:
+        return ureg.Quantity(q.magnitude, _OFFSET_SCALES[str(q.units)]).to("kelvin")
+    return q.to("kelvin")
+
+
 def check_dimensions(q: Quantity, expected_unit: str) -> bool:
     """Return True if ``q`` has the same dimensionality as ``expected_unit``."""
     return bool(q.dimensionality == ureg.Quantity(1, _parse_unit(expected_unit)).dimensionality)

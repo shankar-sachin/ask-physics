@@ -32,7 +32,6 @@ from askphysics.lm.generate import Decoder, decode_classification, decode_plan
 from askphysics.lm.tokenizer import CLASSIFY, END, PLAN
 from askphysics.models import Classification, Plan
 from askphysics.pipeline import compute, sanity_check
-from askphysics.solver.symbolic import solve_for
 from askphysics.solver.units import Quantity, quantity
 
 REL_TOLERANCE = 1e-6  # plans copy numbers exactly, so a right plan gives the same answer
@@ -81,14 +80,14 @@ def _gold(target: str) -> str:
 
 
 def _answer(p: Plan, store: DataStore) -> Quantity | None:
-    """What a single-equation plan computes, or None if it can't be solved."""
-    if len(p.equation_ids) != 1 or p.equation_ids[0] not in store.equations:
+    """What a plan computes, chaining its equations if it has several; None if it can't."""
+    if not p.equation_ids or any(eid not in store.equations for eid in p.equation_ids):
         return None
     try:
-        knowns = {k.symbol: quantity(k.value, k.unit) for k in p.known_values}
-        return solve_for(store.equations[p.equation_ids[0]], p.target, knowns).value
+        result = compute(p, data=store)
     except (AskPhysicsError, ValueError, ArithmeticError):
         return None
+    return quantity(result.value, result.unit)
 
 
 def _same_quantity(a: Quantity, b: Quantity) -> bool:
