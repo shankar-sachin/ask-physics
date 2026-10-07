@@ -12,6 +12,7 @@ push to main. Generated:
 - ``Glossary.md``, from ``docs/GLOSSARY.md``, so the glossary has one source.
 
 Only the standard library is used, so the workflow needs no install.
+``scripts/wiki_site.py`` renders the same pages as HTML for the website.
 """
 
 from __future__ import annotations

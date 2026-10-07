@@ -23,6 +23,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   look-alikes, source, license) generated from the database. Pages live in
   `docs/wiki/`, `scripts/build_wiki.py` builds them, and a workflow publishes
   them on every push to main.
+- The wiki on the website: askphysics.vercel.app/wiki/ has every page of the
+  GitHub Wiki, built from the same sources, with formulas typeset by KaTeX,
+  and each equation on an answer card links to its page. The site's notes
+  about the stand-in model and its version are up to date.
 - Workflow scripts for the jobs that used to be long command chains:
   `setup.sh`, `update.sh`, `check.sh` (with a merge-conflict check),
   `corpus.sh`, `train.sh` (back up, train, score old and new, compare),

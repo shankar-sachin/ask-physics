@@ -31,6 +31,8 @@ never do arithmetic.
 - [Contributing](Contributing)
 
 Try it in your browser at [askphysics.vercel.app](https://askphysics.vercel.app), with no
-install and no account. The code is at
+install and no account. This wiki is there too, at
+[askphysics.vercel.app/wiki](https://askphysics.vercel.app/wiki/), with every formula
+typeset. The code is at
 [shankar-sachin/ask-physics](https://github.com/shankar-sachin/ask-physics) under the MIT
 license.
