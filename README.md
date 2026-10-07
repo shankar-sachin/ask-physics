@@ -240,13 +240,13 @@ Being straight about what this is right now:
   mechanics, E&M, and thermodynamics. Anything else hits a retrieval miss.
 - **Keyword retrieval is brittle.** Phrasing that shares no words with an
   equation's tags won't find it. Vector search arrives in v0.6.
-- **Single equations only.** Problems that chain two or more equations
-  degrade until v0.4.
+- **Short chains only.** Two-step problems work when the models recognize
+  them; longer chains are rarer in the training data.
 - **The Fermi models will be small.** Trained from scratch at 3M to 120M
   parameters, they'll understand phrasings close to their training data and
   stumble on weird ones. When they stumble, the answer degrades. It never
   makes shit up.
-- **Scalars only.** No vectors, no Celsius, no numerical-only solutions yet
+- **Scalars only.** No vectors and no numerical-only solutions yet
   (see [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md)).
 - **The confidence weights are invented.** They get fit to eval data in v0.8.
 - **Not for research-level physics**, now or at v1.0.

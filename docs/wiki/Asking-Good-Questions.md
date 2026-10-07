@@ -5,8 +5,9 @@ answers.
 
 "Dropped from 20 m" works. "Dropped from 20" doesn't say whether that is metres, feet, or
 storeys. Common spellings work (`m/s`, `km/h`, `mph`, `kilograms`, `ohms`), and a number
-can be digits or words before a unit ("an eight kilogram ball"). Temperatures in Celsius
-and Fahrenheit aren't supported yet; they arrive in v0.4.
+can be digits or words before a unit ("an eight kilogram ball"). Temperatures work in
+kelvin, Celsius, or Fahrenheit ("20 °C", "68 degrees Fahrenheit"); say "heated by 20 °C"
+for a change and "heated to 20 °C" for a temperature.
 
 ## Say which situation you mean
 
@@ -41,6 +42,7 @@ doesn't use it", because the extra value might mean it picked the wrong equation
 
 ## What it can't do yet
 
-- Problems that need two or more equations chained together (v0.4).
-- Vectors, Celsius and Fahrenheit, and answers that need a numerical solver.
+- Problems that need a quantity subtracted from another first ("heated from 20 °C to
+  80 °C" needs the change, 60 °C; say "heated by 60 °C" for now).
+- Vectors, and answers that need a numerical solver.
 - Research-level physics, now or at v1.0.

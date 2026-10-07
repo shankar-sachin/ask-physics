@@ -575,6 +575,37 @@ out a gold answer; on 7,187 gold plans the sanity check found no unused
 value, no ambiguity, and no trivial zero; and none of the 219 factory
 questions for twin equations is ambiguous.
 
+v0.4 added three rules from solem's evals and from chaining:
+- *An ask needs a home.* When no equation with room for the stated values
+  has a variable of the kind the ask names (compared by units, not names:
+  the final velocity in v = v0 + at answers "its speed"), the equations that
+  do have it come first, and the plan chains to the rest. "Pushed with 12 N
+  for 4 s from 2 m/s: work out x" starts from x = v0 t + a t^2/2, not the
+  impulse-momentum theorem, which has room for every value but no x.
+- *A unitless slot needs a value.* An equation with a unitless variable (an
+  emissivity, a coefficient) is ruled out when the question never mentions
+  it, states it, or asks for it; solem once filled an emissivity with the
+  area's 1200. The sanity check also flags any unitless input more than ten
+  times outside its usual range, so a borrowed value is never confidently
+  wrong.
+- *"How strongly" and "how hard" ask for a force*, not an energy.
+
+**Chaining (v0.4).** A plan may cite several equations and list the
+intermediate values as unknowns. Noether solves them in dependency order: any
+equation with exactly one value still missing is solved for it, until the
+target is found (`compute`, `Answer.steps`). A symbol shared between cited
+equations must have the same dimensions in each, so weight W (N) never stands
+in for work W (J). The data factory writes chained problems from a reviewed
+list (`templates.CHAINS`), about one plan example in ten, keeping only chains
+no single equation in the database answers.
+
+**Temperatures (v0.4).** Celsius and Fahrenheit values are converted to
+kelvin before substitution, by what the variable means: "water at 20 degC"
+is 293.15 K, "heated by 20 degC" is a change of 20 K (`Variable.is_change`).
+A temperature answer asked in Celsius or Fahrenheit is also given on that
+scale. The factory writes some temperatures in degC and degF, changes
+included.
+
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable
 would have it forced into the plan; the data factory never writes one, and
