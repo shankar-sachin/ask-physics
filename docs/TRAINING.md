@@ -94,6 +94,23 @@ caffeinate -dims askphysics model train --model fermi-tellus-1 \
   celeste only if solem's held-out results leave room for it to help
   (open question Q16).
 
+### The prose corpus (ADR-017)
+
+The 118,000-word *Physics* book is small. The full corpus is about 20 million
+words: 25 OpenStax textbooks under CC BY 4.0 plus public-domain books. Build it
+once (about 15 minutes for the first run, which downloads the books):
+
+```bash
+python scripts/build_corpus.py
+askphysics model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192 \
+  --prose build/corpus/prose.jsonl
+```
+
+Then pass `--prose build/corpus/prose.jsonl` to `model train` instead of the
+single book. At 20M words, 200 prose steps cover about 3% of it, so a corpus
+run wants far more prose steps, for example `--prose-steps 3000 --prose-share
+0.1`, which is a job for a fast GPU (see the celeste plan in the roadmap).
+
 ### Real prose first (solem and celeste)
 
 Every task example is written by our templates, so on its own a model never

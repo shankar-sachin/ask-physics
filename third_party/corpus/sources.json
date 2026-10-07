@@ -1,0 +1,276 @@
+{
+  "_comment": "Sources of the prose corpus (ADR-017). scripts/build_corpus.py builds it; nothing here is fetched until you run it.",
+  "target_words": 20000000,
+  "openstax": [
+    {
+      "repo": "openstax/osbooks-physics",
+      "commit": "dfdfd7a5356ecdd42e504de3df50d9153e33ea49",
+      "books": [
+        {
+          "collection": "physics.collection.xml",
+          "title": "Physics",
+          "slug": "physics",
+          "authors": [
+            "Fatih Gozuacik",
+            "Denise Pattison",
+            "Catherine Tabor"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-chemistry-bundle",
+      "commit": "32c719622fbb7a0ca729cd645c1df4cf4e7d5b3a",
+      "books": [
+        {
+          "collection": "chemistry-2e.collection.xml",
+          "title": "Chemistry 2e",
+          "slug": "chemistry-2e",
+          "authors": []
+        },
+        {
+          "collection": "chemistry-atoms-first-2e.collection.xml",
+          "title": "Chemistry: Atoms First 2e",
+          "slug": "chemistry-atoms-first-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-biology-bundle",
+      "commit": "d2779c2edfb435e75047325434fe2fe93d5aa120",
+      "books": [
+        {
+          "collection": "biology-2e.collection.xml",
+          "title": "Biology 2e",
+          "slug": "biology-2e",
+          "authors": []
+        },
+        {
+          "collection": "biology-ap-courses.collection.xml",
+          "title": "Biology for AP\u00ae Courses",
+          "slug": "biology-ap-courses",
+          "authors": [
+            "Julianne Zedalis",
+            "John Eggebrecht"
+          ]
+        },
+        {
+          "collection": "concepts-biology.collection.xml",
+          "title": "Concepts of Biology",
+          "slug": "concepts-biology",
+          "authors": [
+            "Samantha Fowler",
+            "Rebecca Roush",
+            "James Wise"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-astronomy",
+      "commit": "63157f370b09c06a4cc12832384aaaf4de1ced3b",
+      "books": [
+        {
+          "collection": "astronomy-2e.collection.xml",
+          "title": "Astronomy 2e",
+          "slug": "astronomy-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-anatomy-physiology",
+      "commit": "b0058a743bdd2cc08196abaaa7d5469970c0d80c",
+      "books": [
+        {
+          "collection": "anatomy-and-physiology-2e.collection.xml",
+          "title": "Anatomy and Physiology 2e",
+          "slug": "anatomy-and-physiology-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-microbiology",
+      "commit": "ecf34dad129d686703780e87ab5aa2e59c577a6a",
+      "books": [
+        {
+          "collection": "microbiology.collection.xml",
+          "title": "Microbiology",
+          "slug": "microbiology",
+          "authors": [
+            "Nina Parker",
+            "Mark Schneegurt",
+            "Anh-Hue Thi Tu",
+            "Brian M. Forster",
+            "Philip Lister"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-college-physics-bundle",
+      "commit": "f98d7a792138a6133fe7267d17e70aa04e9ccbed",
+      "books": [
+        {
+          "collection": "college-physics-2e.collection.xml",
+          "title": "College Physics 2e",
+          "slug": "college-physics-2e",
+          "authors": []
+        },
+        {
+          "collection": "college-physics-ap-courses-2e.collection.xml",
+          "title": "College Physics for AP\u00ae Courses 2e",
+          "slug": "college-physics-ap-courses-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-university-physics-bundle",
+      "commit": "db44eb99e9aa1d918fd8cf182f82ccdece9c7b11",
+      "books": [
+        {
+          "collection": "university-physics-volume-1.collection.xml",
+          "title": "University Physics Volume 1",
+          "slug": "university-physics-volume-1",
+          "authors": []
+        },
+        {
+          "collection": "university-physics-volume-2.collection.xml",
+          "title": "University Physics Volume 2",
+          "slug": "university-physics-volume-2",
+          "authors": []
+        },
+        {
+          "collection": "university-physics-volume-3.collection.xml",
+          "title": "University Physics Volume 3",
+          "slug": "university-physics-volume-3",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-college-algebra-bundle",
+      "commit": "4922e46ebc04326979e19392ccc2384cb8b9076c",
+      "books": [
+        {
+          "collection": "algebra-and-trigonometry-2e.collection.xml",
+          "title": "Algebra and Trigonometry 2e",
+          "slug": "algebra-and-trigonometry-2e",
+          "authors": []
+        },
+        {
+          "collection": "college-algebra-2e.collection.xml",
+          "title": "College Algebra 2e",
+          "slug": "college-algebra-2e",
+          "authors": []
+        },
+        {
+          "collection": "college-algebra-corequisite-support-2e.collection.xml",
+          "title": "College Algebra with Corequisite Support 2e",
+          "slug": "college-algebra-corequisite-support-2e",
+          "authors": []
+        },
+        {
+          "collection": "precalculus-2e.collection.xml",
+          "title": "Precalculus 2e",
+          "slug": "precalculus-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introductory-statistics-bundle",
+      "commit": "50ec91749080bb040b57bb40c34337cacc994cba",
+      "books": [
+        {
+          "collection": "introductory-business-statistics-2e.collection.xml",
+          "title": "Introductory Business Statistics 2e",
+          "slug": "introductory-business-statistics-2e",
+          "authors": []
+        },
+        {
+          "collection": "introductory-statistics-2e.collection.xml",
+          "title": "Introductory Statistics 2e",
+          "slug": "introductory-statistics-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-prealgebra-bundle",
+      "commit": "77a933c672e9c48c746eb802d588a9a7ddfd6e0d",
+      "books": [
+        {
+          "collection": "elementary-algebra-2e.collection.xml",
+          "title": "Elementary Algebra 2e",
+          "slug": "elementary-algebra-2e",
+          "authors": []
+        },
+        {
+          "collection": "intermediate-algebra-2e.collection.xml",
+          "title": "Intermediate Algebra 2e",
+          "slug": "intermediate-algebra-2e",
+          "authors": []
+        },
+        {
+          "collection": "prealgebra-2e.collection.xml",
+          "title": "Prealgebra 2e",
+          "slug": "prealgebra-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-psychology",
+      "commit": "e061043bf2f9e86ace51c4e8dc9555160f60a99d",
+      "books": [
+        {
+          "collection": "psychology-2e.collection.xml",
+          "title": "Psychology 2e",
+          "slug": "psychology-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-statistics",
+      "commit": "7dea80ae2800386d470b11f6528962f9c4992d15",
+      "books": [
+        {
+          "collection": "statistics.collection.xml",
+          "title": "Statistics",
+          "slug": "statistics",
+          "authors": [
+            "Barbara Illowsky",
+            "Susan Dean"
+          ]
+        }
+      ]
+    }
+  ],
+  "gutenberg": {
+    "latest_death": 1955,
+    "loccs": [
+      "QC",
+      "QB",
+      "QD",
+      "QA",
+      "Q",
+      "PR",
+      "PS"
+    ],
+    "exclude_subjects": [
+      "Poetry",
+      "Drama",
+      "Dictionaries",
+      "Encyclopedias",
+      "Indexes",
+      "Songs",
+      "Hymns"
+    ],
+    "min_book_words": 5000
+  }
+}

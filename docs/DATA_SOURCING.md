@@ -55,7 +55,10 @@ the project, with a textbook cited as the `source` for verification, are
 
   Earlier versions of this document said every OpenStax book was
   `CC-BY-4.0`. That was wrong for *University Physics* and *College
-  Physics*.
+  Physics*, because OpenStax relicensed them (and most of its catalog) to
+  `CC-BY-NC-SA-4.0` in March 2026. Versions published before that stay
+  `CC-BY-4.0` (the license is irrevocable), so ADR-017 uses those, pinned to
+  the last commit before each switch, for the prose corpus.
 - **License risk:** low for *Physics* text, with attribution to OpenStax and
   its contributors. Some *Physics* artwork was provided through separate
   permissions, so we use **text only**: no figures, no captions. The

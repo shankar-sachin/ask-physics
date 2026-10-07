@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 COLLECTION = """<?xml version="1.0"?>
 <col:collection xmlns="http://cnx.rice.edu/collxml" xmlns:md="http://cnx.rice.edu/mdml"
   xmlns:col="http://cnx.rice.edu/collxml">
+  <metadata xmlns:md="http://cnx.rice.edu/mdml">
+    <md:title>Physics</md:title>
+    <md:license url="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution License</md:license>
+  </metadata>
   <col:content>
     <col:module document="m1"/>
     <col:subcollection><md:title>Motion</md:title>
@@ -74,3 +78,18 @@ def test_refuses_a_source_that_is_not_cc_by(tmp_path: Path) -> None:
     )  # fmt: skip
     assert result.returncode != 0 and "not CC BY 4.0" in result.stderr
     assert not (tmp_path / "out" / "prose.jsonl").exists()
+
+
+def test_refuses_a_book_whose_own_license_is_not_cc_by(tmp_path: Path) -> None:
+    source = tmp_path / "book"
+    (source / "collections").mkdir(parents=True)
+    (source / "collections" / "physics.collection.xml").write_text(
+        COLLECTION.replace("licenses/by/4.0/", "licenses/by-nc-sa/4.0/")
+    )
+    (source / "LICENSE").write_text("Attribution 4.0 International\n...")
+    result = subprocess.run(
+        [sys.executable, "scripts/extract_openstax.py", "--source", str(source),
+         "--out", str(tmp_path / "out")],
+        cwd=ROOT, capture_output=True, text=True,
+    )  # fmt: skip
+    assert result.returncode != 0 and "not CC BY 4.0" in result.stderr

@@ -620,3 +620,60 @@ figure". The result, about 1,650 paragraphs and 118,000 words, is in
 --prose-share F` trains on it alone for N steps and mixes it into a share F
 of later batches; the tokenizer can learn from it too. Uses (1) and (2),
 the real-question eval and the exercises as classify examples, come next.
+
+---
+
+## ADR-017: A 20M-word prose corpus from pre-relicensing OpenStax and public-domain books
+
+**Status:** Accepted (v0.4), decided by the maintainer
+
+**Context.** solem learned English from one 118,000-word book (ADR-016), and its
+held-out prose loss (5.07) shows it. Writing well needs millions of words. The
+project is MIT and the maintainer's rule stands: only text whose license lets
+anyone use it commercially without share-alike.
+
+Checking the `openstax/osbooks-*` repositories in October 2026 found that
+OpenStax relicensed almost every book from CC BY 4.0 to CC BY-NC-SA 4.0 between
+2026-03-12 and 2026-03-23 (one commit per repository, e.g. `b375d3f` "updating
+license to CC BY NC-SA"). Before that, each repository's `LICENSE` and every
+book's collection metadata said CC BY 4.0. Calculus and Organic Chemistry were
+never CC BY; Physics and Statistics still are.
+
+**Decision.**
+
+- **OpenStax, pinned before the switch.** CC BY 4.0 grants a "worldwide,
+  royalty-free, non-sublicensable, non-exclusive, irrevocable license" (section
+  2.a.1). Versions published under it stay usable under it after the publisher
+  relicenses newer ones. `third_party/corpus/sources.json` pins each repository
+  to its last commit before the switch, and the build refuses to read a commit
+  unless its `LICENSE` and the book's own metadata both say CC BY 4.0. Nothing
+  after a switch is used, so later corrections are not in the corpus. 25 books
+  across 13 repositories: physics, chemistry, biology, astronomy, anatomy,
+  microbiology, algebra through precalculus, statistics, and psychology,
+  about 2.8M words after removing repeats.
+- **Public-domain books for the rest.** Project Gutenberg texts in English,
+  physics, astronomy, chemistry, mathematics, and general science first, then
+  English and American literature, until the corpus reaches 20M words. A book
+  qualifies only if every person the catalog credits (authors, translators,
+  editors) died in or before 1955, which makes it public domain in the US and in
+  life-plus-70 countries. Gutenberg's header, footer, and trademark are removed.
+- **Not committed.** The corpus is about 130 MB, so `scripts/build_corpus.py`
+  builds it locally under `build/`. The repository holds the manifest, the
+  extractors, and their tests; each build writes `ATTRIBUTION.md`, the CC BY
+  license text, and a lock file listing exact commits, Gutenberg ids, and file
+  hashes.
+- **Cleaning.** Text only, as in ADR-016; reference-list entries and repeated
+  paragraphs removed; paragraphs containing slurs dropped (old literature has
+  them), with the list stored as hashes.
+- Model cards for weights trained on the corpus carry its attribution.
+
+**Consequences.** About 20x the real English solem has seen, with no
+non-commercial or share-alike text. The pre-switch reading of CC BY is the
+standard one, but it is a legal judgment: a lawyer should review this ADR with
+ADR-016 before any commercial launch, and if OpenStax asserts otherwise the
+pinned books come out of the manifest. Old public-domain prose is
+old-fashioned and some of its physics is obsolete; that is acceptable because
+the models only learn language from it, and Noether does the physics. The
+build downloads a few hundred files from a volunteer-run site, so it pauses
+between requests.
+

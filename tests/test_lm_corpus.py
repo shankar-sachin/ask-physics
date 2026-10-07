@@ -123,3 +123,21 @@ def test_the_shipped_openstax_prose_is_clean_and_attributed() -> None:
     assert (OPENSTAX / "LICENSE").read_text().startswith("Attribution 4.0 International")
     attribution = (OPENSTAX / "ATTRIBUTION.md").read_text()
     assert "CC BY 4.0" in attribution and "openstax.org" in attribution
+
+
+def test_a_big_corpus_is_sampled_for_the_tokenizer(
+    dataset: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import askphysics.lm.train as train_module
+
+    seen: list[int] = []
+    real = Tokenizer.train
+
+    def spy(texts: list[str], vocab_size: int) -> Tokenizer:
+        seen.append(sum(1 for t in texts if t in PARAGRAPHS))
+        return real(texts, vocab_size=vocab_size)
+
+    monkeypatch.setattr(train_module, "MAX_TOKENIZER_PROSE", 5)
+    monkeypatch.setattr(Tokenizer, "train", staticmethod(spy))
+    train_tokenizer(dataset, vocab_size=LUNA.vocab_size, prose=PARAGRAPHS)
+    assert seen == [5]
