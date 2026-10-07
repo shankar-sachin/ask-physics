@@ -15,7 +15,7 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 case ${1:-} in
-  -h | --help | "") usage ;;
+  -h | --help | "") usage 0 ;;
   -*) usage 1 ;;
 esac
 release=$1

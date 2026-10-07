@@ -17,7 +17,7 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 case ${1:-} in
-  -h | --help | "") usage ;;
+  -h | --help | "") usage 0 ;;
   -*) usage 1 ;;
 esac
 model=$1
@@ -29,7 +29,7 @@ while [ $# -gt 0 ]; do
     --data) data=$2 && shift ;;
     --directory) directory=$2 && shift ;;
     --against) against=$2 && shift ;;
-    -h | --help) usage ;;
+    -h | --help) usage 0 ;;
     *) fail "unknown option $1 (see --help)" ;;
   esac
   shift

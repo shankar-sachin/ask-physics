@@ -35,7 +35,7 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 case ${1:-} in
-  -h | --help | "") usage ;;
+  -h | --help | "") usage 0 ;;
   -*) usage 1 ;;
 esac
 model=$1
@@ -68,7 +68,7 @@ while [ $# -gt 0 ]; do
     --resume) resume=1 ;;
     --eval-examples) eval_examples=$2 && shift ;;
     --no-eval) evaluate=0 ;;
-    -h | --help) usage ;;
+    -h | --help) usage 0 ;;
     *) fail "unknown option $1 (see --help)" ;;
   esac
   shift
@@ -94,8 +94,9 @@ fi
 installed="$(models_dir)/$model"
 baseline=""
 if [ "$resume" = 1 ]; then
-  [ "$fresh_data" = 0 ] && [ "$fresh_tokenizer" = 0 ] \
-    || fail "--resume can't rebuild the data or tokenizer: the run would no longer match"
+  if [ "$fresh_data" = 1 ] || [ "$fresh_tokenizer" = 1 ]; then
+    fail "--resume can't rebuild the data or tokenizer: the run would no longer match"
+  fi
   info "Resuming $model"
 else
   if [ -d "$installed" ]; then

@@ -13,7 +13,7 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 case ${1:-} in
-  -h | --help | "") usage ;;
+  -h | --help | "") usage 0 ;;
 esac
 action=$1
 models=$(models_dir)
@@ -56,7 +56,9 @@ case $action in
     else
       source_dir=$(newest_backup "$name")
     fi
-    [ -n "$source_dir" ] && [ -d "$source_dir" ] || fail "no backup of $name in $backups"
+    if [ -z "$source_dir" ] || [ ! -d "$source_dir" ]; then
+      fail "no backup of $name in $backups"
+    fi
     backup "$name"
     info "Restoring $name from $source_dir"
     run rm -rf "${models:?}/$name"

@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
   case $1 in
     --fast) fast=1 ;;
     --conflicts) conflicts=1 && shift && break ;;
-    -h | --help) usage ;;
+    -h | --help) usage 0 ;;
     *) fail "unknown option $1 (see --help)" ;;
   esac
   shift

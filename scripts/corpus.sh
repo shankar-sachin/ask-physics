@@ -13,7 +13,7 @@ set -eu
 . "$(dirname "$0")/lib.sh"
 
 case ${1:-} in
-  -h | --help) usage ;;
+  -h | --help) usage 0 ;;
 esac
 to_repo_root
 need_askphysics

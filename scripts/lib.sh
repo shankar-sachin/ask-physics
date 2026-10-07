@@ -65,8 +65,8 @@ backup_dir() {
   printf '%s\n' "${ASKPHYSICS_BACKUP_DIR:-$HOME/askphysics-backup}"
 }
 
-# Print usage (the script's leading comment block, without the #) and exit.
+# Print usage (the script's leading comment block, without the #) and exit with $1.
 usage() {
   sed -n '2,/^[^#]/{/^#/s/^# \{0,1\}//p;}' "$0"
-  exit "${1:-0}"
+  exit "$1"
 }
