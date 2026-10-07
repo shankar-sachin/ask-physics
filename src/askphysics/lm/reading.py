@@ -240,8 +240,22 @@ def asked_variables(text: str, variables: Iterable[Variable]) -> list[Variable]:
 # to words a variable's name must contain, and words it must not: "how fast does it hit
 # the floor" wants a final speed, not the initial one, unless the start is what's asked.
 _IDIOMS: tuple[tuple[re.Pattern[str], tuple[str, ...], tuple[str, ...]], ...] = (
+    (  # "What speed did a go-kart start at if it reaches 160 mph ...?"
+        re.compile(
+            r"\b(?:how fast|what (?:speed|velocity))\b[^.?!]*"
+            r"\b(?:start(?:s|ed)?|begin|began)\s+(?:at|with|out at|off at)\b",
+            re.I,
+        ),
+        ("initial", "starting", "launch"),
+        (),
+    ),
     (
-        re.compile(r"\bhow fast\b[^.?!]*\b(?:start|initial|launch|thrown|throw|begin)", re.I),
+        # "after starting from rest" says how it began, not what is asked.
+        re.compile(
+            r"\bhow fast\b[^.?!]*\b(?:start|initial|launch|thrown|throw|begin)"
+            r"(?![a-z]*\s+from\s+rest)",
+            re.I,
+        ),
         ("initial", "starting", "launch"),
         (),
     ),

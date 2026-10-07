@@ -204,3 +204,18 @@ def test_stated_givens_include_labelled_bare_numbers(store: DataStore) -> None:
         ("300", "K"),
         ("0.392", "dimensionless"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("text", "asked"),
+    [
+        ("What speed did a go-kart start at if it reaches 160 mph after 3 s at 18 m/s^2?", {"v0"}),
+        ("How fast did the scooter start out at, if it hits 16 kph after 4.7 s?", {"v0"}),
+        # Starting from rest says how it began, not what is asked.
+        ("How fast is it going after starting from rest at 2 m/s^2 for 3 s?", {"v"}),
+    ],
+)
+def test_asking_how_it_started_means_the_initial_speed(
+    store: DataStore, text: str, asked: set[str]
+) -> None:
+    assert asked_symbols(text, store.equations["kin_v_at"].variables) == asked
