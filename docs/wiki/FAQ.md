@@ -52,7 +52,8 @@ honest, and the math is never theirs to get wrong.
 
 ## Where are the trained models?
 
-They ship as release assets with v0.4 (`askphysics model pull`). Until then, see
+`askphysics model pull` downloads them; the installers do it for you. They live in
+`~/.cache/askphysics/models/` (or `$ASKPHYSICS_MODEL_DIR`). To build them yourself, see
 [Training the models](Training-the-Models).
 
 ## Something's wrong. Where do I report it?

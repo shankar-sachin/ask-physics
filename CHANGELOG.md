@@ -8,6 +8,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `askphysics model pull` downloads the published Fermi models (tellus and
+  solem; `--all` adds celeste), checking every file's size and sha256
+  against a manifest the package pins, and never leaving a half-installed
+  model. The installers run it last. celeste downloads by itself the first
+  time a question needs it (`ASKPHYSICS_AUTO_PULL=0` turns that off).
+- `askphysics model package` (maintainers) turns a trained model into
+  release assets: bf16 weights, a model card with its training curve, eval
+  results, answering speed, and credit for the prose it learned from, all
+  pinned in the manifest.
 - The Ask Physics Wiki on GitHub: guides for using it, reading an answer, and
   asking good questions, an FAQ, the Fermi models and Noether explained, and a
   page for every equation (formula, variables and units, assumptions,

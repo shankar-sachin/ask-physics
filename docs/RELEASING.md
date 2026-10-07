@@ -22,3 +22,47 @@ Releases are tagged only with the maintainer's approval (`CLAUDE.md`).
 4. **Check the installers.** `install.sh` and `install.ps1` pick up the latest
    release automatically. Run the Installers workflow (`workflow_dispatch`) on
    `main` to confirm they still work everywhere.
+
+## Publishing model weights (ADR-012)
+
+Weights are published separately from code, under their own release tag
+(for example `models-v0.4.0`), so a code release can reuse them.
+
+1. **Evaluate.** Run `askphysics model eval --model fermi-solem-1 --examples 3000`
+   so the card carries the results (they are read from the model's `eval.json`).
+2. **Package.** For each model:
+
+   ```bash
+   askphysics model package --model fermi-solem-1 --release models-v0.4.0 \
+     --attribution build/corpus/ATTRIBUTION.md
+   ```
+
+   Pass `--attribution` for every model trained on the prose corpus or the
+   OpenStax *Physics* text: CC BY needs the credit to travel with the weights.
+   This writes `build/release/fermi-solem-1/` (the packaged model, bf16),
+   `build/release/assets/` (the files to upload), and pins them in
+   `src/askphysics/lm/weights.json`.
+3. **Check the packaged copy.** `askphysics model eval --model fermi-solem-1
+   --directory build/release/fermi-solem-1 --examples 3000` scores exactly what
+   ships. bf16 should match the original within noise.
+4. **Release the assets.** On GitHub, draft a release with the tag
+   `models-v0.4.0` on `main`, attach every file in `build/release/assets/`,
+   and publish. The URLs in the manifest point there.
+5. **Commit the manifest.** Open a PR with `src/askphysics/lm/weights.json`
+   and the model cards. Once it merges, `askphysics model pull` works from
+   `main`, and from the next code release for everyone else.
+
+### Homebrew
+
+The formula can't write to the user's home directory, where models live, so
+it asks the user to pull them. Add to `Formula/askphysics.rb` once weights
+are published:
+
+```ruby
+def caveats
+  <<~EOS
+    Download the Fermi models (about 66 MB) before your first question:
+      askphysics model pull
+  EOS
+end
+```

@@ -49,5 +49,7 @@ Speed and real-question results get measured for the v0.4 model cards.
 
 ## Getting them
 
-Trained weights ship as release assets with v0.4 and download with
-`askphysics model pull`. Until then you can [train your own](Training-the-Models).
+`askphysics model pull` downloads them, checked byte for byte against the manifest this
+version pins; the installers run it for you. Each model comes with its model card
+(`MODEL_CARD.md`: training, results, speed, credit) in its folder under
+`~/.cache/askphysics/models/`. You can also [train your own](Training-the-Models).
