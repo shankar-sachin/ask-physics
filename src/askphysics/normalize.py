@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-from askphysics.solver.units import is_valid_unit
+from askphysics.solver.units import is_valid_unit, quantity
 
 _SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺", "0123456789-+")
 _SUPERSCRIPT_RUN = re.compile(r"([A-Za-zµΩ)])([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)")
@@ -35,6 +35,51 @@ _PER = re.compile(
 _DEGREES = re.compile(r"(\d)\s*°\s*([CF])\b")
 _MICRO = re.compile(r"(\d\s*)[µμ](?=[A-Za-z])")  # micro sign or Greek mu, as a unit prefix
 _OHM = re.compile(r"(\d\s*)([kMm]?)[ΩΩ]")  # Greek omega or the ohm sign
+_ONES = (
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+)
+_TENS = (
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+)
+_WORD_NUMBER = re.compile(
+    r"\b(?:(?P<tens>"
+    + "|".join(_TENS)
+    + r")(?:[- ](?P<unit_digit>"
+    + "|".join(_ONES[1:10])
+    + r"))?|(?P<ones>"
+    + "|".join(_ONES)
+    + r"))(?:\s+(?P<scale>hundred|thousand))?"
+    + r"\s+(?P<unit>[A-Za-z][A-Za-z/^*]*)\b",
+    re.IGNORECASE,
+)
+# Words Pint reads as units that are usually just English: "one in a million" is no inch.
+_NOT_UNITS = frozenset(("in", "at", "a", "are", "as", "us", "ha", "mil", "point"))
 
 
 def _superscript(match: re.Match[str]) -> str:
@@ -48,6 +93,26 @@ def _times_ten(match: re.Match[str]) -> str:
 def _hyphen_unit(match: re.Match[str]) -> str:
     number, unit = match.groups()
     return f"{number} {unit}" if is_valid_unit(unit) else match.group()
+
+
+def _word_number(match: re.Match[str]) -> str:
+    unit = match.group("unit")
+    # Only units with dimensions: "the time for one cycle" names a variable, and a cycle,
+    # like a radian, is dimensionless to Pint.
+    if unit.lower() in _NOT_UNITS or not is_valid_unit(unit) or quantity(1, unit).dimensionless:
+        return match.group()
+    # "One" is in too many names ("the mass of one molecule", "object one") to read as 1.
+    if (match.group("ones") or "").lower() == "one" and not match.group("scale"):
+        return match.group()
+    if match.group("tens"):
+        value = 10 * (_TENS.index(match.group("tens").lower()) + 2)
+        if match.group("unit_digit"):
+            value += _ONES.index(match.group("unit_digit").lower())
+    else:
+        value = _ONES.index(match.group("ones").lower())
+    scale = (match.group("scale") or "").lower()
+    value *= {"hundred": 100, "thousand": 1000}.get(scale, 1)
+    return f"{value} {unit}"
 
 
 def _per(match: re.Match[str]) -> str:
@@ -71,8 +136,12 @@ def normalize_question(text: str) -> str:
     - Degree temperatures get Pint's names: "25 °C" is "25 degC".
     - Symbols the extractors can't start a unit with get letters: "2.5 µC" is "2.5 uC",
       "220 Ω" is "220 ohm", "4.7 kΩ" is "4.7 kohm".
+    - A number spelled out before a unit becomes digits: "an eight kilogram ball" is "an
+      8 kilogram ball", "twenty-five meters" is "25 meters". Without a unit after it, a
+      word stays a word ("ten divided by three").
     """
     text = text.translate(_MINUS)
+    text = _WORD_NUMBER.sub(_word_number, text)
     text = _THOUSANDS.sub(lambda m: m.group(1).replace(",", ""), text)
     text = _TIMES_TEN.sub(_times_ten, text)
     text = _TIMES_TEN_SUP.sub(

@@ -36,11 +36,11 @@ from askphysics.lm.generate import (
     locked_options,
     number_guard_ok,
     quantity_locks,
-    question_spans,
     reason_options,
     redirect_options,
     repeats,
     target_options,
+    template_matches,
 )
 from askphysics.lm.model import FermiLM
 from askphysics.lm.tokenizer import CLASSIFY, END, PLAN, Tokenizer
@@ -161,9 +161,8 @@ def test_refusals_can_only_name_what_the_question_names() -> None:
     question = "how do you find the slope of a curve?"
     reasons = reason_options("out_of_scope", question)
     assert "Not a physics question; it is pure math." in reasons
-    assert "Category error: a curve is an idea, not an object with mass." in reasons
     assert not any("anxiety" in r or "dream" in r for r in reasons)
-    assert not any("Category error: of " in r or "slope of is" in r for r in reasons)
+    assert not any(r.startswith("Category error:") for r in reasons)  # no template matched
     math = "Not a physics question; it is pure math."
     assert redirect_options(question, math) == [
         "How fast is a dropped rock moving after falling for a while?"
@@ -171,8 +170,22 @@ def test_refusals_can_only_name_what_the_question_names() -> None:
     assert "How much does the human brain weigh?" in redirect_options(
         "How much does a dream weigh?"
     )
-    assert question_spans("Who was the first ruler of Lima?")[-1] == "Lima"
-    assert not any(ch.isdigit() for span in question_spans("Is 91 a prime number?") for ch in span)
+
+
+def test_slots_are_filled_only_from_their_own_position() -> None:
+    assert (1 + 0, {"abstract": "a promise"}) not in template_matches("x")
+    matched = dict(template_matches("Hi! How fast is a promise Thanks!"))
+    assert {"abstract": "a promise"} in matched.values()
+    reasons = reason_options("out_of_scope", "How fast is a promise?")
+    assert "Category error: a promise does not move, so it has no speed." in reasons
+    # tellus once filled a slot with "a dropped ball take"; that question matches no template.
+    reasons = reason_options(
+        "out_of_scope", "How long does a dropped ball take to fall from a table"
+    )
+    assert not any("dropped ball take" in r for r in reasons)
+    assert redirect_options(
+        "What is the best taco topping?", "Not a physics question; it is a matter of taste."
+    ) == ["How much energy is in a typical slice of taco?"]
 
 
 def test_gold_classifications_are_always_options(store: DataStore) -> None:
@@ -304,8 +317,11 @@ def test_target_is_what_the_question_leaves_open(store: DataStore) -> None:
     kin = store.equations["kin_v_at"].variables
     q = "A car starts from rest and accelerates at 3 m/s^2 for 4 s. Final speed?"
     assert target_options(kin, q, consts) == ["v"]
+    # "How fast" asks for a speed, and not the starting one unless the start is asked about.
     q = "A car starts from rest and accelerates at 3 m/s^2 for 4 s. How fast?"
-    assert set(target_options(kin, q, consts)) == {"v", "v0"}
+    assert target_options(kin, q, consts) == ["v"]
+    q = "It reaches 9 m/s after accelerating at 3 m/s^2 for 2 s. How fast was it at the start?"
+    assert target_options(kin, q, consts) == ["v0"]
     # The gas constant is a table constant, never a target.
     gas = store.equations["ideal_gas_law"].variables
     assert "R" not in target_options(gas, "Some gas.", consts)
@@ -454,7 +470,8 @@ def test_labels_and_the_ask_pin_the_plan(store: DataStore) -> None:
     q = "Assuming fs is 758 Hz, v = 43 m/s and 2800 Hz for the heard frequency, find vs."
     assert target_options(eq.variables, q, []) == ["vs"]
     locks = quantity_locks(q, eq.variables)
-    assert locks == {"fs": ("758", "Hz"), "v": ("43", "m/s")}
+    # fs and v by symbol, f by name ("2800 Hz for the heard frequency").
+    assert locks == {"fs": ("758", "Hz"), "v": ("43", "m/s"), "f": ("2800", "Hz")}
     unused = stated_quantities(q)
     pending = [eq.variable(s) for s in ("f", "fs", "v")]
     f = assignable_options(known_value_options(pending[0], q, []), pending[0], unused, pending)

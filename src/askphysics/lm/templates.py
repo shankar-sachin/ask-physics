@@ -1441,6 +1441,17 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
         "Not a physics question; it is number theory.",
         "How many atoms are in a grain of sand, roughly?",
     ),
+    # The same arithmetic with digits, so spelled-out numbers don't come to mean "math".
+    (
+        Template("oos_math_08", "What is {int_a} divided by {int_b}?"),
+        "Not a physics question; it is arithmetic.",
+        "How long does a dropped ball take to fall from a table?",
+    ),
+    (
+        Template("oos_math_09_h", "What is {int_a} times {int_b}?"),
+        "Not a physics question; it is arithmetic.",
+        "How long does a dropped ball take to fall from a table?",
+    ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "abstract": (
@@ -1462,6 +1473,8 @@ OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "func": ("x squared", "sin x", "e to the x", "the natural log of x", "x cubed"),
     "equation": ("2x + 3 = 11", "x squared = 49", "5x - 4 = 21", "3x = 12"),
     "integer": ("91", "1001", "221", "97"),
+    "int_a": ("10", "48", "7", "144"),
+    "int_b": ("3", "6", "12"),
 }  # fmt: skip
 
 # --------------------------------------------------------------------------- explanations

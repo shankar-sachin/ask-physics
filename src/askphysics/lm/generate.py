@@ -21,7 +21,7 @@ import re
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from string import Formatter
+from functools import cache
 
 import torch
 import torch.nn.functional as F
@@ -452,128 +452,81 @@ def decode_classification(decoder: Decoder, question: str) -> Classification:
     )
 
 
-MAX_SLOT_WORDS = 4  # the longest slot filler in the data factory is four words
-# A slot filler is a noun phrase: it can't start with these, or end with them.
-_NOT_FIRST = frozenset(
-    (
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "do",
-        "does",
-        "did",
-        "how",
-        "what",
-        "who",
-        "why",
-        "when",
-        "where",
-        "which",
-        "if",
-        "and",
-        "or",
-        "of",
-        "to",
-        "in",
-        "on",
-        "for",
-        "at",
-        "by",
-        "with",
-        "find",
-    )
-)
-_NOT_LAST = _NOT_FIRST | frozenset(
-    (
-        "a",
-        "an",
-        "the",
-        "my",
-        "your",
-        "its",
-        "this",
-        "that",
-        "i",
-        "you",
-        "me",
-        "it",
-    )
+# A slot ends at punctuation, the end, or a sign-off ("... a promise Thanks!"). A sign-off
+# needs a space before it: "Ty" must not end "anxie|ty".
+_END_OF_ASK = (
+    "(?=\\s*(?:[?.!]|$)|\\s+(?:"
+    + "|".join(re.escape(x.rstrip(".!")) for x in tpl.SIGN_OFFS)
+    + ")\\b)"
 )
 
 
-def question_spans(question: str) -> list[str]:
-    """Runs of one to four words from ``question``, punctuation trimmed, digits excluded.
+@cache
+def _template_pattern(text: str) -> re.Pattern[str]:
+    """An out-of-scope question template as a regex whose slots capture the question's words."""
+    parts = re.split(r"(\{\w+\})", text.rstrip("?.!"))
+    body = "".join(f"(?P<{p[1:-1]}>.+?)" if p.startswith("{") else re.escape(p) for p in parts)
+    return re.compile(body + _END_OF_ASK, re.IGNORECASE)
 
-    These are what a reason or redirect slot may be filled with ("Category error: {emotion}
-    is a feeling"), so a refusal can only name things the question names.
+
+def template_matches(question: str) -> list[tuple[int, dict[str, str]]]:
+    """(index into ``OUT_OF_SCOPE``, slot values) for each template ``question`` matches.
+
+    "How fast is a promise?" matches "How fast is {abstract}?" with abstract = "a promise".
+    A slot is only ever filled with the words in its own position, never a stray run of
+    words ("a dropped ball take does not move").
     """
-    words = [w.strip("?.!,:;\"'()") for w in question.split()]
-    spans: list[str] = []
-    for i in range(len(words)):
-        for j in range(i + 1, min(i + MAX_SLOT_WORDS, len(words)) + 1):
-            run = words[i:j]
-            if not all(run) or any(ch.isdigit() for w in run for ch in w):
-                continue
-            if run[0].lower() not in _NOT_FIRST and run[-1].lower() not in _NOT_LAST:
-                span = " ".join(run)
-                if span not in spans:
-                    spans.append(span)
-    return spans
-
-
-def _fill(templates: Iterable[str], spans: Sequence[str]) -> list[str]:
-    """Each template as-is, or once per span if it has one slot."""
-    out: list[str] = []
-    for text in dict.fromkeys(templates):
-        fields = {f for _, f, _, _ in Formatter().parse(text) if f}
-        if not fields:
-            out.append(text)
-        elif len(fields) == 1:
-            (name,) = fields
-            out.extend(text.format(**{name: span}) for span in spans)
+    out: list[tuple[int, dict[str, str]]] = []
+    for i, (template, _, _) in enumerate(tpl.OUT_OF_SCOPE):
+        match = _template_pattern(template.text).search(question)
+        if match is not None:
+            out.append((i, {k: v.strip() for k, v in match.groupdict().items()}))
     return out
 
 
 def reason_options(category: str, question: str) -> list[str]:
     """The reasons a classification may give: reviewed sentences, never free writing.
 
-    Standard and Fermi reasons come from the data factory's lists. Out-of-scope reasons are
-    its reviewed sentences with their slot ("{emotion}", "{abstract}") filled by words
-    copied from the question, so a refusal can't loop or name something the question
-    didn't ("anxiety is a feeling" for "what is ten divided by three").
+    Standard and Fermi reasons come from the data factory's lists. An out-of-scope reason
+    with a slot ("Category error: {emotion} is a feeling") is offered only when the
+    question matches its template, filled with the words in that slot's position. A fixed
+    one that names something ("a dream is an experience") must share a word with the
+    question; a generic one ("Not a physics question; it is history.") always fits.
     """
     if category == "standard":
         return [r.format(domain=d) for d in DOMAINS for r in tpl.STANDARD_REASONING]
     if category == "fermi":
         return list(tpl.FERMI_REASONING)
-    spans = question_spans(question)
     words = content_words(question)
-    out: list[str] = []
+    out = [tpl.OUT_OF_SCOPE[i][1].format(**slots) for i, slots in template_matches(question)]
     for reason in dict.fromkeys(r for _, r, _ in tpl.OUT_OF_SCOPE):
-        if "{" in reason:
-            out.extend(_fill([reason], spans))
-        # A fixed sentence that names something ("a dream is an experience") must be about
-        # this question; a generic one ("Not a physics question; it is history.") always fits.
-        elif reason.startswith(GENERIC_REASONS) or content_words(reason) & words:
+        if "{" not in reason and (
+            reason.startswith(GENERIC_REASONS) or content_words(reason) & words
+        ):
             out.append(reason)
-    return out
+    return list(dict.fromkeys(out))
 
 
 def redirect_options(question: str, reason: str | None = None) -> list[str]:
-    """The answerable questions a refusal may suggest, slots filled from the question.
+    """The answerable questions a refusal may suggest, given the chosen ``reason``.
 
-    Given the chosen ``reason``, only the redirects written for that reason are offered,
-    so a math refusal suggests the math redirect and not one about the human brain.
+    Only redirects written for that reason are offered (a math refusal suggests the math
+    redirect), with slots filled from the matching template. A redirect whose slot can't
+    be filled that way is never offered.
     """
-    spans = question_spans(question)
-    pairs = [(r, c) for _, r, c in tpl.OUT_OF_SCOPE]
-    if reason is not None:
-        paired = [c for r, c in pairs if reason in _fill([r], spans)]
-        if paired:
-            return _fill(paired, spans)
-    return _fill((c for _, c in pairs), spans)
+    matched = dict(template_matches(question))
+    out: list[str] = []
+    for i, (_, r, closest) in enumerate(tpl.OUT_OF_SCOPE):
+        slots = matched.get(i, {})
+        try:
+            filled_reason, filled = r.format(**slots), closest.format(**slots)
+        except KeyError:
+            continue  # a slot the question didn't fill
+        if reason is None or filled_reason == reason:
+            out.append(filled)
+    if not out:
+        out = [c for _, _, c in tpl.OUT_OF_SCOPE if "{" not in c]
+    return list(dict.fromkeys(out))
 
 
 def _choose_text(decoder: Decoder, options: Sequence[str]) -> str:
@@ -966,7 +919,6 @@ __all__ = [
     "locked_options",
     "number_guard_ok",
     "quantity_locks",
-    "question_spans",
     "reason_options",
     "redirect_options",
     "repeats",
