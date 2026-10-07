@@ -8,6 +8,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- 16 more worked examples (20 in all) across mechanics, circuits, heat,
+  waves, optics, fluids, and modern physics, including a two-step problem and
+  two in Celsius. A test re-solves every example through Noether and checks it
+  lands within 0.1% of the stated answer, and another keeps them from reading
+  like an eval question.
 - `askphysics model pull` downloads the published Fermi models (tellus and
   solem; `--all` adds celeste), checking every file's size and sha256
   against a manifest the package pins, and never leaving a half-installed
