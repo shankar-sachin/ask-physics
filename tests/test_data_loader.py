@@ -34,7 +34,7 @@ def _edit(path: Path, fn: Any) -> None:
 def test_every_seed_file_validates(store: DataStore) -> None:
     assert store.summary() == {
         "equations": 110,
-        "examples": 4,
+        "examples": 20,
         "constants": 11,
         "fermi_assumptions": 8,
     }
@@ -112,3 +112,34 @@ def test_broken_and_missing_files(data_dir: Path) -> None:
     assert any("invalid JSON" in p for p in problems)
     assert any("file not found" in p for p in problems)
     assert any("must be a JSON array" in p for p in problems)
+
+
+def test_every_worked_example_re_solves(store: DataStore) -> None:
+    """Noether solves each example to within 0.1% of its stated answer (v0.4 exit criterion)."""
+    from askphysics.models import Plan
+    from askphysics.pipeline import compute
+    from askphysics.solver.units import quantity
+
+    assert len(store.examples) >= 15
+    for ex in store.examples.values():
+        plan = Plan(
+            equation_ids=ex.equations_used,
+            target=ex.unknowns[0],
+            unknowns=ex.unknowns,
+            known_values=ex.known_values,
+            assumptions=[],
+            strategy=ex.solution_steps[0],
+        )
+        result = compute(plan, data=store)
+        got = quantity(result.value, result.unit).to(ex.final_answer.unit).magnitude
+        assert got == pytest.approx(ex.final_answer.value, rel=1e-3), ex.id
+
+
+def test_worked_examples_do_not_read_like_eval_questions(store: DataStore) -> None:
+    from askphysics.lm.factory import LEAK_THRESHOLD, load_blocklist, word_overlap
+
+    evals = load_blocklist(Path(__file__).resolve().parents[1] / "evals" / "questions.yaml")
+    assert evals
+    for ex in store.examples.values():
+        for question in evals:
+            assert word_overlap(ex.problem_text, question) < LEAK_THRESHOLD, (ex.id, question)

@@ -66,5 +66,267 @@
     "tags": ["momentum", "baseball"],
     "source": "Project-authored",
     "license": "MIT"
+  },
+  {
+    "id": "ex_dyn_001",
+    "problem_text": "A 4 kg box is pushed across a smooth floor with a net force of 18 N. What is its acceleration?",
+    "known_values": [
+      {"symbol": "F", "value": 18.0, "unit": "N", "origin": "given"},
+      {"symbol": "m", "value": 4.0, "unit": "kg", "origin": "given"}
+    ],
+    "unknowns": ["a"],
+    "equations_used": ["newton_second_law"],
+    "solution_steps": ["Rearrange F = m*a to a = F/m.", "Substitute F = 18 N, m = 4 kg.", "a = 4.5 m/s^2."],
+    "final_answer": {"value": 4.5, "unit": "m/s^2"},
+    "difficulty": "intro",
+    "tags": ["dynamics", "force", "acceleration"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_friction_001",
+    "problem_text": "A crate slides across a warehouse floor with a normal force of 400 N. The coefficient of kinetic friction is 0.3. How large is the friction force?",
+    "known_values": [
+      {"symbol": "mu", "value": 0.3, "unit": "dimensionless", "origin": "given"},
+      {"symbol": "Fn", "value": 400.0, "unit": "N", "origin": "given"}
+    ],
+    "unknowns": ["f"],
+    "equations_used": ["kinetic_friction"],
+    "solution_steps": ["Use f = mu*Fn.", "Substitute mu = 0.3 dimensionless, Fn = 400 N.", "f = 120 N."],
+    "final_answer": {"value": 120.0, "unit": "N"},
+    "difficulty": "intro",
+    "tags": ["dynamics", "friction"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_circuit_001",
+    "problem_text": "A 150 ohm resistor and a 330 ohm resistor are connected in series. What is their equivalent resistance?",
+    "known_values": [
+      {"symbol": "R1", "value": 150.0, "unit": "ohm", "origin": "given"},
+      {"symbol": "R2", "value": 330.0, "unit": "ohm", "origin": "given"}
+    ],
+    "unknowns": ["R"],
+    "equations_used": ["series_resistors"],
+    "solution_steps": ["In series, resistances add: R = R1 + R2.", "Substitute R1 = 150 ohm, R2 = 330 ohm.", "R = 480 ohm."],
+    "final_answer": {"value": 480.0, "unit": "ohm"},
+    "difficulty": "intro",
+    "tags": ["electromagnetism", "circuit", "series", "resistors"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_circuit_002",
+    "problem_text": "A 6 ohm resistor and a 3 ohm resistor are connected in parallel. What is their equivalent resistance?",
+    "known_values": [
+      {"symbol": "R1", "value": 6.0, "unit": "ohm", "origin": "given"},
+      {"symbol": "R2", "value": 3.0, "unit": "ohm", "origin": "given"}
+    ],
+    "unknowns": ["R"],
+    "equations_used": ["parallel_resistors"],
+    "solution_steps": ["In parallel, 1/R = 1/R1 + 1/R2.", "Substitute R1 = 6 ohm, R2 = 3 ohm.", "R = 2 ohm."],
+    "final_answer": {"value": 2.0, "unit": "ohm"},
+    "difficulty": "intro",
+    "tags": ["electromagnetism", "circuit", "parallel", "resistors"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_heat_001",
+    "problem_text": "How much heat does it take to warm 2 kg of water by 30 °C? The specific heat of water is 4186 J/(kg*K).",
+    "known_values": [
+      {"symbol": "m", "value": 2.0, "unit": "kg", "origin": "given"},
+      {"symbol": "c", "value": 4186.0, "unit": "J/(kg*K)", "origin": "given"},
+      {"symbol": "dT", "value": 30.0, "unit": "degC", "origin": "given"}
+    ],
+    "unknowns": ["Q"],
+    "equations_used": ["specific_heat"],
+    "solution_steps": ["A change of 30 °C is a change of 30 K; use Q = m*c*dT.", "Substitute m = 2 kg, c = 4186 J/(kg*K), dT = 30 degC.", "Q = 251160 J."],
+    "final_answer": {"value": 251160.0, "unit": "J"},
+    "difficulty": "intro",
+    "tags": ["thermodynamics", "heat", "specific heat", "celsius"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_heat_002",
+    "problem_text": "An ideal heat engine runs between a hot reservoir at 227 °C and a cold one at 27 °C. What is its maximum efficiency?",
+    "known_values": [
+      {"symbol": "Th", "value": 227.0, "unit": "degC", "origin": "given"},
+      {"symbol": "Tc", "value": 27.0, "unit": "degC", "origin": "given"}
+    ],
+    "unknowns": ["eta"],
+    "equations_used": ["carnot_efficiency"],
+    "solution_steps": ["Convert to kelvin first (500.15 K and 300.15 K); then eta = 1 - Tc/Th.", "Substitute Th = 227 degC, Tc = 27 degC.", "eta = 0.39988 dimensionless."],
+    "final_answer": {"value": 0.39988, "unit": "dimensionless"},
+    "difficulty": "intermediate",
+    "tags": ["thermodynamics", "heat engine", "carnot", "efficiency", "celsius"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_wave_001",
+    "problem_text": "A tuning fork vibrates at 440 Hz and makes sound waves 0.78 m long. How fast does the sound travel?",
+    "known_values": [
+      {"symbol": "f", "value": 440.0, "unit": "Hz", "origin": "given"},
+      {"symbol": "lam", "value": 0.78, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["v"],
+    "equations_used": ["wave_speed"],
+    "solution_steps": ["Use v = f*lam.", "Substitute f = 440 Hz, lam = 0.78 m.", "v = 343.2 m/s."],
+    "final_answer": {"value": 343.2, "unit": "m/s"},
+    "difficulty": "intro",
+    "tags": ["waves", "sound", "wave speed", "frequency", "wavelength"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_optics_001",
+    "problem_text": "An object sits 0.3 m in front of a converging lens with a focal length of 0.1 m. Where does the image form?",
+    "known_values": [
+      {"symbol": "f", "value": 0.1, "unit": "m", "origin": "given"},
+      {"symbol": "do", "value": 0.3, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["di"],
+    "equations_used": ["thin_lens"],
+    "solution_steps": ["Rearrange 1/f = 1/do + 1/di for di.", "Substitute f = 0.1 m, do = 0.3 m.", "di = 0.15 m."],
+    "final_answer": {"value": 0.15, "unit": "m"},
+    "difficulty": "intermediate",
+    "tags": ["optics", "lens", "image distance"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_circular_001",
+    "problem_text": "A cyclist rides at 12 m/s around a curve of radius 30 m. What is the centripetal acceleration?",
+    "known_values": [
+      {"symbol": "v", "value": 12.0, "unit": "m/s", "origin": "given"},
+      {"symbol": "r", "value": 30.0, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["a"],
+    "equations_used": ["centripetal_acceleration"],
+    "solution_steps": ["Use a = v^2/r.", "Substitute v = 12 m/s, r = 30 m.", "a = 4.8 m/s^2."],
+    "final_answer": {"value": 4.8, "unit": "m/s^2"},
+    "difficulty": "intro",
+    "tags": ["circular motion", "centripetal", "acceleration"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_fluid_001",
+    "problem_text": "What is the water pressure 15 m below the surface of a freshwater lake, not counting the air above it? Fresh water has a density of 1000 kg/m^3.",
+    "known_values": [
+      {"symbol": "rho", "value": 1000.0, "unit": "kg/m^3", "origin": "given"},
+      {"symbol": "g", "value": 9.80665, "unit": "m/s^2", "origin": "constant"},
+      {"symbol": "h", "value": 15.0, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["P"],
+    "equations_used": ["hydrostatic_pressure"],
+    "solution_steps": ["Use P = rho*g*h with standard gravity.", "Substitute rho = 1000 kg/m^3, g = 9.80665 m/s^2, h = 15 m.", "P = 147100 Pa."],
+    "final_answer": {"value": 147100.0, "unit": "Pa"},
+    "difficulty": "intro",
+    "tags": ["fluids", "pressure", "depth", "water"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_spring_001",
+    "problem_text": "A spring with a spring constant of 250 N/m is stretched 0.04 m. How hard does it pull back?",
+    "known_values": [
+      {"symbol": "k", "value": 250.0, "unit": "N/m", "origin": "given"},
+      {"symbol": "x", "value": 0.04, "unit": "m", "origin": "given"}
+    ],
+    "unknowns": ["F"],
+    "equations_used": ["hookes_law"],
+    "solution_steps": ["Use F = k*x.", "Substitute k = 250 N/m, x = 0.04 m.", "F = 10 N."],
+    "final_answer": {"value": 10.0, "unit": "N"},
+    "difficulty": "intro",
+    "tags": ["springs", "hooke", "force"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_power_001",
+    "problem_text": "A motor does 1800 J of work in 6 s. What is its average power?",
+    "known_values": [
+      {"symbol": "W", "value": 1800.0, "unit": "J", "origin": "given"},
+      {"symbol": "t", "value": 6.0, "unit": "s", "origin": "given"}
+    ],
+    "unknowns": ["P"],
+    "equations_used": ["power_work_time"],
+    "solution_steps": ["Use P = W/t.", "Substitute W = 1800 J, t = 6 s.", "P = 300 W."],
+    "final_answer": {"value": 300.0, "unit": "W"},
+    "difficulty": "intro",
+    "tags": ["energy", "power", "work"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_chain_001",
+    "problem_text": "A 3 kg cart rolling at 2 m/s is pushed forward with a net force of 12 N for 4 s. How far does it travel in that time?",
+    "known_values": [
+      {"symbol": "m", "value": 3.0, "unit": "kg", "origin": "given"},
+      {"symbol": "F", "value": 12.0, "unit": "N", "origin": "given"},
+      {"symbol": "v0", "value": 2.0, "unit": "m/s", "origin": "given"},
+      {"symbol": "t", "value": 4.0, "unit": "s", "origin": "given"}
+    ],
+    "unknowns": ["x", "a"],
+    "equations_used": ["kin_x_at", "newton_second_law"],
+    "solution_steps": ["No single equation links force to distance here: first find the acceleration from F = m*a.", "From newton_second_law: a = 4 m/s^2.", "Substitute m = 3 kg, F = 12 N, v0 = 2 m/s, t = 4 s.", "x = 40 m."],
+    "final_answer": {"value": 40.0, "unit": "m"},
+    "difficulty": "intermediate",
+    "tags": ["dynamics", "kinematics", "force", "distance", "two steps"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_photon_001",
+    "problem_text": "Green light has a frequency of 5.6e14 Hz. How much energy does one photon of it carry?",
+    "known_values": [
+      {"symbol": "h", "value": 6.62607015e-34, "unit": "J*s", "origin": "constant"},
+      {"symbol": "f", "value": 560000000000000.0, "unit": "Hz", "origin": "given"}
+    ],
+    "unknowns": ["E"],
+    "equations_used": ["photon_energy"],
+    "solution_steps": ["Use E = h*f with Planck's constant.", "Substitute h = 6.62607e-34 J*s, f = 5.6e+14 Hz.", "E = 3.7106e-19 J."],
+    "final_answer": {"value": 3.7106e-19, "unit": "J"},
+    "difficulty": "intro",
+    "tags": ["modern", "photon", "light", "energy"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_momentum_002",
+    "problem_text": "A 2 kg cart moving at 3 m/s runs into a 1 kg cart at rest, and they stick together. How fast do they move afterward?",
+    "known_values": [
+      {"symbol": "m1", "value": 2.0, "unit": "kg", "origin": "given"},
+      {"symbol": "v1", "value": 3.0, "unit": "m/s", "origin": "given"},
+      {"symbol": "m2", "value": 1.0, "unit": "kg", "origin": "given"},
+      {"symbol": "v2", "value": 0.0, "unit": "m/s", "origin": "assumption"}
+    ],
+    "unknowns": ["vf"],
+    "equations_used": ["inelastic_collision"],
+    "solution_steps": ["Momentum is conserved: m1*v1 + m2*v2 = (m1 + m2)*vf.", "Substitute m1 = 2 kg, v1 = 3 m/s, m2 = 1 kg, v2 = 0 m/s.", "vf = 2 m/s."],
+    "final_answer": {"value": 2.0, "unit": "m/s"},
+    "difficulty": "intro",
+    "tags": ["momentum", "collision", "inelastic"],
+    "source": "Project-authored",
+    "license": "MIT"
+  },
+  {
+    "id": "ex_pendulum_001",
+    "problem_text": "A pendulum is 1 m long. How long does one full swing take on Earth?",
+    "known_values": [
+      {"symbol": "L", "value": 1.0, "unit": "m", "origin": "given"},
+      {"symbol": "g", "value": 9.80665, "unit": "m/s^2", "origin": "constant"}
+    ],
+    "unknowns": ["T"],
+    "equations_used": ["pendulum_period"],
+    "solution_steps": ["Use T = 2*pi*sqrt(L/g) with standard gravity.", "Substitute L = 1 m, g = 9.80665 m/s^2.", "T = 2.00641 s."],
+    "final_answer": {"value": 2.00641, "unit": "s"},
+    "difficulty": "intro",
+    "tags": ["oscillations", "pendulum", "period"],
+    "source": "Project-authored",
+    "license": "MIT"
   }
 ]
