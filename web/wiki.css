@@ -1,0 +1,29 @@
+/* The wiki pages at /wiki/: the site's look, laid out for reading. */
+.wiki {
+  display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px;
+  max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px;
+}
+.wiki-side { position: sticky; top: 72px; align-self: start; font-size: 14px; color: var(--muted); }
+.wiki-side p { margin: 16px 0 4px; color: var(--label); }
+.wiki-side ul { list-style: none; margin: 0; padding: 0; }
+.wiki-side li { margin: 2px 0; }
+/* The site's main and footer rules center themselves with auto margins; inside the grid
+   that would shrink the article to its widest table, so the wiki resets them. */
+.wiki .wiki-page, .wiki .wiki-foot { min-width: 0; max-width: none; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
+.wiki-page h1 { font-size: clamp(28px, 5vw, 44px); margin-bottom: 20px; overflow-wrap: anywhere; hyphens: auto; }
+.wiki-page p, .wiki-page li { overflow-wrap: anywhere; }
+.wiki-page h2, .wiki-page h3, .wiki-page h4 { font-family: var(--display); margin: 32px 0 8px; }
+.wiki-page p, .wiki-page li { color: var(--text); }
+.wiki-page table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; display: block; overflow-x: auto; }
+.wiki-page th, .wiki-page td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.wiki-page th { background: var(--bg2); color: var(--label); }
+.wiki-page pre { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+.wiki-page code { background: var(--bg2); border-radius: 4px; padding: 1px 4px; }
+.wiki-page pre code { background: none; padding: 0; }
+.wiki-page .math { margin: 20px 0; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-family: var(--mono); color: var(--eq); overflow-x: auto; text-align: center; }
+.wiki-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+@media (max-width: 760px) {
+  .wiki { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-top: 20px; }
+  /* On a phone the article comes first; the page list follows it. */
+  .wiki-side { position: static; order: 2; border-top: 1px solid var(--line); padding-top: 8px; }
+}

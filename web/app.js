@@ -125,7 +125,13 @@ function renderCard({ answer, display }) {
     const box = el("div");
     for (const eq of display.equations) {
       const line = el("div");
-      line.append(el("span", "eq-id", eq.id), el("span", "eq-name", eq.name));
+      // Each equation id opens its wiki page (ids are lowercase words and digits).
+      const id = /^[a-z0-9_]+$/.test(eq.id) ? el("a", "eq-id", eq.id) : el("span", "eq-id", eq.id);
+      if (id.tagName === "A") {
+        id.href = `/wiki/${eq.id}/`;
+        id.title = "Open this equation's wiki page";
+      }
+      line.append(id, el("span", "eq-name", eq.name));
       if (eq.math) line.append(el("span", "eq-math", eq.math));
       if (eq.source) line.append(el("span", "eq-src", `source: ${eq.source}`));
       box.append(line);
