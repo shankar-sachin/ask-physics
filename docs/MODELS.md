@@ -135,7 +135,8 @@ model:
    *Physics* (2020, CC BY 4.0, text only, attributed). Not *University
    Physics* or *College Physics*, which are CC BY-NC-SA. The prose is in
    `third_party/openstax-physics/` and trains as a language-modeling stage
-   before the tasks (`--prose`). A model card for weights trained with it
+   before the tasks (`--prose`); its calculation problems are classify
+   examples, except the 49 kept for the real-question eval. A model card for weights trained with it
    must repeat the credit in that directory's `ATTRIBUTION.md`. The same holds
    for the 20M-word corpus built by `scripts/build_corpus.py` (ADR-017),
    whose build writes its own `ATTRIBUTION.md`.

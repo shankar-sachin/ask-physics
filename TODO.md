@@ -97,9 +97,16 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 
 ### Evals
 - [ ] Celeste rescue rate on the held-out factory set.
-- [ ] Real-question eval from OpenStax *Physics* exercises, with
-      project-written gold plans the maintainer reviews (ADR-016).
-- [ ] OpenStax questions as extra classify examples.
+- [x] Real-question eval from OpenStax *Physics* exercises, with
+      project-written gold plans (ADR-016): 49 questions, each gold answer
+      checked against the book's answer key, run by `model eval`.
+- [ ] Maintainer review of the 49 gold plans in
+      `third_party/openstax-physics/real_eval.jsonl`.
+- [ ] Keyword retrieval misses the gold equations of 7 of the 49 real
+      questions at top_k 5 ("a 5-kg object ... accelerate at 20 m/s^2" never
+      sees Newton's second law), capping any model at 85.7%.
+- [x] OpenStax questions as extra classify examples (180 problems, held out
+      from the real-question eval).
 - [ ] Run the 8 eval questions per model and record results in the model cards.
 
 ### Solver

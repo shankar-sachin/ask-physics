@@ -194,3 +194,16 @@ needs a key (default: no).
 
 **Default for now:** the CLI needs no key, ever. Keys are designed with the
 v0.9 API server and ship with the website.
+
+### Q19. How should a conceptual question be classified?
+
+OpenStax *Physics* has hundreds of questions like "Why does a heavier ball
+not fall faster?" They are physics, and well posed, but there is nothing to
+compute. None of the three categories fits: `standard` and `fermi` promise
+a number, and `out_of_scope` refuses with a redirect, which is wrong for a
+good question. A fourth category ("conceptual", answered with prose and the
+relevant equation) is possible but changes the task format.
+
+**Default for now:** conceptual questions are not used as classify examples
+(ADR-016), and the classifier keeps three categories. Revisit when the
+explain stage can answer in prose without a number.
