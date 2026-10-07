@@ -125,9 +125,16 @@ askphysics model train-tokenizer --data build/data --out build/tokenizer.json --
 ```
 
 Then pass `--prose build/corpus/prose.jsonl` to `model train` instead of the
-single book. At 20M words, 200 prose steps cover about 3% of it, so a corpus
-run wants far more prose steps, for example `--prose-steps 3000 --prose-share
-0.1`, which is a job for a fast GPU (see the celeste plan in the roadmap).
+single book. A corpus run wants far more prose steps, for example `--steps 5000
+--prose-steps 2000 --prose-share 0.1`: 2000 prose-only steps (about two passes
+over the corpus at batch 32), then 3000 on the tasks with one batch in ten still
+prose. `--prose-steps` must be fewer than `--steps`, because the prose-only steps
+come first; the CLI refuses a run that would never reach the tasks. Measured on an
+M5 Pro, solem's prose steps take about 23 seconds each (passages are long), so
+2000 of them take about 13 hours; task steps are much shorter. A fast GPU helps
+(see the celeste plan in the roadmap). A run checkpoints every quarter of
+`--steps` (at most every 2000), and `--resume` with new `--steps` and
+`--prose-steps` continues from the last checkpoint.
 
 ### Real prose first (solem and celeste)
 

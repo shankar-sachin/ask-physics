@@ -280,6 +280,12 @@ def train(
         prose_val = tokenize_prose(val_texts, tokenizer, config.context_length)
     elif cfg.prose_steps or cfg.prose_share:
         raise ValueError("prose_steps and prose_share need prose texts")
+    if cfg.prose_steps >= cfg.steps > 0:
+        # Prose-only steps come first: as many as the whole run would never train the tasks.
+        raise ValueError(
+            f"prose_steps ({cfg.prose_steps}) must be fewer than steps ({cfg.steps}), "
+            "or the model never trains on the tasks"
+        )
 
     model = FermiLM(config).to(device)
     opt = _optimizer(model, cfg)

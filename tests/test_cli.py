@@ -125,3 +125,15 @@ def test_pull_downloads_and_verifies(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 def test_ask_without_models_says_how_to_get_them() -> None:
     result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
     assert "No Fermi models are installed" in result.output
+
+
+def test_train_refuses_prose_steps_that_leave_no_task_steps(tmp_path: Path) -> None:
+    prose = tmp_path / "prose.jsonl"
+    prose.write_text('{"source": "s", "title": "t", "text": "Some prose."}\n')
+    result = runner.invoke(
+        cli.app,
+        ["model", "train", "--model", "fermi-luna-1", "--steps", "3000", "--prose", str(prose),
+         "--prose-steps", "3000", "--tokenizer", str(tmp_path / "t.json")],
+    )  # fmt: skip
+    assert result.exit_code == 1
+    assert "never train on the tasks" in result.output and "--steps 6000" in result.output
