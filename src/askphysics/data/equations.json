@@ -456,7 +456,7 @@
     "domain": "momentum",
     "assumptions": ["Constant mass", "Motion along a single line"],
     "validity_conditions": ["Speeds far below the speed of light"],
-    "tags": ["impulse", "momentum change", "collision", "force", "speed up", "slow down", "impact", "catch"],
+    "tags": ["impulse", "momentum change", "collision", "force", "speed up", "slow down", "impact", "catch", "stop", "stopping", "brake", "braking"],
     "source": "OpenStax University Physics Volume 1, Chapter 9 (reference; entry written by the project)",
     "license": "MIT",
     "confidence_in_entry": 0.98
