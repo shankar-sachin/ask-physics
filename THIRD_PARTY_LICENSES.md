@@ -113,6 +113,13 @@ extracted and reformatted by this project (ADR-016). It keeps that license
 trained with `--prose` carry that attribution in their model cards. It is
 used for training only and is not shipped in the Python package.
 
+The larger prose corpus (ADR-017) is built locally by `scripts/build_corpus.py`
+and never committed. It combines 25 OpenStax books under **CC BY 4.0**, read
+at commits from before OpenStax relicensed them (listed with their authors in
+the corpus's generated `ATTRIBUTION.md` and pinned in
+`third_party/corpus/sources.json`), with public-domain books from Project
+Gutenberg. Weights trained on it carry that attribution in their model cards.
+
 ## Installers and distribution
 
 | Tool | License | Project |

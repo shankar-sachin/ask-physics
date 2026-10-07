@@ -120,18 +120,56 @@ def para_text(para: ET.Element) -> str | None:
     return text
 
 
-def clone(dest: Path) -> Path:
+def clone(dest: Path, repo: str = REPO, commit: str = COMMIT) -> Path:
+    """Check out ``repo`` at ``commit``: only the text (no images), so it stays small."""
+    git = ["git", "-C", str(dest)]
     subprocess.run(["git", "init", "-q", str(dest)], check=True)
     subprocess.run(
-        ["git", "-C", str(dest), "fetch", "-q", "--depth", "1", REPO, COMMIT], check=True
+        [*git, "sparse-checkout", "set", "--no-cone", "/LICENSE", "/collections/*",
+         "/modules/*/index.cnxml"],
+        check=True,
+    )  # fmt: skip
+    subprocess.run(
+        [*git, "fetch", "-q", "--depth", "1", "--filter=blob:none", repo, commit], check=True
     )
-    subprocess.run(["git", "-C", str(dest), "checkout", "-q", "FETCH_HEAD"], check=True)
+    subprocess.run([*git, "checkout", "-q", "FETCH_HEAD"], check=True)
     return dest
 
 
-def modules(source: Path) -> Iterator[tuple[str, str]]:
+def verify_cc_by(source: Path, collections: list[str]) -> str:
+    """The checkout's CC BY 4.0 license text, after checking every book is CC BY 4.0 too.
+
+    Both must hold at the commit being read: OpenStax relicensed most books to CC BY-NC-SA
+    in March 2026, and only versions published before that are CC BY (ADR-017).
+
+    Raises:
+        SystemExit: the LICENSE or a book's metadata is anything else.
+    """
+    license_text = (source / "LICENSE").read_text(encoding="utf-8")
+    if not license_text.startswith("Attribution 4.0 International"):
+        raise SystemExit(f"{source}: LICENSE is not CC BY 4.0; refusing to extract")
+    for collection in collections:
+        meta = ET.parse(source / collection).getroot().find(f"{COLXML}metadata")
+        lic = meta.find(f"{MDML}license") if meta is not None else None
+        url = lic.attrib.get("url", "") if lic is not None else ""
+        if "/licenses/by/4.0" not in url:
+            raise SystemExit(f"{collection}: book license is {url or 'missing'}, not CC BY 4.0")
+    return license_text
+
+
+def book(source: Path, collection: str) -> Iterator[tuple[str, str, str]]:
+    """(chapter, module, paragraph) for one book's prose, in reading order."""
+    for chapter, module in modules(source, collection):
+        path = source / "modules" / module / "index.cnxml"
+        if chapter in SKIP_CHAPTERS or not path.exists():
+            continue
+        for text in paragraphs(path):
+            yield to_ascii(chapter), module, text
+
+
+def modules(source: Path, collection: str = COLLECTION) -> Iterator[tuple[str, str]]:
     """(chapter title, module id) in reading order."""
-    root = ET.parse(source / COLLECTION).getroot()
+    root = ET.parse(source / collection).getroot()
 
     def walk(node: ET.Element, chapter: str) -> Iterator[tuple[str, str]]:
         for child in node:
@@ -180,23 +218,21 @@ def main() -> None:
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
         source = args.source or clone(Path(tmp) / "osbooks-physics")
-        license_text = (source / "LICENSE").read_text(encoding="utf-8")
-        if not license_text.startswith("Attribution 4.0 International"):
+        if (
+            not (source / "LICENSE")
+            .read_text(encoding="utf-8")
+            .startswith("Attribution 4.0 International")
+        ):
             raise SystemExit("the source LICENSE is not CC BY 4.0; refusing to extract")
+        license_text = verify_cc_by(source, [COLLECTION])
         args.out.mkdir(parents=True, exist_ok=True)
         rows = 0
         words = 0
         with (args.out / "prose.jsonl").open("w", encoding="utf-8") as f:
-            for chapter, module in modules(source):
-                if chapter in SKIP_CHAPTERS:
-                    continue
-                for text in paragraphs(source / "modules" / module / "index.cnxml"):
-                    f.write(
-                        json.dumps({"module": module, "chapter": to_ascii(chapter), "text": text})
-                        + "\n"
-                    )
-                    rows += 1
-                    words += len(text.split())
+            for chapter, module, text in book(source, COLLECTION):
+                f.write(json.dumps({"module": module, "chapter": chapter, "text": text}) + "\n")
+                rows += 1
+                words += len(text.split())
         (args.out / "LICENSE").write_text(license_text, encoding="utf-8")
     print(f"{rows} paragraphs, {words} words -> {args.out / 'prose.jsonl'}")
 

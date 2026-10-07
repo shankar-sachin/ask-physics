@@ -365,11 +365,17 @@ def train(
     return metrics
 
 
+MAX_TOKENIZER_PROSE = 30_000  # paragraphs; a sample is enough to learn the words
+
+
 def train_tokenizer(
     data_dir: Path, vocab_size: int, max_examples: int = 50_000, prose: Sequence[str] = ()
 ) -> Tokenizer:
     """Train the BPE tokenizer on the prompts and targets of the training split, plus any
-    ``prose`` paragraphs, so real English words get tokens of their own."""
+    ``prose`` paragraphs, so real English words get tokens of their own. A large corpus is
+    sampled down to ``MAX_TOKENIZER_PROSE`` paragraphs (a fixed sample, so it's repeatable)."""
+    if len(prose) > MAX_TOKENIZER_PROSE:
+        prose = random.Random(0).sample(list(prose), MAX_TOKENIZER_PROSE)
     texts: list[str] = list(prose)
     for i, e in enumerate(read_examples(data_dir / "train")):
         if i >= max_examples:

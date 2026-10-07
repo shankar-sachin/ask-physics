@@ -136,7 +136,9 @@ model:
    Physics* or *College Physics*, which are CC BY-NC-SA. The prose is in
    `third_party/openstax-physics/` and trains as a language-modeling stage
    before the tasks (`--prose`). A model card for weights trained with it
-   must repeat the credit in that directory's `ATTRIBUTION.md`.
+   must repeat the credit in that directory's `ATTRIBUTION.md`. The same holds
+   for the 20M-word corpus built by `scripts/build_corpus.py` (ADR-017),
+   whose build writes its own `ATTRIBUTION.md`.
 
 The factory never reads `evals/`, and a similarity check enforces it
 (`docs/EVALS.md`).
