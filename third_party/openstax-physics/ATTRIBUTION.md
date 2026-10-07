@@ -1,6 +1,7 @@
 # Attribution: OpenStax *Physics*
 
-`prose.jsonl` in this directory contains text from:
+`prose.jsonl`, `questions.jsonl`, and the questions and answer options in
+`real_eval.jsonl` in this directory contain text from:
 
 > **Physics** (2020), by Fatih Gozuacik, Denise Pattison, and Catherine Tabor
 > (authors as OpenStax's collection metadata credits them).
@@ -15,16 +16,22 @@
 
 **Changes made by the Ask Physics project** (`scripts/extract_openstax.py`):
 
-- Kept only body prose paragraphs. Removed all figures, captions, media,
-  tables, exercises, display equations, the preface, and teacher-support
-  material.
-- Wrote inline math as plain text (for example `v = d / t`), replaced
+- `prose.jsonl`: kept only body prose paragraphs. Removed all figures,
+  captions, media, tables, exercises, display equations, the preface, and
+  teacher-support material.
+- `questions.jsonl`: kept the exercises of the practice, end-of-chapter, and
+  test-prep sections, with their answer options and solution text, and
+  removed every exercise that needs a figure or table.
+- `real_eval.jsonl`: 49 of those multiple-choice problems, each with a
+  calculation plan and the letter of the book's answer. The plans were
+  written by the Ask Physics project, not by OpenStax.
+- Wrote inline math as plain text (for example `v = d / t`, `10^8`), replaced
   automatic references to figures and tables with "the figure" and "the
   table", and skipped paragraphs that embed exercises or begin mid-sentence.
 - Converted typographic characters to ASCII (curly quotes, dashes, Greek
   letters as names, accents removed).
 
-The text is used to train the Fermi language models (ADR-016). Any model
-trained on it carries this attribution in its model card. OpenStax and Rice
+The text is used to train and evaluate the Fermi language models (ADR-016).
+Any model trained on it carries this attribution in its model card. OpenStax and Rice
 University do not endorse Ask Physics, and the OpenStax name and logo are
 used here only to give credit.

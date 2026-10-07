@@ -1,14 +1,18 @@
-"""Extract the body prose of OpenStax *Physics* (2020) for language-model training (ADR-016).
+"""Extract the prose and exercises of OpenStax *Physics* (2020) (ADR-016).
 
     python scripts/extract_openstax.py [--source DIR] [--out third_party/openstax-physics]
+
+Writes ``prose.jsonl`` (body paragraphs, for language-model training) and
+``questions.jsonl`` (exercises, for the real-question eval and classify examples).
 
 The book is CC BY 4.0 (its LICENSE file and collection metadata say so). Only prose
 paragraphs are kept: no figures, captions, media, tables, exercises, display equations, or
 teacher-support material (it quotes state standards that aren't OpenStax's to license).
 Inline math is written out as text ("v = d / t"), an auto-numbered reference to a figure
 or table reads "the figure" or "the table", and a paragraph that embeds an exercise or
-starts mid-sentence (after a display equation) is skipped. The output keeps the book's
-license and attribution; it is never relabelled MIT.
+starts mid-sentence (after a display equation) is skipped. Exercises are kept with their
+answer options and solution text, except those that need a figure or table. The output
+keeps the book's license and attribution; it is never relabelled MIT.
 
 Without ``--source`` the repository is cloned at the pinned commit below.
 """
@@ -46,7 +50,7 @@ ASCII = str.maketrans(
     {
         "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2014": " - ",
         "\u2013": "-", "\u2212": "-", "\u2026": "...", "\u00a0": " ", "\u00d7": "x",
-        "\u00b7": "*", "\u2248": "~", "\u2264": "<=", "\u2265": ">=", "\u00b0": " degrees",
+        "\u00b7": "*", "\u2248": "~", "\u2264": "<=", "\u2265": ">=", "\u00b0": " degrees ",
         "\u03c0": "pi", "\u03a9": "ohm", "\u03bc": "mu", "\u00b5": "mu", "\u0394": "delta",
         "\u03b8": "theta", "\u03bb": "lambda", "\u03c9": "omega", "\u03c1": "rho",
         "\u03b1": "alpha", "\u03b2": "beta", "\u03b3": "gamma", "\u03b5": "epsilon",
@@ -63,6 +67,7 @@ def to_ascii(text: str) -> str:
 
 # Notes for teachers, and the section objectives (a list, not prose).
 SKIP_NOTES = ("teacher", "learning-objectives")
+POWER_START = set("0123456789-+\u2212\u2013")
 REFERENCES = {"Figure": "the figure", "Table": "the table"}
 MIN_WORDS = 8
 
@@ -74,11 +79,11 @@ def math_text(node: ET.Element) -> str:
     if tag in ("mi", "mn", "mo", "mtext"):
         return (node.text or "").strip()
     if tag == "msup" and len(kids) == 2:
-        return f"{kids[0]}^{kids[1]}"
+        return f"{kids[0]}^{kids[1].replace(' ', '')}"
     if tag == "msub" and len(kids) == 2:
         return f"{kids[0]}{kids[1]}"
     if tag == "msubsup" and len(kids) == 3:
-        return f"{kids[0]}{kids[1]}^{kids[2]}"
+        return f"{kids[0]}{kids[1]}^{kids[2].replace(' ', '')}"
     if tag == "mfrac" and len(kids) == 2:
         return f"{kids[0]} / {kids[1]}"
     if tag == "msqrt":
@@ -86,8 +91,12 @@ def math_text(node: ET.Element) -> str:
     return " ".join(k for k in kids if k)
 
 
-def para_text(para: ET.Element) -> str | None:
-    """A paragraph as plain text, or None if it can't be read without its page."""
+def para_text(para: ET.Element, *, sentence: bool = True) -> str | None:
+    """A paragraph as plain text, or None if it can't be read without its page.
+
+    ``sentence`` also rejects text that starts mid-sentence; answer options ("$0.69",
+    "zero") are read with it off.
+    """
     parts: list[str] = []
 
     def walk(node: ET.Element) -> bool:
@@ -103,6 +112,9 @@ def para_text(para: ET.Element) -> str | None:
             parts.append(kind)
             parts.append(node.tail or "")
             return True
+        # "10<sup>8</sup>" is 10^8 and "m/s<sup>2</sup>" is m/s^2, but "18<sup>th</sup>" is 18th.
+        if node.tag == f"{CNXML}sup" and (node.text or "").strip()[:1] in POWER_START:
+            parts.append("^")
         parts.append(node.text or "")
         for child in node:
             if not walk(child):
@@ -115,9 +127,64 @@ def para_text(para: ET.Element) -> str | None:
         return None
     text = re.sub(r"\s+", " ", to_ascii("".join(parts))).strip()
     text = re.sub(r"\s+([.,;:!?)])", r"\1", text)
-    if not text or not (text[0].isupper() or text[0].isdigit() or text[0] in '"\u201c('):
+    starts_well = text[:1].isupper() or text[:1].isdigit() or text[:1] in ('"', "\u201c", "(")
+    if not text or (sentence and not starts_well):
         return None  # starts mid-sentence, after a display equation
     return text
+
+
+# Sections whose exercises are questions to answer: practice and end-of-chapter problems,
+# the end-of-chapter conceptual questions, and the test prep. Labs, worked examples, and
+# the performance tasks are not.
+EXERCISE_SECTIONS = (
+    "practice-problems", "problems", "check-understanding", "concept", "critical-thinking",
+    "multiple-choice", "short-answer", "extended-response",
+)  # fmt: skip
+
+
+def exercise(node: ET.Element) -> dict[str, object] | None:
+    """One exercise as {text, options, solution}, or None if it needs a figure or table."""
+    problem = node.find(f"{CNXML}problem")
+    if problem is None or any(problem.iter(f"{CNXML}figure")) or any(problem.iter(f"{CNXML}table")):
+        return None
+    paras = [para_text(p) for p in problem.findall(f"{CNXML}para")]
+    if not paras or any(p is None for p in paras):
+        return None
+    options: list[str] = []
+    for lst in problem.findall(f"{CNXML}list"):
+        for item in lst.findall(f"{CNXML}item"):
+            text = para_text(item, sentence=False)
+            if not text:
+                return None  # an option we can't read makes the question unanswerable
+            options.append(text)
+    solution = node.find(f"{CNXML}solution")
+    answer = None
+    if solution is not None:
+        parts = [para_text(p, sentence=False) for p in solution.iter(f"{CNXML}para")]
+        answer = " ".join(p for p in parts if p) or None
+    return {"text": " ".join(p for p in paras if p), "options": options, "solution": answer}
+
+
+def exercises(source: Path, collection: str) -> Iterator[dict[str, object]]:
+    """Every exercise in ``EXERCISE_SECTIONS``, in reading order, with where it came from."""
+    for chapter, module in modules(source, collection):
+        path = source / "modules" / module / "index.cnxml"
+        if chapter in SKIP_CHAPTERS or not path.exists():
+            continue
+        for section in ET.parse(path).getroot().iter(f"{CNXML}section"):
+            kind = section.attrib.get("class", "")
+            if kind not in EXERCISE_SECTIONS:
+                continue
+            for node in section.iter(f"{CNXML}exercise"):
+                row = exercise(node)
+                if row is not None:
+                    yield {
+                        "id": node.attrib["id"],
+                        "module": module,
+                        "chapter": to_ascii(chapter),
+                        "kind": kind,
+                        **row,
+                    }
 
 
 def clone(dest: Path, repo: str = REPO, commit: str = COMMIT) -> Path:
@@ -237,8 +304,14 @@ def main() -> None:
                 f.write(json.dumps({"module": module, "chapter": chapter, "text": text}) + "\n")
                 rows += 1
                 words += len(text.split())
+        questions = 0
+        with (args.out / "questions.jsonl").open("w", encoding="utf-8") as f:
+            for row in exercises(source, COLLECTION):
+                f.write(json.dumps(row) + "\n")
+                questions += 1
         (args.out / "LICENSE").write_text(license_text, encoding="utf-8")
     print(f"{rows} paragraphs, {words} words -> {args.out / 'prose.jsonl'}")
+    print(f"{questions} exercises -> {args.out / 'questions.jsonl'}")
 
 
 if __name__ == "__main__":
