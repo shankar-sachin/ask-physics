@@ -29,7 +29,9 @@ from askphysics.ui import (
 if TYPE_CHECKING:
     from askphysics.lm.evaluate import RealReport
 
-# OpenStax Physics questions with project-written gold plans (ADR-016), in a checkout.
+# OpenStax Physics questions (ADR-016), in a checkout: all of them, and those with gold
+# plans the project wrote, which are the real-question eval and never training data.
+TEXTBOOK_QUESTIONS = Path("third_party/openstax-physics/questions.jsonl")
 REAL_QUESTIONS = Path("third_party/openstax-physics/real_eval.jsonl")
 
 app = typer.Typer(
@@ -158,15 +160,29 @@ def build_data(
     blocklist: Annotated[
         Path, typer.Option(help="Eval questions to keep out of the data (leakage policy).")
     ] = Path("evals/questions.yaml"),
+    textbook: Annotated[
+        Path,
+        typer.Option(help="Textbook questions to add as classify examples; skipped if missing."),
+    ] = TEXTBOOK_QUESTIONS,
 ) -> None:
-    """Generate training data from the equation database (solved by Noether)."""
-    from askphysics.lm.factory import build_dataset, load_blocklist
+    """Generate training data from the equation database (solved by Noether), plus real
+    textbook problems as classify examples (never the real-question eval's)."""
+    from askphysics.lm.factory import build_dataset, load_blocklist, textbook_examples
 
     blocked = load_blocklist(blocklist)
     if not blocked:
         console.print(f"[warn]![/] no eval questions found at {safe(str(blocklist))}")
+    extra = []
+    if textbook.exists():
+        held_out = set()
+        if REAL_QUESTIONS.exists():
+            lines = REAL_QUESTIONS.read_text(encoding="utf-8").splitlines()
+            held_out = {json.loads(line)["id"] for line in lines if line.strip()}
+        extra = textbook_examples(textbook, exclude=held_out, seed=seed)
     with console.status(f"[muted]generating {examples:,} examples with {workers} worker(s)"):
-        manifest = build_dataset(out, examples, seed=seed, workers=workers, blocklist=blocked)
+        manifest = build_dataset(
+            out, examples, seed=seed, workers=workers, blocklist=blocked, extra=extra
+        )
     table = Table(
         title=Text(f"✓ dataset written to {out}", style="ok"),
         title_justify="left",
@@ -182,6 +198,11 @@ def build_data(
         f"[muted]Dropped {manifest['dropped']:,} attempts "
         "(unsolvable, or too close to an eval question).[/]"
     )
+    if extra:
+        console.print(
+            f"[muted]Includes {len(extra):,} classify examples from {safe(str(textbook))} "
+            "(OpenStax Physics, CC BY 4.0).[/]"
+        )
 
 
 @model_app.command("train-tokenizer")
