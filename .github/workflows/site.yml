@@ -2,15 +2,11 @@ name: Website
 
 # Builds askphysics.vercel.app and drives it in headless Chromium against the
 # real Pyodide CDN and PyPI: the page boots Python and answers questions.
+# Every pull request runs it, whatever it touches: "smoke" is a required check, and a
+# path filter would leave it unreported (and the pull request unmergeable) on one that
+# touches none of the filtered paths.
 on:
   pull_request:
-    paths:
-      - "web/**"
-      - "src/askphysics/**"
-      - "scripts/build_site.sh"
-      - "scripts/site_smoke.mjs"
-      - "vercel.json"
-      - ".github/workflows/site.yml"
   push:
     branches: [main]
     paths:
