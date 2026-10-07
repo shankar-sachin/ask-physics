@@ -35,6 +35,7 @@ from askphysics.lm.generate import (
     known_value_options,
     locked_options,
     number_guard_ok,
+    ordered_options,
     quantity_locks,
     reason_options,
     redirect_options,
@@ -511,3 +512,38 @@ def test_assumptions_come_from_the_equation_and_its_scenarios(store: DataStore) 
     assert options[: len(eq.assumptions)] == list(eq.assumptions)
     assert "Air resistance is negligible" in options
     assert len(options) == len(set(options))
+
+
+def test_the_question_picks_between_twins(store: DataStore) -> None:
+    eqs = [store.equations["series_resistors"], store.equations["parallel_resistors"]]
+    q = "Two resistors: total resistance 3 ohm, resistance 2 is 5 ohm. What is resistance 1?"
+    # Unsaid, both stay, and the sanity check flags the answer as ambiguous.
+    assert equation_options(eqs, q) == ["series_resistors", "parallel_resistors"]
+    assert equation_options(eqs, q.replace("resistors:", "resistors in parallel:")) == [
+        "parallel_resistors"
+    ]
+
+
+def test_a_labelled_bare_number_needs_a_home(store: DataStore) -> None:
+    eqs = [store.equations["stefan_boltzmann"], store.equations["stefan_boltzmann_emissivity"]]
+    q = (
+        "A panel at 350 K with surface area 2 m^2 radiates heat. The emissivity comes out "
+        "to 0.017. What power does it radiate?"
+    )
+    assert equation_options(eqs, q) == ["stefan_boltzmann_emissivity"]
+    q = "600W for the radiated power. The temperature comes out to 350 K. 0.036 for the emissivity."
+    assert equation_options(eqs, f"{q} Find the area.") == ["stefan_boltzmann_emissivity"]
+
+
+def test_the_first_value_stated_goes_to_the_first_of_a_pair() -> None:
+    # "One has mass 0.293 kg and speed 9.27 km/h, the other mass 140 kg and speed 31 mph."
+    unused = [("0.293", "kg"), ("9.27", "km/h"), ("140", "kg"), ("31", "mph")]
+    first, second = ValueOption("9.27", "km/h", "given"), ValueOption("31", "mph", "given")
+    zero = ValueOption("0", "m/s", "assumption")
+    options = [first, second, zero]
+    assert ordered_options(options, "v1", {}, unused, ["v1", "v2"]) == [first, zero]
+    assert ordered_options(options, "v2", {}, unused, ["v1", "v2"]) == [second, zero]
+    # A label on either half decides instead, and so does a pair already half filled.
+    assert ordered_options(options, "v1", {"v2": ("31", "mph")}, unused, ["v1", "v2"]) == options
+    assert ordered_options(options, "v2", {}, unused, ["v2"]) == options
+    assert ordered_options(options, "vf", {}, unused, ["vf"]) == options

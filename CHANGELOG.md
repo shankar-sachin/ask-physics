@@ -29,6 +29,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Spelled-out numbers before a unit are read as digits ("an eight kilogram
   ball" is "an 8 kilogram ball"), and the training data has arithmetic with
   digits too, so number words no longer mean "math question".
+- Every confidently wrong answer in solem's 3,000-question eval is fixed.
+  When a question doesn't say whether resistors are in series or parallel
+  (or whether a speed is orbital or escape), the answer says so and its confidence is
+  low; "in parallel" picks the parallel formula. A stated value the plan
+  doesn't use ("the emissivity comes out to 0.017") is retried, and flagged
+  if no plan uses it. Unlabelled pairs of values go in the order stated.
+- An impossible result (a negative resistance, a 0 N braking force from an
+  assumed 0) is never shown as the answer; the answer degrades and says why.
+  "Stop" and "braking" questions now find the impulse equation.
 
 ## [0.3.0] - 2026-10-06
 

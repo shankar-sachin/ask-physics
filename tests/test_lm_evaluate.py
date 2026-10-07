@@ -11,6 +11,7 @@ from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import LUNA
 from askphysics.lm.evaluate import (
     evaluate_tasks,
+    route_plan,
     sample_examples,
     score_classification,
     score_plan,
@@ -152,3 +153,41 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
     assert json.loads((tmp_path / "luna" / "eval.json").read_text())["plan_examples"] == 1
     r = CliRunner().invoke(cli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
     assert r.exit_code == 1
+
+
+def _resistor_payload(question: str, store: DataStore) -> dict[str, object]:
+    return {
+        "question": question,
+        "category": "standard",
+        "equations": [{"id": "series_resistors"}, {"id": "parallel_resistors"}],
+        "constants": [],
+    }
+
+
+def test_the_eval_never_counts_an_impossible_answer(store: DataStore) -> None:
+    series = _plan(
+        equation_ids=["series_resistors"],
+        target="R1",
+        unknowns=["R1"],
+        known_values=[
+            KnownValue(symbol="R", value=1.3, unit="ohm", origin="given"),
+            KnownValue(symbol="R2", value=10.1, unit="ohm", origin="given"),
+        ],
+    )
+    q = "In series: total 1.3 ohm, resistance 2 is 10.1 ohm. Find resistance 1."
+    decoder = Decoder.__new__(Decoder)  # never called: the first attempt is given
+    routed = route_plan(decoder, _resistor_payload(q, store), store, 1, first=series)
+    assert routed.plan is None and routed.answer is None and not routed.possible
+    flagged = route_plan(
+        decoder,
+        _resistor_payload(f"{q} The battery is 9 V.", store),
+        store,
+        1,
+        first=_plan(
+            equation_ids=["parallel_resistors"],
+            target="R1",
+            unknowns=["R1"],
+            known_values=series.known_values,
+        ),
+    )
+    assert flagged.plan is not None and flagged.possible and not flagged.passed

@@ -38,6 +38,7 @@ from askphysics.lm.formats import (
     serialize_classification,
     serialize_plan,
 )
+from askphysics.lm.reading import mentions, own_tags, twins
 from askphysics.lm.tokenizer import END
 from askphysics.models import Classification, Constant, Equation, KnownValue, Plan, Variable
 from askphysics.retrieval.keyword import KeywordRetriever
@@ -360,6 +361,12 @@ class DataFactory:
         knowns: list[KnownValue],
         assumptions: list[str],
     ) -> StandardProblem | None:
+        context = tpl.EQUATION_CONTEXT.get(eq.id)
+        if context and any(
+            not mentions(question, own_tags(eq, t))
+            for t in twins(eq, self.store.equations.values())
+        ):
+            question = f"{self.rng.choice(context)} {question}"
         if self._leaks(question):
             self.dropped += 1
             return None

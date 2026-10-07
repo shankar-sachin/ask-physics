@@ -133,12 +133,14 @@ def route_plan(
     attempts: int,
     first: Plan | None = None,
 ) -> Routed:
-    """Plan like ``Pipeline._plan_and_compute``: retry with the equations rotated until
-    a plan computes a possible result. ``first`` reuses an already-decoded first attempt.
+    """Plan like ``Pipeline._plan_and_compute``: retry with the equations rotated until a
+    plan computes a possible result that uses every stated value, falling back to a
+    possible one that doesn't. An impossible result is never an answer.
+    ``first`` reuses an already-decoded first attempt.
     """
     equations = [store.equations[eq["id"]] for eq in payload["equations"]]
     constants = [store.constants[c["name"]] for c in payload["constants"]]
-    kept: Routed | None = None
+    flagged: Routed | None = None
     for attempt in range(attempts):
         if attempt == 0 and first is not None:
             p = first
@@ -153,7 +155,7 @@ def route_plan(
             result = compute(p, data=store)
         except (AskPhysicsError, NotImplementedError, ValueError, ArithmeticError):
             continue
-        sanity = sanity_check(p, result, data=store)
+        sanity = sanity_check(p, result, data=store, question=payload["question"])
         routed = Routed(
             plan=p,
             answer=quantity(result.value, result.unit),
@@ -161,11 +163,12 @@ def route_plan(
             passed=sanity.passed,
             tries=attempt + 1,
         )
-        if sanity.possible:
+        if sanity.possible and not sanity.unused:
             return routed
-        kept = kept or routed
-    if kept is not None:
-        return Routed(kept.plan, kept.answer, kept.possible, kept.passed, attempts)
+        if sanity.possible:
+            flagged = flagged or routed
+    if flagged is not None:
+        return Routed(flagged.plan, flagged.answer, True, flagged.passed, attempts)
     return Routed(plan=None, answer=None, possible=False, passed=False, tries=attempts)
 
 

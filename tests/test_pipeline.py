@@ -370,3 +370,61 @@ def test_a_stated_zero_answer_is_not_trivial(store: DataStore) -> None:
     )
     report = sanity_check(p, compute(p, data=store), data=store)
     assert not report.trivial and report.possible
+
+
+def _resistors(equation: str, *, total: float = 3.0, r2: float = 5.0) -> Plan:
+    return Plan.model_validate(
+        {
+            "equation_ids": [equation],
+            "target": "R1",
+            "unknowns": ["R1"],
+            "known_values": [
+                {"symbol": "R", "value": total, "unit": "ohm", "origin": "given"},
+                {"symbol": "R2", "value": r2, "unit": "ohm", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )
+
+
+def test_an_unused_stated_value_is_flagged(store: DataStore) -> None:
+    p = _resistors("parallel_resistors")
+    q = "In parallel: total 3 ohm, resistance 2 is 5 ohm, on a 9 V battery. Find resistance 1."
+    report = sanity_check(p, compute(p, data=store), data=store, question=q)
+    assert report.unused == ["9 V"] and report.possible and not report.passed
+    assert any("gives 9 V, but the plan doesn't use it" in i for i in report.issues)
+    # The same value stated twice must be used twice.
+    q = "In parallel: total 3 ohm, resistance 2 is 5 ohm. Find resistance 1."
+    assert sanity_check(p, compute(p, data=store), data=store, question=q).passed
+
+
+def test_an_unnamed_twin_is_ambiguous(store: DataStore) -> None:
+    p = _resistors("parallel_resistors")
+    q = "Two resistors: total 3 ohm, resistance 2 is 5 ohm. Find resistance 1."
+    report = sanity_check(p, compute(p, data=store), data=store, question=q)
+    assert report.ambiguous and report.possible and not report.passed
+    assert any("series" in i and "parallel" in i for i in report.issues)
+    named = sanity_check(p, compute(p, data=store), data=store, question=f"In parallel. {q}")
+    assert not named.ambiguous
+
+
+def test_without_the_question_givens_are_not_checked(store: DataStore) -> None:
+    p = _resistors("parallel_resistors")
+    report = sanity_check(p, compute(p, data=store), data=store)
+    assert report.unused == [] and not report.ambiguous
+
+
+def test_a_doubtful_answer_caps_confidence() -> None:
+    def score(doubtful: bool) -> float:
+        return score_confidence(
+            retrieval_score=1.0,
+            dimensions_ok=True,
+            magnitude_ok=True,
+            n_assumptions=0,
+            category="standard",
+            doubtful=doubtful,
+        ).score
+
+    assert score(False) > 0.4
+    assert score(True) == 0.4

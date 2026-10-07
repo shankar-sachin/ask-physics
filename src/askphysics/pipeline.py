@@ -13,6 +13,7 @@ the ``explanation`` prose.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple
@@ -27,7 +28,9 @@ from askphysics.errors import (
 from askphysics.llm.base import LLMClient, Roster, client_name
 from askphysics.llm.fake import FakeLLMClient
 from askphysics.llm.routing import can_route
+from askphysics.lm.formats import format_number
 from askphysics.lm.paths import installed_models
+from askphysics.lm.reading import mentions, own_tags, stated_givens, twins
 from askphysics.models import (
     Answer,
     Category,
@@ -240,8 +243,12 @@ def never_negative(variable: Variable) -> bool:
     return any(word in name for word in NEVER_NEGATIVE)
 
 
-def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityReport:
-    """Stage 5: dimension check and order-of-magnitude check.
+def sanity_check(
+    p: Plan, result: ComputeResult, *, data: DataStore, question: str = ""
+) -> SanityReport:
+    """Stage 5: dimension, sign, and order-of-magnitude checks, and, given the question,
+    whether the plan used every value it states and whether the question says which of
+    two look-alike equations applies.
 
     Failures here never block the answer; they lower confidence and add caveats.
     """
@@ -281,6 +288,31 @@ def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityRe
             "it probably put the unknown in the wrong slot"
         )
 
+    unused: list[str] = []
+    ambiguous = False
+    if question:
+        used = Counter(
+            (format_number(k.value), k.unit) for k in p.known_values if k.origin == "given"
+        )
+        for number, unit in stated_givens(question, data.equations.values()):
+            if used[(number, unit)] > 0:
+                used[(number, unit)] -= 1
+            else:
+                shown = number if unit == "dimensionless" else f"{number} {unit}"
+                unused.append(shown)
+        if unused:
+            issues.append(
+                f"The question gives {', '.join(unused)}, but the plan doesn't use "
+                f"{'it' if len(unused) == 1 else 'them'}"
+            )
+        for twin in twins(equation, data.equations.values()):
+            if not mentions(question, own_tags(equation, twin)):
+                ambiguous = True
+                issues.append(
+                    f"The question doesn't say whether {equation.name.lower()} or "
+                    f"{twin.name.lower()} applies"
+                )
+
     magnitude_ok: bool | None = None
     if target_var.typical_range is not None:
         low, high = target_var.typical_range
@@ -300,6 +332,8 @@ def sanity_check(p: Plan, result: ComputeResult, *, data: DataStore) -> SanityRe
         issues=issues,
         sign_ok=sign_ok,
         trivial=trivial,
+        unused=unused,
+        ambiguous=ambiguous,
     )
 
 
@@ -323,6 +357,7 @@ def score_confidence(
     category: Category,
     sign_ok: bool = True,
     trivial: bool = False,
+    doubtful: bool = False,
 ) -> Confidence:
     """The crude, documented confidence formula from ``PLAN.md`` section 7."""
     r = min(max(retrieval_score, 0.0), 1.0)
@@ -332,6 +367,8 @@ def score_confidence(
     score = 0.35 * r + 0.30 * d + 0.20 * s + 0.15 * a
     if not dimensions_ok or not sign_ok or trivial:
         score = min(score, 0.2)
+    if doubtful:  # a stated value went unused, or the question fits two look-alike laws
+        score = min(score, 0.4)
     if category == "fermi":
         score = min(score, 0.6)
     score = round(score, 2)
@@ -363,6 +400,7 @@ def explain(
         category=classification.category,
         sign_ok=sanity.sign_ok,
         trivial=sanity.trivial,
+        doubtful=bool(sanity.unused) or sanity.ambiguous,
     )
     equations = [data.equations[eid] for eid in p.equation_ids]
     explained_by = client_name(llm)
@@ -427,6 +465,7 @@ _STAGE_HINTS = {
     "retrieve": "The equation database does not cover this yet.",
     "plan": "The planner could not build a valid plan from the retrieved equations.",
     "compute": "The math engine could not finish the calculation.",
+    "sanity_check": "Every plan gave a result that can't be right, so none is shown.",
 }
 
 
@@ -581,12 +620,12 @@ class Pipeline:
 
         A plan is rejected when it fails validation, when compute fails, or when its
         result is impossible: wrong dimensions, negative where it can't be, or a zero that
-        only an assumed zero produced (ADR-010).
-        If every attempt is rejected, the first plan that computed at all is kept (its
-        sanity report lowers confidence); with none, the last failure becomes the degraded
-        answer.
+        only an assumed zero produced (ADR-010). A possible plan that leaves a stated
+        value unused is kept as a fallback while the router tries for one that uses them
+        all. If no plan is possible, the answer degrades: an impossible number is never
+        shown as an answer.
         """
-        kept: _Attempt | None = None
+        flagged: _Attempt | None = None
         failure = _Failure("plan", PlanValidationError("no plan attempts were made"), 0)
         for attempt, planner in enumerate(planners):
             try:
@@ -606,12 +645,18 @@ class Pipeline:
             except (AskPhysicsError, NotImplementedError) as exc:
                 failure = _Failure("compute", exc, attempt + 1)
                 continue
-            sanity = sanity_check(p, result, data=self.data)
+            sanity = sanity_check(p, result, data=self.data, question=question.text)
             done = _Attempt(p, result, sanity, attempt + 1, client_name(planner))
-            if sanity.possible:
+            if sanity.possible and not sanity.unused:
                 return done
-            kept = kept or done
-        return kept or failure
+            if sanity.possible:
+                flagged = flagged or done
+            else:
+                reason = sanity.issues[0] if sanity.issues else "an impossible result"
+                failure = _Failure("sanity_check", PlanValidationError(reason), attempt + 1)
+        if flagged is not None:
+            return flagged._replace(attempts=len(planners))
+        return failure
 
 
 class _Attempt(NamedTuple):

@@ -288,9 +288,16 @@ installed, without loading weights; `llm/fermi_client.py` wraps each one.
   the wrong equation gives a negative resistor, and the retry fixes it. A
   result of exactly 0 is also rejected when the plan assumed a 0 (`trivial`):
   "how fast does a rock hit the floor?" solved for the acceleration with
-  v = 0 answers a question nobody asked. A zero from stated values stands. If every attempt is
-  rejected, the first plan that computed at all is kept (its sanity report
-  lowers confidence); with none, the answer degrades.
+  v = 0 answers a question nobody asked. A zero from stated values stands.
+- Plans are tiered. A possible plan that uses every value the question
+  states (`stated_givens`) is answered at once. A possible plan that leaves
+  one unused ("the emissivity comes out to 0.017", never plugged in) is kept
+  as a fallback while the remaining attempts look for one that uses them
+  all; if none does, it is shown with the unused value in its caveats and
+  confidence capped at 0.4. An impossible result is never shown: when every
+  attempt is impossible, the answer degrades and says why. (Until v0.4 the
+  first impossible plan was kept as a last resort, which showed "0 N" for a
+  braking car.)
 - Plans decode greedily, so a seed changes nothing. Each retry rotates the
   order the retrieved equations are listed in, which changes the prompt.
 - The `auto` provider (the default) uses the Fermi models when tellus,
@@ -543,6 +550,30 @@ start is asked about), "how far" and "what height" to a distance or height,
 question's match against that refusal's template, never from an arbitrary
 run of words. On 10,669 generated plans and 10,665 classifications, none of
 these ruled out a gold answer.
+
+The solem 3,000-question eval added four more rules, one per kind of miss.
+- *Twins.* Some equations have identical variables and differ only in
+  meaning: series and parallel resistors, orbital and escape speed. Words
+  decide: an equation whose twin's own tags the question uses, and whose
+  own it doesn't, is ruled out ("in parallel" rules out the series
+  formula). When the question names neither, both stay, and the sanity
+  check marks the answer ambiguous (confidence capped at 0.4) instead of
+  confidently picking one. The data factory opens each twin's questions with
+  a sentence that says which (`EQUATION_CONTEXT`) when its own wording
+  doesn't, so training never teaches a coin flip.
+- *Labelled bare numbers need a home.* A number without a unit that a
+  variable's name or symbol labels ("the emissivity comes out to 0.017") is
+  a value, so equations with a variable for it are preferred. Unlabelled
+  bare numbers still never count ("resistor 2" is a name).
+- *Pairs go in order.* When neither half of an indexed pair (m1 and m2, v1
+  and v2) is labelled, the first value stated goes to the "1" variable and
+  the last to the "2" one.
+- *A name labels without a connector* ("the second mass 1100 kg") only when
+  the value has a unit, since "mass 2" is a name, not a mass of 2.
+On 10,813 generated plans and 10,558 classifications, none of these ruled
+out a gold answer; on 7,187 gold plans the sanity check found no unused
+value, no ambiguity, and no trivial zero; and none of the 219 factory
+questions for twin equations is ambiguous.
 
 Fermi plans keep the looser rules until the Fermi engine (v0.7). A question
 that states an irrelevant quantity with the same dimensions as a variable

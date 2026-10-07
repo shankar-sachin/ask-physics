@@ -28,6 +28,7 @@ from askphysics.lm.formats import (
     plan_units,
     stated_quantities,
 )
+from askphysics.lm.reading import mentions, own_tags, twins
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Plan
 from askphysics.solver.symbolic import solve_for
@@ -309,3 +310,16 @@ def test_every_suggested_question_is_trained_as_answerable(store: DataStore) -> 
             assert any(r.split(" {")[0][:20].lower() in question.lower() for r in redirects)
             seen[c.category] += 1
     assert seen["fermi"] > 50
+
+
+def test_questions_for_twins_say_which(store: DataStore, examples: list[Example]) -> None:
+    # Series and parallel resistors have identical variables: the words must decide.
+    seen = 0
+    for e in (x for x in examples if x.task == "plan"):
+        plan = Plan.model_validate(json.loads(e.target[: -len(END)]))
+        eq = store.equations[plan.equation_ids[0]]
+        question = _payload(e.prompt, PLAN)["question"]
+        for twin in twins(eq, store.equations.values()):
+            seen += 1
+            assert mentions(question, own_tags(eq, twin)), question
+    assert seen > 0

@@ -19,10 +19,10 @@ import math
 import re
 from collections.abc import Iterable, Sequence
 
-from askphysics.lm.formats import format_number
+from askphysics.lm.formats import format_number, question_quantities
 from askphysics.lm.templates import VAR_SYNONYMS
-from askphysics.models import Variable
-from askphysics.solver.units import is_valid_unit
+from askphysics.models import Equation, Variable
+from askphysics.solver.units import is_valid_unit, quantity
 
 _NUMBER = r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
 _UNIT = r"[A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?"
@@ -95,8 +95,9 @@ def labelled_quantities(text: str) -> list[tuple[str, str, str]]:
 
 # A name labels the quantity right after it: "primary turns: 61000", "the speed at the end
 # comes out to 160 mph", "a mass of 5 kg". Searched back only to the start of the clause.
+# The connector may be missing: "the second mass 1100 kg".
 _NAME_CONNECTOR = re.compile(
-    r"\s*(?:=|:|\bis\b|\bequals\b|\bwas measured at\b|\bwas\b|\bcomes? out to\b|\bof\b)\s*$",
+    r"\s*(?:=|:|\bis\b|\bequals\b|\bwas measured at\b|\bwas\b|\bcomes? out to\b|\bof\b)?\s*$",
     re.IGNORECASE,
 )
 _CLAUSE_START = re.compile(r"[,;.!?]|\b(?:and|when|if|given|that|where|while)\b", re.IGNORECASE)
@@ -144,6 +145,9 @@ def name_labels(text: str, variables: Sequence[Variable]) -> list[tuple[str, str
         labels: set[str] = set()
         before = text[: match.start()]
         connector = _NAME_CONNECTOR.search(before)
+        # Without a connector, only a value with a unit is labelled: "mass 2" is a name.
+        if connector is not None and not connector.group().strip() and found[1] == "dimensionless":
+            connector = None
         if connector is not None:
             head = before[: connector.start()]
             start = max((c.end() for c in _CLAUSE_START.finditer(head)), default=0)
@@ -153,7 +157,9 @@ def name_labels(text: str, variables: Sequence[Variable]) -> list[tuple[str, str
                 v = _named(clause, variables, suffix=True)
                 if v is not None:
                     labels.add(v.symbol)
-        after = _FOR_NAME.match(text[match.end() :])
+        # A bare number's match may have taken the next word as a unit: "0.036 for the".
+        end = match.end("number") if found[1] == "dimensionless" else match.end()
+        after = _FOR_NAME.match(text[end:])
         if after is not None:
             v = _named(after.group("rest"), variables, suffix=False)
             if v is not None:
@@ -294,3 +300,62 @@ def symbol_locks(text: str, variables: Sequence[Variable]) -> dict[str, tuple[st
             clashes.add(symbol)
         locks[symbol] = (number, unit)
     return {s: q for s, q in locks.items() if s not in clashes}
+
+
+# --------------------------------------------------------------------------- twins and givens
+
+
+def mentions(text: str, phrases: Iterable[str]) -> bool:
+    """Whether ``text`` contains any of ``phrases`` as whole words, ignoring case."""
+    lowered = text.lower()
+    return any(re.search(rf"(?<![a-z]){re.escape(p.lower())}(?![a-z])", lowered) for p in phrases)
+
+
+def _signature(eq: Equation) -> frozenset[tuple[str, str]]:
+    return frozenset((v.symbol, str(quantity(1, v.unit).dimensionality)) for v in eq.variables)
+
+
+def twins(eq: Equation, equations: Iterable[Equation]) -> list[Equation]:
+    """Equations with exactly ``eq``'s variables: series vs parallel resistors, orbital vs
+    escape speed. Only the question's words can tell them apart."""
+    sig = _signature(eq)
+    return [o for o in equations if o.id != eq.id and _signature(o) == sig]
+
+
+def own_tags(eq: Equation, twin: Equation) -> list[str]:
+    """Tags ``eq`` has and its twin doesn't: "series" for series resistors."""
+    return sorted(set(eq.tags) - set(twin.tags))
+
+
+def contradicted(question: str, eq: Equation, others: Iterable[Equation]) -> bool:
+    """Whether the question names a twin of ``eq`` and not ``eq`` ("in parallel" for the
+    series formula)."""
+    return any(
+        mentions(question, own_tags(t, eq)) and not mentions(question, own_tags(eq, t))
+        for t in twins(eq, others)
+    )
+
+
+def stated_givens(question: str, equations: Iterable[Equation]) -> list[tuple[str, str]]:
+    """Values a question states that a plan should use: (number, unit) pairs.
+
+    Every number written with a unit, plus bare numbers a variable's symbol or name labels
+    ("the emissivity comes out to 0.017", "eps = 0.392"). Unlabelled bare numbers are left
+    out, because they are as often labels themselves ("resistor 2").
+    """
+    equations = list(equations)
+    # Only a unitless variable can label a bare number: "resistance 2 for the total
+    # resistance" is an index, not a resistance of 2.
+    unitless = {
+        v.symbol for eq in equations for v in eq.variables if quantity(1, v.unit).dimensionless
+    }
+    bare = {
+        n for s, n, u in labelled_quantities(question) if u == "dimensionless" and s in unitless
+    }
+    for eq in equations:
+        bare |= {
+            n
+            for s, n, u in name_labels(question, eq.variables)
+            if u == "dimensionless" and s in unitless
+        }
+    return [*question_quantities(question), *((n, "dimensionless") for n in sorted(bare))]

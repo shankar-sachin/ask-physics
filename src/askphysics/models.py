@@ -229,10 +229,20 @@ class SanityReport(_Model):
     # True when the result is exactly 0 only because the plan assumed a 0 ("v = 0" for a
     # rock that hits the floor): the plan answered a different, trivial question.
     trivial: bool = False
+    # Values the question states that the plan never used ("0.017" for the emissivity).
+    unused: list[str] = Field(default_factory=list)
+    # True when an equation with identical variables fits too, and the question doesn't
+    # say which (series or parallel resistors).
+    ambiguous: bool = False
 
     @property
     def passed(self) -> bool:
-        return self.possible and self.magnitude_ok is not False
+        return (
+            self.possible
+            and self.magnitude_ok is not False
+            and not self.unused
+            and not self.ambiguous
+        )
 
     @property
     def possible(self) -> bool:
