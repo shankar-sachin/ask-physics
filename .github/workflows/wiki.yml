@@ -37,8 +37,9 @@ jobs:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" build/wiki-repo
-          rsync -a --delete --exclude .git build/wiki/ build/wiki-repo/
           cd build/wiki-repo
+          git rm -q -r --ignore-unmatch .
+          cp ../wiki/*.md .
           git add -A
           if git diff --cached --quiet; then
             echo "The wiki is already up to date."
