@@ -48,6 +48,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `model train` refuses `--prose-steps` as large as `--steps`. Prose-only steps
+  come first, so such a run reads prose all night and never trains on the
+  tasks; `scripts/train.sh` defaulted to exactly that for solem and celeste
+  (3000 and 3000) and now runs 5000 steps, 2000 of them prose.
 - Every answer v0.3's eval caught confidently wrong is fixed by rules, for
   any model: a value labelled by a variable's name ("primary turns: 61000",
   "the speed at the end comes out to 160 mph") is locked to that variable;

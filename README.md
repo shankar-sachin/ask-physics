@@ -6,7 +6,7 @@
   <a href="https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml"><img src="https://github.com/shankar-sachin/ask-physics/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.2.0-orange.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.0-orange.svg" alt="Version"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://mypy-lang.org/"><img src="https://www.mypy-lang.org/static/mypy_badge.svg" alt="Checked with mypy"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-pre--alpha-red.svg" alt="Status: pre-alpha"></a>

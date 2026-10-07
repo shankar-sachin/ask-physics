@@ -233,3 +233,13 @@ def test_cli_end_to_end(tmp_path: Path) -> None:
     assert "No Fermi models installed" in r.output
     r = runner.invoke(cli.app, ["model", "train", "--model", "fermi-blackhole-1"])
     assert r.exit_code == 1 and "unknown model" in r.output
+
+
+def test_prose_steps_must_leave_task_steps(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    cfg = TrainConfig(steps=10, batch_size=2, prose_steps=10, prose_share=0.1)
+    with pytest.raises(ValueError, match="never trains on the tasks"):
+        train(
+            LUNA, tokenizer, dataset, tmp_path / "luna", cfg, prose=["Some prose here. " * 20] * 30
+        )

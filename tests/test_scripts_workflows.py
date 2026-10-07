@@ -68,8 +68,17 @@ def test_train_backs_up_scores_both_and_compares(tmp_path: Path) -> None:
     ]
     assert steps[-1][2].startswith(str(tmp_path / "backups" / "fermi-solem-1-"))
     train = next(c for c in _commands(result) if c.startswith("askphysics model train "))
-    assert f"--prose {prose} --prose-steps 3000 --prose-share 0.1" in train
-    assert "--steps 3000" in train and "--resume" not in train
+    assert f"--prose {prose} --prose-steps 2000 --prose-share 0.1" in train
+    assert "--steps 5000" in train and "--resume" not in train
+
+
+def test_train_refuses_a_run_with_no_task_steps(tmp_path: Path) -> None:
+    # --steps 3000 with --prose-steps 3000 once spent a whole night on prose alone.
+    prose = tmp_path / "prose.jsonl"
+    prose.write_text("{}\n")
+    result = _run("train.sh", "fermi-solem-1", "--steps", "3000", "--prose", str(prose),
+                  "--prose-steps", "3000", tmp_path=tmp_path)  # fmt: skip
+    assert result.returncode != 0 and "never trains on the tasks" in result.stderr
 
 
 def test_train_resume_skips_backup_and_rebuilds(tmp_path: Path) -> None:

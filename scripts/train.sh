@@ -14,14 +14,16 @@
 #   6. score the new model and compare it with the baseline
 #
 # Options:
-#   --steps N            training steps (tellus 1500, solem and celeste 3000)
+#   --steps N            total steps, prose included (tellus 1500; solem and celeste
+#                        5000: 2000 prose-only, then 3000 on the tasks)
 #   --batch-size N       default 32
 #   --data DIR           default build/data
 #   --examples N         examples when building data (default 1000000)
 #   --workers N          processes when building data (default 10)
 #   --tokenizer FILE     default build/tokenizer.json
 #   --prose FILE         prose to read first (default build/corpus/prose.jsonl if built)
-#   --prose-steps N      prose-only steps first (default 3000 with the corpus)
+#   --prose-steps N      prose-only steps first (default 2000 with the corpus); must be
+#                        fewer than --steps, or the model never trains on the tasks
 #   --prose-share F      share of later batches on prose (default 0.1 with the corpus)
 #   --no-prose           train on the tasks only
 #   --fresh-data         rebuild the training data even if it exists
@@ -43,7 +45,7 @@ shift
 
 case $model in
   fermi-tellus-1) steps=1500 wants_prose=0 ;;
-  fermi-solem-1 | fermi-celeste-1) steps=3000 wants_prose=1 ;;
+  fermi-solem-1 | fermi-celeste-1) steps=5000 wants_prose=1 ;;
   fermi-luna-1) steps=300 wants_prose=0 ;;
   *) fail "unknown model $model (fermi-tellus-1, fermi-solem-1, fermi-celeste-1, fermi-luna-1)" ;;
 esac
@@ -87,8 +89,12 @@ if [ "$wants_prose" = 1 ] && [ -z "$prose" ]; then
   fi
 fi
 if [ "$wants_prose" = 1 ]; then
-  prose_steps=${prose_steps:-3000}
+  prose_steps=${prose_steps:-2000}
   prose_share=${prose_share:-0.1}
+  # Prose-only steps come first: as many as the whole run would never train the tasks.
+  if [ "$prose_steps" -ge "$steps" ]; then
+    fail "--prose-steps ($prose_steps) must be fewer than --steps ($steps), or the model never trains on the tasks"
+  fi
 fi
 
 installed="$(models_dir)/$model"

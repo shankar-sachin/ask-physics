@@ -264,6 +264,12 @@ def train_cmd(
     )
     if (prose_steps or prose_share) and prose is None:
         raise _fail("--prose-steps and --prose-share need --prose")
+    if prose_steps >= steps:
+        raise _fail(
+            f"--prose-steps ({prose_steps}) must be fewer than --steps ({steps}): prose-only "
+            "steps come first, so the model would never train on the tasks. For example, "
+            f"--steps {prose_steps + 3000} trains 3000 task steps after the prose."
+        )
     from askphysics.lm.corpus import read_prose
 
     texts = read_prose(prose) if prose else []
