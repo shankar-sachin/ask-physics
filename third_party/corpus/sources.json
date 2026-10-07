@@ -249,6 +249,317 @@
           ]
         }
       ]
+    },
+    {
+      "repo": "openstax/osbooks-us-history",
+      "commit": "046331cfcea0ac1b1a8fd461b3e6aae638845af3",
+      "books": [
+        {
+          "collection": "us-history.collection.xml",
+          "title": "U.S. History",
+          "slug": "us-history",
+          "authors": [
+            "P. Scott Corbett",
+            "Volker Janssen",
+            "John M. Lund",
+            "Todd Pfannestiel",
+            "Paul Vickery"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-american-government",
+      "commit": "5c90dd7907dbf25f42266417e63ca3bb0012f031",
+      "books": [
+        {
+          "collection": "american-government-4e.collection.xml",
+          "title": "American Government 4e",
+          "slug": "american-government-4e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-world-history",
+      "commit": "3e17beda9130380d24be881e6d1942dfcc1be845",
+      "books": [
+        {
+          "collection": "world-history-volume-1.collection.xml",
+          "title": "World History Volume 1, to 1500",
+          "slug": "world-history-volume-1",
+          "authors": []
+        },
+        {
+          "collection": "world-history-volume-2.collection.xml",
+          "title": "World History Volume 2, from 1400",
+          "slug": "world-history-volume-2",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introduction-sociology",
+      "commit": "d35d5f3bdac40f93607d600134865d4f13ce1f9b",
+      "books": [
+        {
+          "collection": "introduction-sociology-3e.collection.xml",
+          "title": "Introduction to Sociology 3e",
+          "slug": "introduction-sociology-3e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introduction-philosophy",
+      "commit": "d7bd4f0f520529b3ad83272448a9c2be25c9040a",
+      "books": [
+        {
+          "collection": "introduction-philosophy.collection.xml",
+          "title": "Introduction to Philosophy",
+          "slug": "introduction-philosophy",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-writing-guide",
+      "commit": "a6c95528390e3a2936f5bf87c49ac1a4995a0a6e",
+      "books": [
+        {
+          "collection": "writing-guide.collection.xml",
+          "title": "Writing Guide with Handbook",
+          "slug": "writing-guide",
+          "authors": [
+            "Michelle Bachelor Robinson",
+            "Maria Jerskey",
+            "featuring Toby Fulwiler"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-principles-marketing",
+      "commit": "40369d8ce3adb160cf8d2cc6528cd00be6a472eb",
+      "books": [
+        {
+          "collection": "principles-marketing.collection.xml",
+          "title": "Principles of Marketing",
+          "slug": "principles-marketing",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-entrepreneurship",
+      "commit": "c1fa2c872ba07dc864c3aeb5a510b08b4f657288",
+      "books": [
+        {
+          "collection": "entrepreneurship.collection.xml",
+          "title": "Entrepreneurship",
+          "slug": "entrepreneurship",
+          "authors": [
+            "Michael Laverty",
+            "Chris Littel"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-business-ethics",
+      "commit": "d64573e2807a1e7ba5d7dec8c36cd815a942b5c7",
+      "books": [
+        {
+          "collection": "business-ethics.collection.xml",
+          "title": "Business Ethics",
+          "slug": "business-ethics",
+          "authors": [
+            "Stephen M. Byars",
+            "Kurt Stanberry"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introduction-political-science",
+      "commit": "4391e659b98eec43b71e8b3f08241215fb4dd4c4",
+      "books": [
+        {
+          "collection": "introduction-political-science.collection.xml",
+          "title": "Introduction to Political Science",
+          "slug": "introduction-political-science",
+          "authors": [
+            "Mark Carl Rom",
+            "Masaki Hidaka",
+            "Rachel Bzostek Walker"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-principles-economics-bundle",
+      "commit": "020e54dbecb376f27b37c3498f9347a45961c11a",
+      "books": [
+        {
+          "collection": "principles-economics-3e.collection.xml",
+          "title": "Principles of Economics 3e",
+          "slug": "principles-economics-3e",
+          "authors": []
+        },
+        {
+          "collection": "principles-macroeconomics-3e.collection.xml",
+          "title": "Principles of Macroeconomics 3e",
+          "slug": "principles-macroeconomics-3e",
+          "authors": []
+        },
+        {
+          "collection": "principles-macroeconomics-ap-courses-2e.collection.xml",
+          "title": "Principles of Macroeconomics for AP\u00ae Courses 2e",
+          "slug": "principles-macroeconomics-ap-courses-2e",
+          "authors": []
+        },
+        {
+          "collection": "principles-microeconomics-3e.collection.xml",
+          "title": "Principles of Microeconomics 3e",
+          "slug": "principles-microeconomics-3e",
+          "authors": []
+        },
+        {
+          "collection": "principles-microeconomics-ap-courses-2e.collection.xml",
+          "title": "Principles of Microeconomics for AP\u00ae Courses 2e",
+          "slug": "principles-microeconomics-ap-courses-2e",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-principles-finance",
+      "commit": "3b7fc65c527ef51dbee24689691f19947fb72fb2",
+      "books": [
+        {
+          "collection": "principles-finance.collection.xml",
+          "title": "Principles of Finance",
+          "slug": "principles-finance",
+          "authors": [
+            "Julie Dahlquist",
+            "Rainford Knight"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-life-liberty-and-pursuit-happiness",
+      "commit": "acb6fbe2744dd112187b6aff5946cfe969410fca",
+      "books": [
+        {
+          "collection": "life-liberty-and-pursuit-happiness.collection.xml",
+          "title": "Life, Liberty, and the Pursuit of Happiness",
+          "slug": "life-liberty-and-pursuit-happiness",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-college-success-bundle",
+      "commit": "4c04b87eb2753872c2d442fe9736859ddb27bb72",
+      "books": [
+        {
+          "collection": "college-success-concise.collection.xml",
+          "title": "College Success Concise",
+          "slug": "college-success-concise",
+          "authors": []
+        },
+        {
+          "collection": "college-success.collection.xml",
+          "title": "College Success",
+          "slug": "college-success",
+          "authors": []
+        },
+        {
+          "collection": "preparing-for-college-success.collection.xml",
+          "title": "Preparing for College Success",
+          "slug": "preparing-for-college-success",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introduction-anthropology",
+      "commit": "f0f11fc382e1f8974f2b961d512369ac87d27e32",
+      "books": [
+        {
+          "collection": "introduction-anthropology.collection.xml",
+          "title": "Introduction to Anthropology",
+          "slug": "introduction-anthropology",
+          "authors": [
+            "Jennifer Hasty",
+            "David G. Lewis",
+            "Marjorie M. Snipes"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-lifespan-development",
+      "commit": "2a3fbff4504dd90fa2728ff06a27c23a36e6b88d",
+      "books": [
+        {
+          "collection": "lifespan-development.collection.xml",
+          "title": "Lifespan Development",
+          "slug": "lifespan-development",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introduction-python-programming",
+      "commit": "2825b114221917bea5ae328a94e484b4da8a93ca",
+      "books": [
+        {
+          "collection": "introduction-python-programming.collection.xml",
+          "title": "Introduction to Python Programming",
+          "slug": "introduction-python-programming",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-principles-data-science",
+      "commit": "e9fbc64ccb92f58f1cefe526e49a69854a681805",
+      "books": [
+        {
+          "collection": "principles-data-science.collection.xml",
+          "title": "Principles of Data Science",
+          "slug": "principles-data-science",
+          "authors": []
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-introduction-intellectual-property",
+      "commit": "6dad5479f5a7974df9a2dcb01f4ce9a970658029",
+      "books": [
+        {
+          "collection": "introduction-intellectual-property.collection.xml",
+          "title": "Introduction to Intellectual Property",
+          "slug": "introduction-intellectual-property",
+          "authors": [
+            "David Kline"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "openstax/osbooks-contemporary-mathematics",
+      "commit": "fa7c1a151783958fd2c114da66831e3d57ce2321",
+      "books": [
+        {
+          "collection": "contemporary-mathematics.collection.xml",
+          "title": "Contemporary Mathematics",
+          "slug": "contemporary-mathematics",
+          "authors": []
+        }
+      ]
     }
   ],
   "gutenberg": {
@@ -259,8 +570,24 @@
       "QD",
       "QA",
       "Q",
-      "PR",
-      "PS"
+      "T",
+      "R",
+      "S",
+      "G",
+      "D",
+      "E",
+      "F",
+      "B",
+      "H",
+      "J",
+      "K",
+      "L",
+      "N",
+      "M",
+      "U",
+      "V",
+      "Z",
+      "P"
     ],
     "exclude_subjects": [
       "Poetry",
@@ -271,6 +598,7 @@
       "Songs",
       "Hymns"
     ],
-    "min_book_words": 5000
+    "min_book_words": 5000,
+    "_loccs": "Library of Congress classes in priority order: the sciences, technology, medicine, and agriculture; then expository non-fiction (geography, history, philosophy, social science, politics, law, education, arts); then language and literature (P, which includes the English and American novels in PR and PS)."
   }
 }

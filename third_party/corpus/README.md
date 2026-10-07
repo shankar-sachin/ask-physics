@@ -7,10 +7,13 @@ About 20 million words of real English for the Fermi models to learn from
 python scripts/build_corpus.py          # writes build/corpus/ (about 130 MB)
 ```
 
-- **25 OpenStax textbooks** under CC BY 4.0, each read at the last commit of
-  its repository before OpenStax relicensed it to CC BY-NC-SA. The build stops
-  if a pinned commit's `LICENSE` or a book's metadata says anything else.
-- **Public-domain books** from Project Gutenberg, science first, then
+- **52 OpenStax textbooks** (about 6.8M words) under CC BY 4.0, each read at
+  the last commit of its repository before OpenStax relicensed it to CC
+  BY-NC-SA: sciences, mathematics, history, economics, social sciences,
+  philosophy, writing, business, and more. The build stops if a pinned
+  commit's `LICENSE` or a book's metadata says anything else.
+- **Public-domain books** from Project Gutenberg: the sciences first, then
+  expository non-fiction (history, philosophy, essays, and the like), then
   literature, until the target is reached. Everyone credited must have died in
   or before 1955.
 
