@@ -671,8 +671,11 @@ never CC BY; Physics and Statistics still are.
   license text, and a lock file listing exact commits, Gutenberg ids, and file
   hashes.
 - **Cleaning.** Text only, as in ADR-016; reference-list entries and repeated
-  paragraphs removed; paragraphs containing slurs dropped (old literature has
-  them), with the list stored as hashes.
+  paragraphs removed; paragraphs containing slurs or swear words dropped, by
+  the maintainer's rule of none at all in what the models learn from (old
+  books and quoted history have both). The list is stored as hashes, and
+  words with innocent meanings (a surname, a crack in a shutter, a bloody
+  nose, a finger prick, a rooster, a donkey) are left off it.
 - Model cards for weights trained on the corpus carry its attribution.
 
 **Consequences.** About 20x the real English solem has seen, with no

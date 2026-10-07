@@ -141,3 +141,18 @@ def test_the_manifest_pins_only_cc_by_books() -> None:
     assert not titles & never_cc_by
     # Non-fiction ranks ahead of literature (P), which comes last.
     assert spec["gutenberg"]["loccs"][-1] == "P" and spec["gutenberg"]["loccs"][0] == "QC"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Oyserman and Coon (2002) studied individualism.",  # a surname
+        "Light passed through a chink in the shutter.",  # a crack
+        "Symptoms include a bloody nose and fever.",  # medicine
+        "A finger prick gives a drop of blood for the test.",
+        "Ishmael tells the story of Moby Dick.",
+        "The cock crowed at dawn, and the ass carried the load.",  # a rooster, a donkey
+    ],
+)
+def test_innocent_words_are_kept(text: str) -> None:
+    assert not build_corpus.blocked(text)

@@ -14,7 +14,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   writing, and more), read at commits from before OpenStax relicensed them,
   and public-domain books from Project Gutenberg, explanatory non-fiction
   ahead of fiction. Every pinned commit's license
-  is checked at build time, repeated paragraphs, citations, and slurs are
+  is checked at build time, repeated paragraphs, citations, slurs, and swear words are
   removed, and each build writes its attribution and a lock file.
 
 ### Fixed
