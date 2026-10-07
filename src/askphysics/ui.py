@@ -169,6 +169,16 @@ def answer_card(answer: Answer, equations: Mapping[str, Equation] | None = None)
             inputs.append(f"  {k.origin}", style="muted")
         rows.append(("inputs", inputs))
 
+    if answer.steps:  # values found along the way when the plan chained equations
+        steps = Text()
+        for i, s in enumerate(answer.steps):
+            if i:
+                steps.append("\n")
+            steps.append(f"{pretty_symbol(s.symbol)} = ", style="muted")
+            steps.append(f"{pretty_number(s.value)} {pretty_unit(s.unit)}", style="value")
+            steps.append(f"  from {s.equation_id}", style="muted")
+        rows.append(("found", steps))
+
     if answer.assumptions:
         rows.append(("assumes", Text("\n".join(f"• {a}" for a in answer.assumptions))))
     if answer.models:

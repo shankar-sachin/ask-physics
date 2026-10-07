@@ -43,11 +43,13 @@ from askphysics.lm.tokenizer import END
 from askphysics.models import Classification, Constant, Equation, KnownValue, Plan, Variable
 from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.symbolic import solve_for
-from askphysics.solver.units import check_dimensions, quantity, unit_string
+from askphysics.solver.units import check_dimensions, quantity, to_kelvin, unit_string
 
 Task = Literal["classify", "plan", "explain"]
 LEAK_THRESHOLD = 0.7
 RETRIES_PER_TARGET = 6
+# Share of plan examples that chain two equations (``tpl.CHAINS``).
+CHAIN_SHARE = 0.1
 _WORDS = re.compile(r"[a-z]+")
 
 
@@ -75,6 +77,19 @@ class StandardProblem:
     plan: Plan
     value: float
     unit: str
+
+
+def _symbols(eq: Equation) -> set[str]:
+    return {v.symbol for v in eq.variables}
+
+
+def _substitutable(knowns: Sequence[KnownValue], equations: Sequence[Equation]) -> dict[str, Any]:
+    """Known values as quantities Noether can substitute, Celsius and Fahrenheit in kelvin."""
+    variables = {v.symbol: v for eq in equations for v in eq.variables}
+    return {
+        k.symbol: to_kelvin(quantity(k.value, k.unit), change=variables[k.symbol].is_change)
+        for k in knowns
+    }
 
 
 def word_overlap(a: str, b: str) -> float:
@@ -164,6 +179,7 @@ class DataFactory:
         *,
         adjective: bool = False,
         typical: tuple[float, float] | None = None,
+        change: bool = False,
     ) -> tuple[str, str, str]:
         """A realistic value for a variable measured in ``unit``.
 
@@ -184,7 +200,11 @@ class DataFactory:
             return number, unit, number
         value = math.exp(self.rng.uniform(math.log(low), math.log(high)))
         shown_unit = self.rng.choice(tpl.ALT_UNITS.get(unit, (unit,)))
-        shown = quantity(value, unit).to(shown_unit).magnitude
+        if change and shown_unit in tpl.TEMPERATURE_SCALES:
+            # A change of 60 K is a change of 60 degC (and 108 degF), not -213 degC.
+            shown = value * tpl.TEMPERATURE_SCALES[shown_unit]
+        else:
+            shown = quantity(value, unit).to(shown_unit).magnitude
         digits = self.rng.choice((2, 2, 3))
         number = format_number(float(f"{shown:.{digits}g}"))
         if "." not in number and "e" not in number and self.rng.random() < 0.05:
@@ -258,13 +278,25 @@ class DataFactory:
         ]
         if scenarios and self.rng.random() < 0.6:
             return self._scenario_problem(self.rng.choice(scenarios))
+        question, template_id, knowns = self._generic(list(eq.variables), target)
+        return self._finish(
+            self._dress(question), template_id, eq, target.symbol, knowns, list(eq.assumptions)
+        )
+
+    def _generic(
+        self, variables: Sequence[Variable], target: Variable
+    ) -> tuple[str, str, list[KnownValue]]:
+        """A generic question asking for ``target`` that states every other variable.
+
+        Returns the question, its template id ("gen_01+kp_10"), and the known values.
+        """
         frame = self.rng.choice(tpl.GENERIC)
         pattern = self.rng.choice(tpl.KNOWN_PATTERNS)
         mixed = self.rng.random() < 0.25
         used = [pattern]
         knowns: list[KnownValue] = []
         phrases: list[_Phrase] = []
-        for v in eq.variables:
+        for v in variables:
             if v.symbol == target.symbol:
                 continue
             const = self._constant_for(v.name, v.unit)
@@ -275,7 +307,7 @@ class DataFactory:
                     )
                 )
                 continue
-            number, unit, shown = self._sample(v.unit, typical=v.typical_range)
+            number, unit, shown = self._sample(v.unit, typical=v.typical_range, change=v.is_change)
             knowns.append(
                 KnownValue(symbol=v.symbol, value=float(number), unit=unit, origin="given")
             )
@@ -300,13 +332,76 @@ class DataFactory:
         pattern_id = "kp_mix" if mixed else pattern.id
         if mixed and any(p.held_out for p in used):
             pattern_id += "_h"
-        return self._finish(
-            self._dress(question),
-            f"{frame.id}+{pattern_id}",
-            eq,
-            target.symbol,
-            knowns,
-            list(eq.assumptions),
+        return question, f"{frame.id}+{pattern_id}", knowns
+
+    def chained_problem(self, chain: tpl.Chain | None = None) -> StandardProblem | None:
+        """A solved two-step problem (``tpl.CHAINS``): ``first`` gives the intermediate value
+        that ``then`` needs. The gold plan cites both equations, target's first, and lists
+        the intermediate as an unknown; Noether solves it in order."""
+        chain = chain or self.rng.choice(tpl.CHAINS)
+        first, then = self.store.equations[chain.first], self.store.equations[chain.then]
+        variables: dict[str, Variable] = {}
+        for v in (*then.variables, *first.variables):
+            if v.symbol != chain.via:
+                variables.setdefault(v.symbol, v)
+        target = then.variable(chain.target)
+        question, template_id, knowns = self._generic(list(variables.values()), target)
+        question = self._dress(question)
+        if self._leaks(question):
+            self.dropped += 1
+            return None
+        given = _substitutable(knowns, [then, first])
+        try:
+            via = solve_for(first, chain.via, {s: given[s] for s in given if s in _symbols(first)})
+            given[chain.via] = via.value
+            outcome = solve_for(
+                then, chain.target, {s: given[s] for s in _symbols(then) if s in given}
+            )
+        except AskPhysicsError:
+            self.dropped += 1
+            return None
+        value = float(outcome.value.magnitude)
+        if not (math.isfinite(value) and value > 0 and float(via.value.magnitude) > 0):
+            self.dropped += 1
+            return None
+        retrieved = self._retrieved(question, then)
+        if first.id not in {e.id for e in retrieved}:
+            retrieved.insert(self.rng.randrange(len(retrieved) + 1), first)
+        constants = relevant_constants(retrieved, self.constants)
+        names = {
+            "first": equation_phrase(first.name),
+            "then": equation_phrase(then.name),
+            "via": plain_name(first.variable(chain.via).name),
+            "via_sym": chain.via,
+            "target": plain_name(target.name),
+            "sym": chain.target,
+        }
+        assumptions = list(dict.fromkeys([*then.assumptions, *first.assumptions]))
+        plan = Plan(
+            equation_ids=[then.id, first.id],
+            target=chain.target,
+            unknowns=[chain.target, chain.via],
+            known_values=knowns,
+            assumptions=assumptions,
+            strategy=self.rng.choice(tpl.CHAIN_STRATEGIES).format(**names),
+        )
+        allowed_numbers = set(plan_numbers(question, constants))
+        allowed_units = set(plan_units(question, retrieved, constants))
+        if any(
+            format_number(k.value) not in allowed_numbers or k.unit not in allowed_units
+            for k in knowns
+        ):
+            self.dropped += 1
+            return None
+        return StandardProblem(
+            question=question,
+            template=f"chain+{template_id}",
+            equation=then,
+            retrieved=retrieved,
+            constants=constants,
+            plan=plan,
+            value=float(f"{value:.6g}"),
+            unit=unit_string(outcome.value.units),
         )
 
     def _scenario_problem(self, sc: tpl.Scenario | None = None) -> StandardProblem | None:
@@ -342,7 +437,7 @@ class DataFactory:
                 continue
             adjective = "{" + v.symbol + "_a}" in sc.template.text
             number_text, unit, shown = self._sample(
-                v.unit, adjective=adjective, typical=v.typical_range
+                v.unit, adjective=adjective, typical=v.typical_range, change=v.is_change
             )
             knowns.append(
                 KnownValue(symbol=v.symbol, value=float(number_text), unit=unit, origin="given")
@@ -371,7 +466,7 @@ class DataFactory:
             self.dropped += 1
             return None
         try:
-            outcome = solve_for(eq, target, {k.symbol: quantity(k.value, k.unit) for k in knowns})
+            outcome = solve_for(eq, target, _substitutable(knowns, [eq]))
         except AskPhysicsError:
             self.dropped += 1
             return None
@@ -421,7 +516,8 @@ class DataFactory:
         return "val" if any(p.endswith("_h") for p in template_id.split("+")) else "train"
 
     def plan_example(self) -> Example | None:
-        p = self.standard_problem()
+        chained = self.rng.random() < CHAIN_SHARE
+        p = self.chained_problem() if chained else self.standard_problem()
         if p is None:
             return None
         prompt = plan_prompt(p.question, "standard", p.retrieved, p.constants)

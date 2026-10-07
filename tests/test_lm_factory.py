@@ -31,7 +31,7 @@ from askphysics.lm.formats import (
 from askphysics.lm.reading import mentions, own_tags, twins
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Plan
-from askphysics.solver.symbolic import solve_for
+from askphysics.pipeline import compute
 from askphysics.solver.units import check_dimensions, quantity
 
 EVALS = Path(__file__).resolve().parents[1] / "evals" / "questions.yaml"
@@ -85,10 +85,8 @@ def test_plan_targets_are_decodable_and_correct(store: DataStore, examples: list
             assert k.unit in units
         for text in [*plan.assumptions, plan.strategy]:
             assert set(extract_numbers(text)) <= numbers, text
-        # The gold plan actually solves.
-        eq = store.equations[plan.equation_ids[0]]
-        knowns = {k.symbol: quantity(k.value, k.unit) for k in plan.known_values}
-        assert solve_for(eq, plan.target, knowns).value.magnitude > 0
+        # The gold plan actually solves, chaining its equations if it cites two.
+        assert compute(plan, data=store).value > 0
 
 
 def test_given_values_are_written_in_the_question(examples: list[Example]) -> None:
@@ -323,3 +321,25 @@ def test_questions_for_twins_say_which(store: DataStore, examples: list[Example]
             seen += 1
             assert mentions(question, own_tags(eq, twin)), question
     assert seen > 0
+
+
+def test_chained_problems_need_both_equations(store: DataStore) -> None:
+    factory = DataFactory(store, seed=12)
+    for chain in tpl.CHAINS:
+        problems = [p for p in (factory.chained_problem(chain) for _ in range(30)) if p]
+        assert problems, chain
+        for p in problems:
+            assert p.plan.equation_ids == [chain.then, chain.first]
+            assert p.plan.unknowns == [chain.target, chain.via]
+            assert chain.via not in {k.symbol for k in p.plan.known_values}
+            assert {chain.then, chain.first} <= {e.id for e in p.retrieved}
+            result = compute(p.plan, data=store)
+            assert [s.equation_id for s in result.steps] == [chain.first, chain.then]
+            assert result.value == pytest.approx(p.value, rel=1e-5)
+            assert p.template.startswith("chain+")
+
+
+def test_some_plan_examples_chain(examples: list[Example]) -> None:
+    plans = [e for e in examples if e.task == "plan"]
+    chained = [e for e in plans if e.template.startswith("chain+")]
+    assert 0.02 < len(chained) / len(plans) < 0.2

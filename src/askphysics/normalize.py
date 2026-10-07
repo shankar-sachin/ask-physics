@@ -33,6 +33,19 @@ _PER = re.compile(
     r"(?<![\w.])(\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s+([A-Za-z]+)\s+per\s+([A-Za-z]+)(\s+squared)?\b"
 )
 _DEGREES = re.compile(r"(\d)\s*°\s*([CF])\b")
+# "20 degrees Celsius", "68 degrees F", "15 Celsius", "-4 deg F". Bare "C" is a coulomb.
+_DEGREE_WORDS = re.compile(
+    r"(\d)\s*(?:(?:degrees?|deg)\s+(?:(Celsius|centigrade|C)|(Fahrenheit|F))|"
+    r"(Celsius|centigrade)|(Fahrenheit))\b",
+    re.IGNORECASE,
+)
+
+
+def _degree_words(m: re.Match[str]) -> str:
+    celsius = m.group(2) or m.group(4)
+    return f"{m.group(1)} {'degC' if celsius else 'degF'}"
+
+
 _MICRO = re.compile(r"(\d\s*)[µμ](?=[A-Za-z])")  # micro sign or Greek mu, as a unit prefix
 _OHM = re.compile(r"(\d\s*)([kMm]?)[ΩΩ]")  # Greek omega or the ohm sign
 _ONES = (
@@ -133,7 +146,8 @@ def normalize_question(text: str) -> str:
     - A hyphen between a number and a unit goes: "55-kg" is "55 kg".
     - "per" between units is a slash: "20 meters per second" is "20 meters/second",
       "9.8 meters per second squared" is "9.8 meters/second^2".
-    - Degree temperatures get Pint's names: "25 °C" is "25 degC".
+    - Degree temperatures get Pint's names: "25 °C", "25 degrees Celsius", and "25 Celsius"
+      are "25 degC"; Fahrenheit likewise is "degF".
     - Symbols the extractors can't start a unit with get letters: "2.5 µC" is "2.5 uC",
       "220 Ω" is "220 ohm", "4.7 kΩ" is "4.7 kohm".
     - A number spelled out before a unit becomes digits: "an eight kilogram ball" is "an
@@ -153,6 +167,7 @@ def normalize_question(text: str) -> str:
     text = _HYPHEN_UNIT.sub(_hyphen_unit, text)
     text = _PER.sub(_per, text)
     text = _DEGREES.sub(lambda m: f"{m.group(1)} deg{m.group(2)}", text)
+    text = _DEGREE_WORDS.sub(_degree_words, text)
     text = _MICRO.sub(r"\1u", text)
     text = _OHM.sub(r"\1\2ohm", text)
     return text

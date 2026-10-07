@@ -31,6 +31,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   ahead of fiction. Every pinned commit's license
   is checked at build time, repeated paragraphs, citations, slurs, and swear words are
   removed, and each build writes its attribution and a lock file.
+- Multi-equation answers: a plan can chain equations ("a 3 kg cart is pushed
+  with 12 N for 4 s: how far does it go?" finds the acceleration first), and
+  the answer shows each value found along the way. The training data now
+  includes two-step problems.
+- Celsius and Fahrenheit: "20 °C", "68 degrees Fahrenheit", and "100 degrees
+  centigrade" all work, converted as a temperature or as a change in one by
+  what the equation means, and a temperature asked in Celsius is answered in
+  Celsius too.
 
 ### Fixed
 
@@ -57,6 +65,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An impossible result (a negative resistance, a 0 N braking force from an
   assumed 0) is never shown as the answer; the answer degrades and says why.
   "Stop" and "braking" questions now find the impulse equation.
+- The last two confidently wrong answers in solem's 3,000-question eval:
+  "how strongly do they attract?" asks for a force, not an energy, and a
+  question that never mentions an emissivity no longer gets one borrowed
+  from another number (and a borrowed unitless value is flagged).
 
 ## [0.3.0] - 2026-10-06
 

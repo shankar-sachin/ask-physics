@@ -47,6 +47,8 @@ from askphysics.lm.reading import (
     asked_symbols,
     asked_variables,
     contradicted,
+    mentions,
+    names_for,
     stated_givens,
     symbol_locks,
 )
@@ -728,6 +730,26 @@ def locked_options(
     return narrowed or list(options)
 
 
+def _unfilled_unitless(eq: Equation, question: str, asked: Sequence[Variable]) -> bool:
+    """Whether ``eq`` has a unitless variable the question never mentions, states, or asks
+    for ("the Lorentz factor is unknown... what is it?" mentions one)."""
+    labelled = {
+        s for s, (_, u) in quantity_locks(question, eq.variables).items() if u == "dimensionless"
+    }
+    return any(
+        v.unit == "dimensionless"
+        and v.symbol not in labelled
+        and v not in asked
+        and not mentions(question, names_for(v))
+        and not known_value_options(v, question, [])
+        for v in eq.variables
+    )
+
+
+def _dimensions(unit: str) -> str:
+    return str(quantity(1.0, unit).dimensionality)
+
+
 def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
     """Ids a standard plan may start with: equations with room for every stated quantity.
 
@@ -754,6 +776,17 @@ def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
         return True
 
     roomy = [eq for eq in equations if has_room(eq)] or list(equations)
+    # When no equation with room has the variable the ask names, the answer takes two steps
+    # ("the force, mass, and time are given: how far does it go?"): start from the
+    # equations that do have it, and chain to the rest.
+    # Kinds of quantity are compared, not names: "its speed" names the speed in v = d/t,
+    # but the final velocity in v = v0 + at is a speed too.
+    asked_any = asked_variables(question, [v for eq in equations for v in eq.variables])
+    asked_kinds = {_dimensions(v.unit) for v in asked_any}
+    if asked_any and not any(
+        _dimensions(v.unit) in asked_kinds for eq in roomy for v in eq.variables
+    ):
+        roomy = [eq for eq in equations if any(v in asked_any for v in eq.variables)]
     # "in parallel" rules out the series formula, whose variables are otherwise identical.
     roomy = [eq for eq in roomy if not contradicted(question, eq, equations)] or roomy
     # A bare number the question labels ("the emissivity comes out to 0.017") needs a home
@@ -762,6 +795,11 @@ def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
     if labelled:
         housing = [eq for eq in roomy if labelled <= set(quantity_locks_bare(question, eq))]
         roomy = housing or roomy
+    # A unitless variable (an emissivity, a coefficient) needs its value stated or asked
+    # for: "the area is 1200 cm^2 and the temperature 610 K, what power?" rules out the
+    # law with an emissivity, which would otherwise borrow the 1200.
+    asked_here = asked_variables(question, [v for eq in roomy for v in eq.variables])
+    roomy = [eq for eq in roomy if not _unfilled_unitless(eq, question, asked_here)] or roomy
     # Prefer equations with the variable the ask names: "what is its mass?" rules out
     # W = Fd. Names compete across equations, so "time to reach the top" beats "time".
     asked = asked_variables(question, [v for eq in roomy for v in eq.variables])

@@ -6,7 +6,7 @@ from tests.conftest import DEMO_QUESTION
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import LLMError, PlanValidationError
+from askphysics.errors import LLMError, PlanValidationError, SolverError
 from askphysics.llm.fake import FakeLLMClient
 from askphysics.models import (
     Classification,
@@ -148,9 +148,71 @@ def test_validate_plan_rejects_empty_and_bad_units(retriever: KeywordRetriever) 
         validate_plan(_plan(known_values=[bad]), retrieval)
 
 
-def test_compute_multi_equation_is_a_stub(store: DataStore) -> None:
-    with pytest.raises(NotImplementedError):
-        compute(_plan(equation_ids=["kin_v_squared", "kin_v_at"]), data=store)
+def _car_plan(equation_ids: list[str], **overrides: object) -> Plan:
+    # A 1500 kg car goes from 0 to 20 m/s in 8 s: a = 2.5 m/s^2, so F = 3750 N.
+    data: dict[str, object] = {
+        "equation_ids": equation_ids,
+        "target": "F",
+        "unknowns": ["F", "a"],
+        "known_values": [
+            KnownValue(symbol="m", value=1500, unit="kg", origin="given"),
+            KnownValue(symbol="v", value=20, unit="m/s", origin="given"),
+            KnownValue(symbol="v0", value=0, unit="m/s", origin="assumption"),
+            KnownValue(symbol="t", value=8, unit="s", origin="given"),
+        ],
+        "assumptions": [],
+        "strategy": "Find a, then F.",
+    }
+    data.update(overrides)
+    return Plan.model_validate(data)
+
+
+@pytest.mark.parametrize(
+    "order", [["newton_second_law", "kin_v_at"], ["kin_v_at", "newton_second_law"]]
+)
+def test_compute_chains_equations_in_dependency_order(store: DataStore, order: list[str]) -> None:
+    result = compute(_car_plan(order), data=store)
+    assert result.value == pytest.approx(3750) and result.unit == "newton"
+    assert [(s.equation_id, s.symbol) for s in result.steps] == [
+        ("kin_v_at", "a"),
+        ("newton_second_law", "F"),
+    ]
+    assert result.steps[0].value == pytest.approx(2.5)
+    assert "a" in result.substitutions
+
+
+def test_a_single_equation_is_one_step(store: DataStore) -> None:
+    result = compute(_plan(), data=store)
+    assert [s.equation_id for s in result.steps] == ["kin_v_squared"]
+
+
+def test_a_chain_that_cannot_reach_the_target_says_what_is_missing(store: DataStore) -> None:
+    plan = _car_plan(
+        ["newton_second_law", "kin_v_at"],
+        known_values=[KnownValue(symbol="m", value=1500, unit="kg", origin="given")],
+    )
+    with pytest.raises(SolverError, match="still missing"):
+        compute(plan, data=store)
+
+
+def test_a_symbol_with_two_meanings_is_never_chained(store: DataStore) -> None:
+    # W is a weight in newtons in one and work in joules in the other.
+    plan = Plan.model_validate(
+        {
+            "equation_ids": ["weight", "power_work_time"],
+            "target": "P",
+            "unknowns": ["P", "W"],
+            "known_values": [
+                {"symbol": "m", "value": 2, "unit": "kg", "origin": "given"},
+                {"symbol": "g", "value": 9.80665, "unit": "m/s^2", "origin": "constant"},
+                {"symbol": "t", "value": 3, "unit": "s", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )
+    with pytest.raises(SolverError, match="means different quantities"):
+        compute(plan, data=store)
 
 
 def test_sanity_flags_out_of_range_magnitude(store: DataStore) -> None:
@@ -428,3 +490,95 @@ def test_a_doubtful_answer_caps_confidence() -> None:
 
     assert score(False) > 0.4
     assert score(True) == 0.4
+
+
+def test_a_borrowed_unitless_value_is_flagged(store: DataStore) -> None:
+    # solem filled the emissivity with the area's 1200 ("1200 cm^2").
+    p = Plan.model_validate(
+        {
+            "equation_ids": ["stefan_boltzmann_emissivity"],
+            "target": "P",
+            "unknowns": ["P"],
+            "known_values": [
+                {"symbol": "eps", "value": 1200, "unit": "dimensionless", "origin": "given"},
+                {"symbol": "sigma", "value": 5.670374419e-08, "unit": "W/(m^2*K^4)",
+                 "origin": "constant"},
+                {"symbol": "A", "value": 1200, "unit": "cm^2", "origin": "given"},
+                {"symbol": "T", "value": 610, "unit": "kelvin", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )  # fmt: skip
+    report = sanity_check(p, compute(p, data=store), data=store)
+    assert report.magnitude_ok is False and not report.passed
+    assert any("eps = 1200 is far outside" in i for i in report.issues)
+
+
+def test_celsius_is_converted_by_meaning(store: DataStore) -> None:
+    def heat(dt_unit: str, dt: float) -> float:
+        p = Plan.model_validate(
+            {
+                "equation_ids": ["specific_heat"],
+                "target": "Q",
+                "unknowns": ["Q"],
+                "known_values": [
+                    {"symbol": "m", "value": 2, "unit": "kg", "origin": "given"},
+                    {"symbol": "c", "value": 4186, "unit": "J/(kg*K)", "origin": "given"},
+                    {"symbol": "dT", "value": dt, "unit": dt_unit, "origin": "given"},
+                ],
+                "assumptions": [],
+                "strategy": "x",
+            }
+        )
+        return compute(p, data=store).value
+
+    # A change of 30 degC is a change of 30 K (and of 54 degF), never 303 K.
+    assert heat("degC", 30) == pytest.approx(heat("K", 30)) == pytest.approx(251160)
+    assert heat("degF", 54) == pytest.approx(251160)
+
+
+def test_an_absolute_celsius_temperature_is_in_kelvin(store: DataStore) -> None:
+    def gas(known: tuple[str, float, str], target: str) -> ComputeResult:
+        values = {"n": (1, "mol"), "R": (8.314, "J/(mol*K)"), "V": (0.0224, "m^3"),
+                  "P": (101325, "Pa"), "T": (27, "degC")}  # fmt: skip
+        values[known[0]] = known[1:]
+        values.pop(target)
+        p = Plan.model_validate(
+            {
+                "equation_ids": ["ideal_gas_law"],
+                "target": target,
+                "unknowns": [target],
+                "known_values": [
+                    {"symbol": s, "value": v, "unit": u, "origin": "given"}
+                    for s, (v, u) in values.items()
+                ],
+                "assumptions": [],
+                "strategy": "x",
+            }
+        )
+        return compute(p, data=store)
+
+    assert gas(("T", 27, "degC"), "P").value == pytest.approx(8.314 * 300.15 / 0.0224)
+    # Asked for a temperature with Celsius in the question: the answer says it in degC too.
+    result = gas(("V", 0.0224, "m^3"), "T")
+    assert result.unit == "kelvin" and result.notes == []
+
+
+def test_a_temperature_asked_in_celsius_is_also_given_in_celsius(store: DataStore) -> None:
+    p = Plan.model_validate(
+        {
+            "equation_ids": ["carnot_efficiency"],
+            "target": "Tc",
+            "unknowns": ["Tc"],
+            "known_values": [
+                {"symbol": "eta", "value": 0.2, "unit": "dimensionless", "origin": "given"},
+                {"symbol": "Th", "value": 100, "unit": "degC", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "x",
+        }
+    )
+    result = compute(p, data=store)
+    assert result.value == pytest.approx(373.15 * 0.8) and result.unit == "kelvin"
+    assert result.notes == ["That is 25.37 degC."]

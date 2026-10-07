@@ -105,10 +105,12 @@ def test_lr_schedule() -> None:
 def test_luna_trains_and_loss_drops(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:
     out = tmp_path / "luna"
     metrics = train(LUNA, tokenizer, dataset, out, FAST)
+    # Single-batch losses are noisy over 50 steps, so compare the last two to the first,
+    # and require held-out loss to fall too.
     losses = [m["loss"] for m in metrics if "loss" in m]
-    assert losses[-1] < losses[0] * 0.8
+    assert sum(losses[-2:]) / 2 < losses[0] * 0.9
     evals = [m for m in metrics if "val_loss" in m]
-    assert evals
+    assert len(evals) >= 2 and evals[-1]["val_loss"] < evals[0]["val_loss"]
     assert {"val_loss_classify", "val_loss_plan", "val_loss_explain"} <= evals[-1].keys()
     model, loaded_tok = load_model(out)
     assert model.num_parameters() == LUNA.num_parameters()

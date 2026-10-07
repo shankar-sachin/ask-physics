@@ -267,6 +267,8 @@ _IDIOMS: tuple[tuple[re.Pattern[str], tuple[str, ...], tuple[str, ...]], ...] = 
         (),
     ),
     (re.compile(r"\bhow heavy\b", re.I), ("mass", "weight"), ()),
+    # "How strongly do they attract each other?" asks for a force, not an energy.
+    (re.compile(r"\bhow (?:strongly|hard)\b", re.I), ("force",), ()),
     (
         re.compile(r"\bhow long (?:does|will|did|would|until)\b|\bhow much time\b", re.I),
         ("time", "duration", "period"),
