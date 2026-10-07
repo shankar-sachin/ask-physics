@@ -23,6 +23,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   look-alikes, source, license) generated from the database. Pages live in
   `docs/wiki/`, `scripts/build_wiki.py` builds them, and a workflow publishes
   them on every push to main.
+- Workflow scripts for the jobs that used to be long command chains:
+  `setup.sh`, `update.sh`, `check.sh` (with a merge-conflict check),
+  `corpus.sh`, `train.sh` (back up, train, score old and new, compare),
+  `eval.sh`, `models.sh` (backup and restore), and `release_weights.sh`, plus
+  `compare_evals.py`. Each has `--help` and a `DRY_RUN=1` mode, and CI runs
+  shellcheck on all of them. `make train MODEL=...` and friends call them.
 - A 20-million-word prose corpus for the Fermi models (ADR-017):
   `scripts/build_corpus.py` builds it locally from 52 OpenStax textbooks
   under CC BY 4.0 (sciences, math, history, economics, social sciences,

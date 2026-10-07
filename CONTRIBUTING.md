@@ -31,6 +31,16 @@ make lint             # ruff check + ruff format --check
 make typecheck        # mypy
 ```
 
+Or let the scripts do it (each prints its options with `--help`, and `DRY_RUN=1` shows
+the commands without running them):
+
+| Script | What it does |
+|---|---|
+| `sh scripts/setup.sh` | Creates `.venv`, installs everything, checks the data |
+| `sh scripts/update.sh` | After a merge: switches to `main`, pulls, reinstalls |
+| `sh scripts/check.sh` | Lint, typecheck, data, and tests: everything a commit needs |
+| `sh scripts/check.sh --conflicts [BRANCH...]` | Also test-merges against `origin/main` (or the branches named) without changing anything |
+
 No API keys, no GPU, and no trained weights are needed for development.
 Tests and the default CLI path use `FakeLLMClient`; model code is tested on
 the tiny `fermi-luna-1` config on CPU. Training the real Fermi models is

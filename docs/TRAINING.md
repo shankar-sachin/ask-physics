@@ -7,6 +7,24 @@ they download the weights we ship (ADR-012). Design background is in
 
 Numbers marked *estimate* get replaced with measurements as we go.
 
+## The short way: scripts
+
+Every step below is also a script that keeps the Mac awake (`caffeinate`) and only runs
+a step when the one before it worked. Each prints its options with `--help`, and
+`DRY_RUN=1` shows the commands without running them.
+
+| Script | What it does |
+|---|---|
+| `sh scripts/corpus.sh` | Builds the prose corpus; safe to rerun after an interruption |
+| `sh scripts/train.sh fermi-solem-1` | Backs up the installed model, builds the data and tokenizer if missing, scores the old model, trains (prose corpus first for solem and celeste), scores the new one, and compares the two |
+| `sh scripts/train.sh fermi-solem-1 --resume` | Continues a run that stopped |
+| `sh scripts/eval.sh fermi-solem-1 --against DIR` | Scores a model, and another copy on the same questions, side by side |
+| `sh scripts/models.sh list` / `backup` / `restore` | Keeps every replaced model in `~/askphysics-backup`; a restore backs up first |
+| `sh scripts/release_weights.sh models-v0.4.0` | Packages each installed model and scores the packaged copy (see `RELEASING.md`) |
+
+`python3 scripts/compare_evals.py OLD/eval.json NEW/eval.json` compares any two reports.
+The rest of this page is what those scripts run, step by step.
+
 ## 1. Set up
 
 ```bash
