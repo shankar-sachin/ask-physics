@@ -25,6 +25,10 @@ from askphysics.pipeline import Pipeline
         ("a charge of −2.5 µC", [("-2.5", "uC")]),
         ("a 220 Ω resistor and a 4.7 kΩ one", [("220", "ohm"), ("4.7", "kohm")]),
         ("1,234.5 m away", [("1234.5", "m")]),
+        # OpenStax Physics phrasings (the real-question eval)
+        ("(Round g to 10 m / s^2.)", [("10", "m/s^2")]),
+        ("a point charge Q = - 25 nC", [("-25", "nC")]),
+        ("a force (− 3 × 10–6 N)", [("-3e-06", "N")]),
     ],
 )
 def test_real_world_quantities_become_readable(raw: str, quantities: list[tuple[str, str]]) -> None:
@@ -37,6 +41,8 @@ def test_real_world_quantities_become_readable(raw: str, quantities: list[tuple[
         "Friction μ = 0.3 between the surfaces.",  # a symbol, not a unit prefix
         "3 apples per minute",  # "apples/minute" is not a unit
         "items 1,2,3 and 12,34",  # not thousands groups
+        "The distance between two points is 1.00 km.",  # Pint knows "point"; English wins
+        "Then 5 - 3 = 2, and x = - y.",  # a minus with no number after it stays
         "How fast does a ball dropped from 20 m hit the ground?",
     ],
 )

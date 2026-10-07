@@ -12,11 +12,14 @@ the ``explanation`` prose.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple
+
+import pint
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore, load_all
@@ -373,10 +376,10 @@ def sanity_check(
         used = Counter(
             (format_number(k.value), k.unit) for k in p.known_values if k.origin == "given"
         )
-        for number, unit in stated_givens(question, data.equations.values()):
-            if used[(number, unit)] > 0:
-                used[(number, unit)] -= 1
-            else:
+        # dict.fromkeys: a value the question repeats ("for 5.0 s ... during the 5.0 s
+        # interval") is one value, used once.
+        for number, unit in dict.fromkeys(stated_givens(question, data.equations.values())):
+            if used[(number, unit)] == 0:
                 shown = number if unit == "dimensionless" else f"{number} {unit}"
                 unused.append(shown)
         if unused:
@@ -409,7 +412,10 @@ def sanity_check(
         if var is None or var.unit != "dimensionless" or var.typical_range is None:
             continue
         low, high = var.typical_range
-        if not low / 10 <= abs(known.value) <= high * 10:
+        value = known.value
+        with contextlib.suppress(pint.DimensionalityError):  # "40 percent" is 0.4
+            value = float(quantity(known.value, known.unit).to("dimensionless").magnitude)
+        if not low / 10 <= abs(value) <= high * 10:
             magnitude_ok = False
             issues.append(
                 f"{known.symbol} = {known.value:g} is far outside the usual range for a "
