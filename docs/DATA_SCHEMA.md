@@ -107,7 +107,7 @@ Validation runs in two layers:
 | `id` | str | yes | Unique |
 | `problem_text` | str | yes | The problem as a student would read it |
 | `known_values` | list[KnownValue] | yes | Values given in or implied by the problem |
-| `unknowns` | list[str] | yes | Symbols to find |
+| `unknowns` | list[str] | yes | Symbols to find: the answer first, then any values found on the way |
 | `equations_used` | list[str] | yes | Equation ids; each must exist |
 | `solution_steps` | list[str] | yes | Ordered, human-readable |
 | `final_answer` | QuantityValue | yes | `{value, unit}` |
@@ -148,6 +148,11 @@ Validation runs in two layers:
   least one referenced equation.
 - All units parse; `final_answer.unit` has the same dimensionality as the
   unknown's declared unit in the equation that defines it.
+- Every example re-solves: Noether solves `equations_used` for the first
+  unknown (chaining them when there are several) and lands within 0.1% of
+  `final_answer` (`tests/test_data_loader.py`, a v0.4 exit criterion).
+- No example reads like an eval question (same word-overlap check the data
+  factory uses).
 - (v0.4) Re-solving with `solve_for` reproduces `final_answer` within 0.1%.
 - No `problem_text` may be a near-duplicate of an eval question (see
   `docs/EVALS.md`, leakage policy).

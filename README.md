@@ -183,14 +183,14 @@ of making something up.
 | Noether: single-equation solve with units (SymPy + Pint) | Works |
 | Dimensional consistency and order-of-magnitude sanity checks | Works |
 | Keyword retrieval over the equation database | Works |
-| Seed data with full validation: 110 equations, 4 examples, 11 constants, 8 Fermi assumptions | Works |
+| Seed data with full validation: 110 equations, 20 worked examples (each re-solved by a test), 11 constants, 8 Fermi assumptions | Works |
 | CLI: `ask`, `version`, `validate-data`, `model build-data / train-tokenizer / train / info` | Works |
 | Confidence scoring (crude, documented formula) | Works |
 | Eval set (8 questions) with a validating loader | Works |
 | Fermi models: tokenizer, transformer, constrained decoding, data factory, training | Works |
 | Fermi models answering in the CLI (router: tellus, solem, celeste) | Works with locally trained weights |
 | `askphysics model pull`: checksum-pinned downloads, installers fetch the models | Works; weights publish with v0.4 |
-| Multi-equation chaining | Stub until v0.4 |
+| Multi-equation chaining, Celsius and Fahrenheit | Works |
 | Eval scoring and runner | Stub until v0.5 |
 | Vector and hybrid retrieval | Stub until v0.6 |
 | Fermi range propagation | Stub until v0.7 |

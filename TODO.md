@@ -88,12 +88,13 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
       room for it to help (open question Q16).
 
 ### Distribution (ADR-012)
-- [ ] Export bf16 safetensors per model and a manifest (URL, size, sha256).
-- [ ] `askphysics model pull [--all]` with checksum verification.
-- [ ] Installers run `model pull`; Homebrew formula adds the weights as
-      resources.
-- [ ] Download celeste on first escalation; clear message when no weights
-      are installed.
+- [x] Export bf16 safetensors per model and a manifest (URL, size, sha256)
+      (`model package`, #51).
+- [x] `askphysics model pull [--all]` with checksum verification (#51).
+- [x] Installers run `model pull` (#51). Homebrew can't write to the home
+      directory, so its formula prints a caveat instead (`docs/RELEASING.md`).
+- [x] Download celeste on first escalation; clear message when no weights
+      are installed (#51).
 
 ### Evals
 - [ ] Celeste rescue rate on the held-out factory set.
@@ -103,16 +104,17 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 - [ ] Run the 8 eval questions per model and record results in the model cards.
 
 ### Solver
-- [ ] Multi-equation chaining: dependency order over the plan's unknowns.
-- [ ] Offset units (Celsius, Fahrenheit) converted before substitution.
-- [ ] 15+ worked examples.
+- [x] Multi-equation chaining: dependency order over the plan's unknowns (#52).
+- [x] Offset units (Celsius, Fahrenheit) converted before substitution (#52).
+- [x] 15+ worked examples, each re-solved within 0.1% by a test.
 
 ### Docs and the Ask Physics Wiki
 - [ ] Model cards for each trained model: config, data, tokens, time, curves,
       results, known failure modes, OpenStax attribution.
-- [ ] `docs/wiki/` as the single source: guides, FAQ, glossary, model cards.
-- [ ] Generate an equation page per database entry (formula, variables with
-      units, validity, source, license).
-- [ ] CI workflow that publishes `docs/wiki/` to the GitHub Wiki.
+- [x] `docs/wiki/` as the single source: guides, FAQ, glossary (#50). Model
+      cards join once the trained models are packaged.
+- [x] Generate an equation page per database entry (formula, variables with
+      units, validity, source, license) (#50).
+- [x] CI workflow that publishes `docs/wiki/` to the GitHub Wiki (#50).
 - [ ] Website wiki at `/wiki/` built from the same pages, with rendered math
       and search; link each equation id on the answer card to its page.
