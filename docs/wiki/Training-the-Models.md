@@ -24,7 +24,19 @@ askphysics model train-tokenizer --data build/smoke --out build/smoke-tok.json -
 askphysics model train --model fermi-luna-1 --data build/smoke --tokenizer build/smoke-tok.json --steps 300
 ```
 
-## The real thing
+## The real thing, in one command each
+
+```bash
+sh scripts/corpus.sh                  # the prose corpus, once
+sh scripts/train.sh fermi-tellus-1    # backs up, builds what's missing, trains, scores
+sh scripts/train.sh fermi-solem-1     # reads the corpus first, then the tasks
+```
+
+`train.sh` keeps the computer awake, backs up the model it replaces, and finishes by
+comparing the new model's scores with the old one's; `sh scripts/models.sh restore
+fermi-solem-1` puts the old one back. Add `--help` to any script for its options.
+
+## The real thing, step by step
 
 1. Build the data: `askphysics model build-data --out build/data --examples 1000000 --workers 10`.
 2. Build the prose corpus: `python scripts/build_corpus.py`. It downloads the textbooks
