@@ -97,7 +97,7 @@ caffeinate -dims askphysics model train --model fermi-tellus-1 \
 ### The prose corpus (ADR-017)
 
 The 118,000-word *Physics* book is small. The full corpus is about 20 million
-words: 25 OpenStax textbooks under CC BY 4.0 plus public-domain books. Build it
+words: 52 OpenStax textbooks under CC BY 4.0 plus public-domain books. Build it
 once (about 15 minutes for the first run, which downloads the books):
 
 ```bash

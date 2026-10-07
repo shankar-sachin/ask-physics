@@ -132,8 +132,27 @@ def test_refuses_a_pin_that_is_not_cc_by(tmp_path: Path) -> None:
 
 def test_the_manifest_pins_only_cc_by_books() -> None:
     spec = json.loads(build_corpus.SOURCES.read_text())
-    assert len(spec["openstax"]) == 13
+    assert len(spec["openstax"]) == 33
+    assert sum(len(e["books"]) for e in spec["openstax"]) == 52
     assert all(len(e["commit"]) == 40 for e in spec["openstax"])
     titles = {b["title"] for e in spec["openstax"] for b in e["books"]}
-    assert "University Physics Volume 1" in titles
-    assert not titles & {"Calculus Volume 1", "Organic Chemistry"}  # never CC BY
+    assert {"University Physics Volume 1", "U.S. History", "Writing Guide with Handbook"} <= titles
+    never_cc_by = {"Calculus Volume 1", "Organic Chemistry", "Business Law I Essentials"}
+    assert not titles & never_cc_by
+    # Non-fiction ranks ahead of literature (P), which comes last.
+    assert spec["gutenberg"]["loccs"][-1] == "P" and spec["gutenberg"]["loccs"][0] == "QC"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Oyserman and Coon (2002) studied individualism.",  # a surname
+        "Light passed through a chink in the shutter.",  # a crack
+        "Symptoms include a bloody nose and fever.",  # medicine
+        "A finger prick gives a drop of blood for the test.",
+        "Ishmael tells the story of Moby Dick.",
+        "The cock crowed at dawn, and the ass carried the load.",  # a rooster, a donkey
+    ],
+)
+def test_innocent_words_are_kept(text: str) -> None:
+    assert not build_corpus.blocked(text)

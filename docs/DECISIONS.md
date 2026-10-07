@@ -647,13 +647,21 @@ never CC BY; Physics and Statistics still are.
   relicenses newer ones. `third_party/corpus/sources.json` pins each repository
   to its last commit before the switch, and the build refuses to read a commit
   unless its `LICENSE` and the book's own metadata both say CC BY 4.0. Nothing
-  after a switch is used, so later corrections are not in the corpus. 25 books
-  across 13 repositories: physics, chemistry, biology, astronomy, anatomy,
-  microbiology, algebra through precalculus, statistics, and psychology,
-  about 2.8M words after removing repeats.
-- **Public-domain books for the rest.** Project Gutenberg texts in English,
-  physics, astronomy, chemistry, mathematics, and general science first, then
-  English and American literature, until the corpus reaches 20M words. A book
+  after a switch is used, so later corrections are not in the corpus. The
+  maintainer asked for anything in English, because explaining well comes
+  from reading good explanations, so every OpenStax book that was CC BY
+  counts: 52 books across 33 repositories, from physics, chemistry, biology,
+  and mathematics to history, economics, sociology, philosophy, writing,
+  business, and psychology, about 6.8M words after removing repeats. Left
+  out: books that were never CC BY (Calculus, Organic Chemistry, Business
+  Law, Accounting), and any whose `LICENSE` file is non-standard or disagrees
+  with the book's metadata (Introduction to Business, Neuroscience, Workplace
+  Software Skills, Foundations of Information Systems).
+- **Public-domain books for the rest.** Project Gutenberg texts in English:
+  the sciences first, then technology and medicine, then expository
+  non-fiction (history, geography, philosophy, social science, law,
+  education, the arts), then language and literature, until the corpus
+  reaches 20M words. Poetry and drama are skipped. A book
   qualifies only if every person the catalog credits (authors, translators,
   editors) died in or before 1955, which makes it public domain in the US and in
   life-plus-70 countries. Gutenberg's header, footer, and trademark are removed.
@@ -663,8 +671,11 @@ never CC BY; Physics and Statistics still are.
   license text, and a lock file listing exact commits, Gutenberg ids, and file
   hashes.
 - **Cleaning.** Text only, as in ADR-016; reference-list entries and repeated
-  paragraphs removed; paragraphs containing slurs dropped (old literature has
-  them), with the list stored as hashes.
+  paragraphs removed; paragraphs containing slurs or swear words dropped, by
+  the maintainer's rule of none at all in what the models learn from (old
+  books and quoted history have both). The list is stored as hashes, and
+  words with innocent meanings (a surname, a crack in a shutter, a bloody
+  nose, a finger prick, a rooster, a donkey) are left off it.
 - Model cards for weights trained on the corpus carry its attribution.
 
 **Consequences.** About 20x the real English solem has seen, with no

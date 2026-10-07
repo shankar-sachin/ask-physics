@@ -9,10 +9,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - A 20-million-word prose corpus for the Fermi models (ADR-017):
-  `scripts/build_corpus.py` builds it locally from 25 OpenStax textbooks
-  under CC BY 4.0, read at commits from before OpenStax relicensed them, and
-  public-domain books from Project Gutenberg. Every pinned commit's license
-  is checked at build time, repeated paragraphs, citations, and slurs are
+  `scripts/build_corpus.py` builds it locally from 52 OpenStax textbooks
+  under CC BY 4.0 (sciences, math, history, economics, social sciences,
+  writing, and more), read at commits from before OpenStax relicensed them,
+  and public-domain books from Project Gutenberg, explanatory non-fiction
+  ahead of fiction. Every pinned commit's license
+  is checked at build time, repeated paragraphs, citations, slurs, and swear words are
   removed, and each build writes its attribution and a lock file.
 
 ### Fixed
