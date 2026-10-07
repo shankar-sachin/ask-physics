@@ -417,6 +417,31 @@ GENERIC: tuple[Template, ...] = (
     Template("gen_44", "Determine the value of the {target} given {knowns}."),
 )
 
+# Equations whose variables are identical to another's (series vs parallel resistors) can
+# only be told apart by the question's words, so a question for one says which, with one of
+# these sentences when its own wording doesn't already. Each names one of the equation's
+# tags that its twin lacks.
+EQUATION_CONTEXT: dict[str, tuple[str, ...]] = {
+    "series_resistors": (
+        "Two resistors are connected in series.",
+        "The resistors are wired in series.",
+        "This is a series circuit.",
+    ),
+    "parallel_resistors": (
+        "Two resistors are connected in parallel.",
+        "The resistors are wired in parallel.",
+        "This is a parallel circuit.",
+    ),
+    "orbital_speed": (
+        "It moves in a circular orbit.",
+        "A satellite is in a circular orbit.",
+    ),
+    "escape_velocity": (
+        "A rocket has to reach escape velocity.",
+        "It has to reach escape speed to leave for good.",
+    ),
+}
+
 # --------------------------------------------------------------------------- framing noise
 
 # Openers and sign-offs, chosen for a minority of questions. No digits, ever.

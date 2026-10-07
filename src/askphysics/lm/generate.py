@@ -43,7 +43,13 @@ from askphysics.lm.formats import (
     stated_quantities,
 )
 from askphysics.lm.model import FermiLM, KVCache
-from askphysics.lm.reading import asked_symbols, asked_variables, symbol_locks
+from askphysics.lm.reading import (
+    asked_symbols,
+    asked_variables,
+    contradicted,
+    stated_givens,
+    symbol_locks,
+)
 from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer, pretokenize
 from askphysics.models import (
     Classification,
@@ -650,10 +656,48 @@ def target_options(
     return [v.symbol for v in picked] or [v.symbol for v in free] or [v.symbol for v in variables]
 
 
+def quantity_locks_bare(question: str, eq: Equation) -> list[str]:
+    """The bare numbers the question labels with one of ``eq``'s variables."""
+    return [n for n, u in quantity_locks(question, eq.variables).values() if u == "dimensionless"]
+
+
 def quantity_locks(question: str, variables: Sequence[Variable]) -> dict[str, tuple[str, str]]:
     """Symbol -> the (number, unit) the question labels it with, when the units fit."""
     by_symbol = {v.symbol: v for v in variables}
     return {s: q for s, q in symbol_locks(question, variables).items() if _fits(q[1], by_symbol[s])}
+
+
+def _partner(symbol: str) -> str | None:
+    """The other half of an indexed pair: "m1" and "m2", "v2" and "v1"."""
+    if symbol[-1:] == "1":
+        return symbol[:-1] + "2"
+    if symbol[-1:] == "2":
+        return symbol[:-1] + "1"
+    return None
+
+
+def ordered_options(
+    options: Sequence[ValueOption],
+    symbol: str,
+    locks: Mapping[str, tuple[str, str]],
+    unused: Sequence[tuple[str, str]],
+    pending: Sequence[str],
+) -> list[ValueOption]:
+    """With neither half of a pair labelled, the first value stated goes to the "1" variable.
+
+    "One has mass 0.293 kg and speed 9.27 km/h, the other mass 140 kg and speed 31 mph":
+    v1 is 9.27 km/h because it is stated first. Falls back to ``options``.
+    """
+    partner = _partner(symbol)
+    if partner is None or partner not in pending or symbol in locks or partner in locks:
+        return list(options)
+    given = [(o.number, o.unit) for o in options if o.origin == "given"]
+    order = [q for q in unused if q in given]
+    if len(order) < 2:
+        return list(options)
+    want = order[0] if symbol.endswith("1") else order[-1]
+    narrowed = [o for o in options if o.origin != "given" or (o.number, o.unit) == want]
+    return narrowed or list(options)
 
 
 def locked_options(
@@ -710,6 +754,14 @@ def equation_options(equations: Sequence[Equation], question: str) -> list[str]:
         return True
 
     roomy = [eq for eq in equations if has_room(eq)] or list(equations)
+    # "in parallel" rules out the series formula, whose variables are otherwise identical.
+    roomy = [eq for eq in roomy if not contradicted(question, eq, equations)] or roomy
+    # A bare number the question labels ("the emissivity comes out to 0.017") needs a home
+    # too: prefer the equations with a variable it names.
+    labelled = {n for n, u in stated_givens(question, roomy) if u == "dimensionless"}
+    if labelled:
+        housing = [eq for eq in roomy if labelled <= set(quantity_locks_bare(question, eq))]
+        roomy = housing or roomy
     # Prefer equations with the variable the ask names: "what is its mass?" rules out
     # W = Fd. Names compete across equations, so "time to reach the top" beats "time".
     asked = asked_variables(question, [v for eq in roomy for v in eq.variables])
@@ -785,12 +837,18 @@ def decode_plan(
     for i, symbol in enumerate(to_fill):
         decoder.emit(("" if i == 0 else ", ") + f'{{"symbol": "{symbol}", "value": ')
         options = (
-            locked_options(
-                assignable_options(
-                    known_value_options(variables[symbol], question, constants),
-                    variables[symbol],
+            ordered_options(
+                locked_options(
+                    assignable_options(
+                        known_value_options(variables[symbol], question, constants),
+                        variables[symbol],
+                        unused,
+                        [variables[s] for s in to_fill[i:]],
+                    ),
+                    symbol,
+                    locks,
                     unused,
-                    [variables[s] for s in to_fill[i:]],
+                    to_fill[i:],
                 ),
                 symbol,
                 locks,
@@ -918,6 +976,7 @@ __all__ = [
     "known_value_options",
     "locked_options",
     "number_guard_ok",
+    "ordered_options",
     "quantity_locks",
     "reason_options",
     "redirect_options",

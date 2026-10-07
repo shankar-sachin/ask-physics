@@ -5,9 +5,14 @@ from askphysics.lm.reading import (
     ask_spans,
     asked_symbols,
     asked_variables,
+    contradicted,
     labelled_quantities,
+    mentions,
     name_labels,
+    own_tags,
+    stated_givens,
     symbol_locks,
+    twins,
 )
 
 
@@ -144,3 +149,73 @@ def test_idioms_name_a_kind_of_quantity(
     store: DataStore, equation: str, text: str, asked: set[str]
 ) -> None:
     assert asked_symbols(text, store.equations[equation].variables) == asked
+
+
+def test_a_name_without_a_connector_labels_only_a_value_with_a_unit(store: DataStore) -> None:
+    variables = store.equations["kinetic_energy"].variables
+    assert name_labels("a ball with mass 3 kg moves at 4 m/s", variables) == [("m", "3", "kg")]
+    # "mass 2" names the second mass; the 2 is not a mass.
+    assert name_labels("the mass 2 moves at 4 m/s", variables) == []
+
+
+def test_twins_share_every_variable(store: DataStore) -> None:
+    series, parallel = store.equations["series_resistors"], store.equations["parallel_resistors"]
+    assert twins(series, store.equations.values()) == [parallel]
+    assert own_tags(series, parallel) == ["series"]
+    assert twins(store.equations["kinetic_energy"], store.equations.values()) == []
+
+
+@pytest.mark.parametrize(
+    ("question", "series", "parallel"),
+    [
+        ("Two resistors in parallel have 3 ohm total.", True, False),
+        ("A series circuit has 3 ohm total.", False, True),
+        ("Two resistors have 3 ohm total.", False, False),  # says neither: rule neither out
+        ("Series or parallel? 3 ohm total.", False, False),
+    ],
+)
+def test_naming_one_twin_rules_out_the_other(
+    store: DataStore, question: str, series: bool, parallel: bool
+) -> None:
+    eqs = store.equations
+    assert contradicted(question, eqs["series_resistors"], eqs.values()) is series
+    assert contradicted(question, eqs["parallel_resistors"], eqs.values()) is parallel
+
+
+def test_mentions_matches_whole_words() -> None:
+    assert mentions("Wired in Parallel.", ["parallel"])
+    assert not mentions("unparalleled series", ["parallel"])
+    assert mentions("the space station", ["space station"])
+
+
+def test_stated_givens_include_labelled_bare_numbers(store: DataStore) -> None:
+    q = "A panel at 350 K radiates 40 W. The emissivity comes out to 0.017. Resistor 2 is 5 ohm."
+    assert stated_givens(q, store.equations.values()) == [
+        ("350", "K"),
+        ("40", "W"),
+        ("5", "ohm"),
+        ("0.017", "dimensionless"),  # "Resistor 2" is a name, not a value
+    ]
+    q = "Compute the resistance 2 for the total resistance is 940 ohm."
+    assert stated_givens(q, store.equations.values()) == [("940", "ohm")]
+    q = "600W for the radiated power. 0.036 for the emissivity. Find the area."
+    assert ("0.036", "dimensionless") in stated_givens(q, store.equations.values())
+    assert stated_givens("eps = 0.392 and T = 300 K", store.equations.values()) == [
+        ("300", "K"),
+        ("0.392", "dimensionless"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "asked"),
+    [
+        ("What speed did a go-kart start at if it reaches 160 mph after 3 s at 18 m/s^2?", {"v0"}),
+        ("How fast did the scooter start out at, if it hits 16 kph after 4.7 s?", {"v0"}),
+        # Starting from rest says how it began, not what is asked.
+        ("How fast is it going after starting from rest at 2 m/s^2 for 3 s?", {"v"}),
+    ],
+)
+def test_asking_how_it_started_means_the_initial_speed(
+    store: DataStore, text: str, asked: set[str]
+) -> None:
+    assert asked_symbols(text, store.equations["kin_v_at"].variables) == asked

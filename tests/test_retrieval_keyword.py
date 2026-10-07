@@ -18,6 +18,7 @@ def test_falling_object_retrieves_kinematics(retriever: KeywordRetriever) -> Non
         ("What current flows through a 220 ohm resistor across a 9 V battery?", "ohms_law"),
         ("Pressure of 2 mol of an ideal gas in a container at 300 K", "ideal_gas_law"),
         ("Gravitational attraction between two planets", "newton_gravitation"),
+        ("What force stops a 1500 kg car braking from 20 m/s in 5 s?", "impulse_momentum"),
     ],
 )
 def test_top_hit_per_domain(retriever: KeywordRetriever, query: str, expected: str) -> None:

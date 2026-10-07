@@ -17,7 +17,7 @@ cp docs/images/logo.svg docs/images/banner.png docs/images/fermi-*.jpg "$out/ima
 # the pipeline never imports it, and Pyodide can't load torch anyway. Of the
 # models package, only the torch-free modules the settings and router read are
 # shipped; tests/test_site_bundle.py checks the pipeline needs nothing else.
-lm_shipped="__init__.py config.py paths.py tokenizer.py"
+lm_shipped="__init__.py config.py formats.py paths.py reading.py templates.py tokenizer.py"
 tar -cf "$out/py/askphysics.tar" -C src \
   --exclude='__pycache__' --exclude='*.pyc' \
   --exclude='askphysics/lm' --exclude='askphysics/cli.py' \

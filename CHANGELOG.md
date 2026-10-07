@@ -8,6 +8,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The Ask Physics Wiki on GitHub: guides for using it, reading an answer, and
+  asking good questions, an FAQ, the Fermi models and Noether explained, and a
+  page for every equation (formula, variables and units, assumptions,
+  look-alikes, source, license) generated from the database. Pages live in
+  `docs/wiki/`, `scripts/build_wiki.py` builds them, and a workflow publishes
+  them on every push to main.
 - A 20-million-word prose corpus for the Fermi models (ADR-017):
   `scripts/build_corpus.py` builds it locally from 52 OpenStax textbooks
   under CC BY 4.0 (sciences, math, history, economics, social sciences,
@@ -31,6 +37,17 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Spelled-out numbers before a unit are read as digits ("an eight kilogram
   ball" is "an 8 kilogram ball"), and the training data has arithmetic with
   digits too, so number words no longer mean "math question".
+- Every confidently wrong answer in solem's 3,000-question eval is fixed.
+  When a question doesn't say whether resistors are in series or parallel
+  (or whether a speed is orbital or escape), the answer says so and its confidence is
+  low; "in parallel" picks the parallel formula. A stated value the plan
+  doesn't use ("the emissivity comes out to 0.017") is retried, and flagged
+  if no plan uses it. Unlabelled pairs of values go in the order stated.
+  "What speed did it start at" asks for the initial speed, and "after
+  starting from rest" no longer does.
+- An impossible result (a negative resistance, a 0 N braking force from an
+  assumed 0) is never shown as the answer; the answer degrades and says why.
+  "Stop" and "braking" questions now find the impulse equation.
 
 ## [0.3.0] - 2026-10-06
 

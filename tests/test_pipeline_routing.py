@@ -183,12 +183,53 @@ def test_an_impossible_answer_is_retried(store: DataStore, retriever: KeywordRet
     assert answer.final_value == pytest.approx(1.0 / (1 / 1.3 - 1 / 10.1), rel=1e-5)
 
 
-def test_an_impossible_answer_is_kept_only_as_a_last_resort(
-    store: DataStore, retriever: KeywordRetriever
-) -> None:
+def test_an_impossible_answer_is_never_shown(store: DataStore, retriever: KeywordRetriever) -> None:
+    # Every attempt gives R1 = -8.8 ohm: the answer degrades instead of showing it.
     planner = ScriptedPlanner([_resistor_plan("series_resistors")])
     roster = Roster(classify=FakeLLMClient(), plan=(planner,) * 2, explain=FakeLLMClient())
     answer = _pipeline(store, retriever, roster).run(RESISTORS)
-    assert answer.final_value is not None and answer.final_value < 0
-    assert answer.confidence.score <= 0.2
-    assert any("negative" in c for c in answer.caveats)
+    assert answer.status == "degraded" and answer.final_value is None
+    assert answer.plan_attempts == 2
+    assert any("sanity_check stage failed" in c and "negative" in c for c in answer.caveats)
+    assert "can't be right" in answer.explanation
+
+
+DROP = "A ball is thrown down at 2 m/s from 20 m up. How fast does it hit the ground?"
+
+
+def _drop_plan(v0: float, origin: str) -> Plan:
+    return Plan.model_validate(
+        {
+            "equation_ids": ["kin_v_squared"],
+            "target": "v",
+            "unknowns": ["v"],
+            "known_values": [
+                {"symbol": "v0", "value": v0, "unit": "m/s", "origin": origin},
+                {"symbol": "a", "value": 9.80665, "unit": "m/s^2", "origin": "constant"},
+                {"symbol": "d", "value": 20, "unit": "m", "origin": "given"},
+            ],
+            "assumptions": [],
+            "strategy": "Solve for v.",
+        }
+    )
+
+
+def test_a_plan_that_skips_a_stated_value_is_retried(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    # The first plan drops the ball from rest and ignores the stated 2 m/s.
+    planner = ScriptedPlanner([_drop_plan(0, "assumption"), _drop_plan(2, "given")])
+    roster = Roster(classify=FakeLLMClient(), plan=(planner,) * 5, explain=FakeLLMClient())
+    answer = _pipeline(store, retriever, roster).run(DROP)
+    assert answer.status == "answered" and answer.plan_attempts == 2
+    assert answer.final_value == pytest.approx((4 + 2 * 9.80665 * 20) ** 0.5, rel=1e-5)
+
+
+def test_a_flagged_plan_is_the_fallback(store: DataStore, retriever: KeywordRetriever) -> None:
+    planner = ScriptedPlanner([_drop_plan(0, "assumption")])
+    roster = Roster(classify=FakeLLMClient(), plan=(planner,) * 3, explain=FakeLLMClient())
+    answer = _pipeline(store, retriever, roster).run(DROP)
+    assert answer.final_value == pytest.approx((2 * 9.80665 * 20) ** 0.5, rel=1e-5)
+    assert answer.plan_attempts == 3  # every attempt was spent looking for a better plan
+    assert answer.confidence.score <= 0.4
+    assert any("gives 2 m/s, but the plan doesn't use it" in c for c in answer.caveats)
