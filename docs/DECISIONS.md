@@ -790,3 +790,50 @@ the models only learn language from it, and Noether does the physics. The
 build downloads a few hundred files from a volunteer-run site, so it pauses
 between requests.
 
+---
+
+## ADR-018: Noether and Fermi as their own packages, in three repositories
+
+**Status:** Proposed by the maintainer; work starts after `fermi-celeste-1` is trained
+
+**Context.** One package, `askphysics`, holds three things that change at
+different speeds and could each be useful alone: Noether, the math engine
+(`solver/`, units, the equation database and its validation); the Fermi models
+(`lm/`, training, decoding, weights, the data factory); and Ask Physics itself
+(the pipeline, retrieval, the CLI, the website, the docs). Today a change to the
+website's CSS and a change to the training loop land in the same repository,
+the same CI, and the same release.
+
+**Decision (proposed).**
+
+- Three repositories under the same owner, each MIT:
+  - **noether**: the `noether` package. SymPy and Pint math, dimension checks,
+    the equation, constant, and Fermi-assumption databases with their loader
+    and `validate-data`, and the compute and sanity-check stages. No torch.
+  - **fermi**: the `fermi` package. The model configs and architecture, the
+    tokenizer, training, constrained decoding, the data factory, `model pull`
+    and weights, `bench` and `eval`. It depends on `noether` (the factory
+    solves every example with it) and keeps `third_party/` with its licenses
+    and attribution, since that text trains the models.
+  - **ask-physics**: the app. The six-stage pipeline wiring the two together,
+    retrieval, the CLI, the website, Ask Physics Docs, and the end-to-end evals.
+    It depends on `noether` and `fermi` (the website only on `noether`, as now).
+- Each package publishes to PyPI on its own version; ask-physics pins ranges.
+- The golden rules travel with the code: noether owns "every number has units"
+  and "every equation has a source and license"; fermi owns "the models never
+  do arithmetic" and "tests never need weights".
+
+**Open before starting.**
+
+- `lm/evaluate.py` imports `compute` and `sanity_check` from the pipeline, and
+  `lm/` reads `normalize` and the shared models; those move into noether, or
+  behind an interface, so fermi doesn't depend on the app.
+- Where the shared Pydantic models (`Plan`, `Classification`, `Answer`) live:
+  likely noether, since plans are its input.
+- Moving history: `git filter-repo` per package keeps each file's history.
+- The release, installer, and Homebrew flows, which today ship one package.
+
+**Consequences.** Smaller, faster CI per repository, and Noether usable on its
+own. The cost is three release trains and cross-repo changes, which is why it
+waits until the models stop changing weekly.
+

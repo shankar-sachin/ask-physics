@@ -125,3 +125,11 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 - [x] CI workflow that publishes `docs/wiki/` to the GitHub Wiki (#50).
 - [x] Ask Physics Docs at `/docs/` built from the same pages, with rendered math
       and search; link each equation id on the answer card to its page.
+
+## After fermi-celeste-1: three packages (ADR-018, proposed)
+
+- [ ] Untangle imports so `lm/` depends only on the solver and data (move
+      compute, sanity checks, normalization, and the shared models).
+- [ ] Split into `noether`, `fermi`, and `ask-physics` repositories with
+      history, each with its own CI and PyPI release.
+- [ ] Installers, Homebrew, and the website unchanged for users.

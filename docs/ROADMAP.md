@@ -127,6 +127,26 @@ explains itself in a wiki.
 
 ---
 
+## After fermi-celeste-1: Noether and Fermi as their own packages (M)
+
+**Goal:** three repositories, each MIT (ADR-018): `noether` (the math engine
+and the equation database), `fermi` (the models, training, and weights), and
+`ask-physics` (the pipeline, CLI, website, and docs, built on the other two).
+
+**Deliverables**
+- Untangle the imports first: compute and sanity checks, normalization, and
+  the shared models move so that fermi depends only on noether.
+- Split with history (`git filter-repo`), one package and CI per repository,
+  PyPI releases, ask-physics pinning both.
+- Installers, Homebrew, and the website keep working unchanged for users.
+
+**Exit criteria**
+- `pip install noether` solves an equation by id with units, with no torch.
+- `pip install fermi` trains and evaluates luna on CPU.
+- ask-physics installs both and passes its full test suite and smoke test.
+
+---
+
 ## v0.5.0 Eval harness (M)
 
 **Goal:** know, with numbers, whether a change made things better or worse.
