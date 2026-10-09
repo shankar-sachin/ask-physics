@@ -59,6 +59,16 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .nav nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; }
 .nav nav a { color: var(--label); }
 .nav nav a:hover { color: var(--text); text-decoration: none; }
+.nav nav { align-items: center; }
+/* The install pill and the GitHub mark, in the site nav and the docs bar. */
+.install-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 15px; border-radius: 999px;
+  background: linear-gradient(90deg, #2f74d0, #7a5cd6); color: #fff !important; font-weight: 600;
+  box-shadow: 0 4px 14px rgba(122, 92, 214, 0.28);
+}
+.install-btn:hover { filter: brightness(1.1); text-decoration: none; }
+.gh { display: inline-flex; align-items: center; color: var(--label); }
+.gh:hover { color: var(--text); }
 
 main, footer { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
 section { padding: 72px 0 24px; }
@@ -185,6 +195,9 @@ footer .credits { font-size: 12px; }
   }
   .nav nav::-webkit-scrollbar { display: none; }
   .nav nav a { white-space: nowrap; padding: 6px 0; }
+  .nav nav a.install-btn { padding: 5px 12px; }
+  /* The GitHub mark sits beside the logo, so it never scrolls out of view. */
+  .nav nav a.gh { position: absolute; top: 16px; right: 16px; padding: 0; }
   section { padding-top: 48px; }
   section[id] { scroll-margin-top: 100px; }
   .hero { padding-top: 40px; }

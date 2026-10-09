@@ -38,6 +38,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   you down the page, a "Copy page" button that copies its Markdown, callout boxes,
   and previous and next links. The header shows the Ask Physics wordmark from the
   banner art, with "Docs" beside it on the docs pages.
+- The nav on the site and the docs ends with a rounded Install button (with a
+  download arrow) and the GitHub mark instead of the word "GitHub".
 - The website works on a phone: the nav keeps every link (it used to hide
   all but GitHub, so the wiki and the sections were unreachable), the model
   pictures sit two to a row, install commands wrap instead of being cut
