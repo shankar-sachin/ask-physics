@@ -287,7 +287,7 @@ The full register, with likelihood, impact, and owner, is in
 ## 10. Milestones
 
 v0.1 Skeleton -> v0.2 Fermi foundations -> v0.3 Fermi models wired in ->
-v0.4 solem, weights, solver, and the wiki -> v0.5 Eval harness -> v0.6 Retrieval and
+v0.4 solem, weights, solver, and the docs -> v0.5 Eval harness -> v0.6 Retrieval and
 data expansion -> v0.7 Fermi engine -> v0.8 Self-verification -> v0.9
 Hardening -> v1.0 Release -> hosted API. (The in-browser website ships early,
 ADR-013.)

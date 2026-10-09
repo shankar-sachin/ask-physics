@@ -22,29 +22,26 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   release assets: bf16 weights, a model card with its training curve, eval
   results, answering speed, and credit for the prose it learned from, all
   pinned in the manifest.
-- The Ask Physics Wiki on GitHub: guides for using it, reading an answer, and
-  asking good questions, an FAQ, the Fermi models and Noether explained, and a
-  page for every equation (formula, variables and units, assumptions,
-  look-alikes, source, license) generated from the database. Pages live in
-  `docs/wiki/`, `scripts/build_wiki.py` builds them, and a workflow publishes
-  them on every push to main.
-- The wiki on the website: askphysics.vercel.app/wiki/ has every page of the
-  GitHub Wiki, built from the same sources, with formulas typeset by KaTeX,
-  and each equation on an answer card links to its page. The site's notes
-  about the stand-in model and its version are up to date.
-- Ask Physics Docs: the website's documentation moved to askphysics.vercel.app/docs/
-  (old /wiki/ links redirect) and got a proper docs layout: a search box (press /),
-  section tabs, a sidebar for each section, an "On this page" outline that follows
-  you down the page, a "Copy page" button that copies its Markdown, callout boxes,
-  and previous and next links. The header shows the Ask Physics wordmark from the
-  banner art, with "Docs" beside it on the docs pages.
+- Ask Physics Docs at askphysics.vercel.app/docs/: guides for using it,
+  reading an answer, and asking good questions, an FAQ, the Fermi models and
+  Noether explained, and a page for every equation (formula, variables and
+  units, assumptions, look-alikes, source, license) generated from the
+  database, with formulas typeset by KaTeX. It has a search box (press /),
+  section tabs, a sidebar for each section, an "On this page" outline that
+  follows you down the page, a "Copy page" button that copies its Markdown,
+  callout boxes, and previous and next links, and each equation on an answer
+  card links to its page. Pages live in `docs/pages/`; `scripts/build_pages.py`
+  and `scripts/docs_site.py` build them with the site. Old /wiki/ links
+  redirect. The header shows the Ask Physics wordmark from the banner art,
+  with "Docs" beside it on the docs pages, and the site's notes about the
+  stand-in model and its version are up to date.
 - The nav on the site and the docs ends with a pair of rounded-square buttons: a
   gradient Install button with a download arrow, and a GitHub tile with GitHub's
   mark instead of the word "GitHub". On a phone both sit beside the logo as icons.
 - The website works on a phone: the nav keeps every link (it used to hide
-  all but GitHub, so the wiki and the sections were unreachable), the model
+  all but GitHub, so the docs and the sections were unreachable), the model
   pictures sit two to a row, install commands wrap instead of being cut
-  off, and links in the wiki are finger-sized. The smoke test checks a
+  off, and links in the docs are finger-sized. The smoke test checks a
   phone-sized screen too.
 - Workflow scripts for the jobs that used to be long command chains:
   `setup.sh`, `update.sh`, `check.sh` (with a merge-conflict check),

@@ -78,7 +78,7 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 
 ---
 
-## v0.4.0 solem, weights, solver, and the wiki
+## v0.4.0 solem, weights, solver, and the docs
 
 ### Training (on the maintainer's M5 Pro)
 - [ ] Train `fermi-solem-1` with the prose stage; record the loss curve,
@@ -115,14 +115,13 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 - [x] Offset units (Celsius, Fahrenheit) converted before substitution (#52).
 - [x] 15+ worked examples, each re-solved within 0.1% by a test.
 
-### Docs and the Ask Physics Wiki
+### Ask Physics Docs
 - [ ] Model cards for each trained model: config, data, tokens, time, curves,
       results, known failure modes, OpenStax attribution.
-- [x] `docs/wiki/` as the single source: guides, FAQ, glossary (#50). Model
+- [x] `docs/pages/` as the single source: guides, FAQ, glossary (#50). Model
       cards join once the trained models are packaged.
 - [x] Generate an equation page per database entry (formula, variables with
       units, validity, source, license) (#50).
-- [x] CI workflow that publishes `docs/wiki/` to the GitHub Wiki (#50).
 - [x] Ask Physics Docs at `/docs/` built from the same pages, with rendered math
       and search; link each equation id on the answer card to its page.
 

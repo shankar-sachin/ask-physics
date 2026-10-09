@@ -2,7 +2,7 @@
 
     python3 scripts/docs_site.py [build/site/docs]
 
-Builds the same Markdown pages as the GitHub Wiki (``scripts/build_wiki.py``) and writes
+Builds the Markdown pages with ``scripts/build_pages.py`` and writes
 each one as ``<out>/<Page>/index.html`` (plus its Markdown as ``index.md``, for "Copy
 page"), with ``Home`` at ``<out>/index.html``, so the answer card can link
 ``/docs/kin_v_at/``. Pages are grouped into the sidebar's sections, shown as tabs; a search
@@ -28,7 +28,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import build_wiki
+import build_pages
 
 KATEX = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist"
 # GitHub's mark (Octicons, MIT) and a download arrow, inline so they need no requests.
@@ -216,8 +216,8 @@ def sections(sidebar_md: str, equations: list[dict[str, str]]) -> list[Section]:
     by_domain: dict[str, list[tuple[str, str]]] = {}
     for eq in sorted(equations, key=lambda e: e["name"].lower()):
         by_domain.setdefault(eq["domain"], []).append((eq["id"], eq["name"]))
-    order = [*build_wiki.DOMAINS, *sorted(set(by_domain) - set(build_wiki.DOMAINS))]
-    eqs.groups = [(build_wiki.DOMAINS.get(d, d), by_domain[d]) for d in order if d in by_domain]
+    order = [*build_pages.DOMAINS, *sorted(set(by_domain) - set(build_pages.DOMAINS))]
+    eqs.groups = [(build_pages.DOMAINS.get(d, d), by_domain[d]) for d in order if d in by_domain]
     tabs = [s for s in out if s.pages]
     # The overview's sidebar lists every guide, so the home page is a way in to all of them.
     tabs[0].groups = [(s.name, s.pages) for s in tabs[1:]]
@@ -314,9 +314,9 @@ def render_page(name: str, body_md: str, all_sections: list[Section], title: str
         for s in all_sections
     )
     source = (
-        f"{build_wiki.REPO}/blob/main/src/askphysics/data/equations.json"
+        f"{build_pages.REPO}/blob/main/src/askphysics/data/equations.json"
         if section.name == "Equations" and name != "Equations"
-        else f"{build_wiki.REPO}/tree/main/docs/wiki"
+        else f"{build_pages.REPO}/tree/main/docs/pages"
     )
     eyebrow = "Welcome" if name == "Home" else section.name
     page_title = "Ask Physics Docs" if name == "Home" else f"{title} · Ask Physics Docs"
@@ -353,7 +353,7 @@ def render_page(name: str, body_md: str, all_sections: list[Section], title: str
         <a href="/#ask">Ask a question</a>
         <a href="/#install" class="install-btn"
           >{DOWNLOAD_ICON}<span class="label">Install</span></a>
-        <a href="{build_wiki.REPO}" class="gh" aria-label="Ask Physics on GitHub"
+        <a href="{build_pages.REPO}" class="gh" aria-label="Ask Physics on GitHub"
           title="GitHub">{GITHUB_ICON}</a>
       </nav>
     </div>
@@ -373,8 +373,7 @@ def render_page(name: str, body_md: str, all_sections: list[Section], title: str
       {body}
       {_neighbours(section, name)}
       <footer class="docs-foot">Built from <a href="{source}" rel="noopener">the repository</a>
-        by <code>scripts/docs_site.py</code>, the same source as the
-        <a href="{build_wiki.REPO}/wiki" rel="noopener">GitHub Wiki</a>.</footer>
+        by <code>scripts/docs_site.py</code>. To change a page, edit it there.</footer>
     </main>
     {toc_html}
   </div>
@@ -404,13 +403,13 @@ def build(out: Path) -> list[str]:
     """Write every docs page under ``out``; returns the page names."""
     with tempfile.TemporaryDirectory() as tmp:
         pages = Path(tmp)
-        build_wiki.build(pages)
+        build_pages.build(pages)
         sidebar = (pages / "_Sidebar.md").read_text(encoding="utf-8")
         if out.exists():
             shutil.rmtree(out)
         out.mkdir(parents=True)
         names = sorted(p.stem for p in pages.glob("*.md") if not p.stem.startswith("_"))
-        equations = json.loads((build_wiki.DATA / "equations.json").read_text(encoding="utf-8"))
+        equations = json.loads((build_pages.DATA / "equations.json").read_text(encoding="utf-8"))
         eq_names = {e["id"]: e["name"] for e in equations}
         tabs = sections(sidebar, equations)
         index = []
@@ -424,7 +423,7 @@ def build(out: Path) -> list[str]:
             index.append(search_entry(name, title, section_of(name, tabs).name, body))
         (out / "search.json").write_text(json.dumps(index, separators=(",", ":")), encoding="utf-8")
     for asset in ("docs.css", "docs.js"):
-        shutil.copyfile(build_wiki.ROOT / "web" / asset, out / asset)
+        shutil.copyfile(build_pages.ROOT / "web" / asset, out / asset)
     return names
 
 

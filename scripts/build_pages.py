@@ -1,18 +1,16 @@
-"""Build the Ask Physics Wiki: the pages in ``docs/wiki/`` plus pages generated from data.
+"""Build the pages of Ask Physics Docs: ``docs/pages/`` plus pages generated from data.
 
-    python scripts/build_wiki.py [build/wiki]
+    python scripts/build_pages.py [build/pages]
 
-Writes a flat folder of Markdown pages, the layout GitHub Wikis use, which the Wiki
-workflow (``.github/workflows/wiki.yml``) publishes to the repository's wiki on every
-push to main. Generated:
+Writes a flat folder of Markdown pages, which ``scripts/docs_site.py`` renders as the
+website's docs at askphysics.vercel.app/docs/. Generated:
 
 - one page per equation, named by its id (``kin_v_at.md``), from ``equations.json``;
 - ``Equations.md``, every equation grouped by domain;
 - ``Constants.md``, from ``constants.json``;
 - ``Glossary.md``, from ``docs/GLOSSARY.md``, so the glossary has one source.
 
-Only the standard library is used, so the workflow needs no install.
-``scripts/docs_site.py`` renders the same pages as HTML for the website (Ask Physics Docs).
+Only the standard library is used, so the Vercel build needs no install.
 """
 
 from __future__ import annotations
@@ -26,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ROOT / "docs" / "wiki"
+PAGES = ROOT / "docs" / "pages"
 DATA = ROOT / "src" / "askphysics" / "data"
 GLOSSARY = ROOT / "docs" / "GLOSSARY.md"
 REPO = "https://github.com/shankar-sachin/ask-physics"
@@ -64,7 +62,7 @@ def look_alikes(eq: dict[str, Any], equations: list[dict[str, Any]]) -> list[dic
 
 
 def equation_page(eq: dict[str, Any], equations: list[dict[str, Any]]) -> str:
-    """The wiki page for one equation."""
+    """The docs page for one equation."""
     lines = [
         f"**{eq['name']}** · {DOMAINS.get(eq['domain'], eq['domain'])} · id `{eq['id']}`",
         "",
@@ -151,7 +149,7 @@ def constants_page(constants: list[dict[str, Any]]) -> str:
 
 
 def glossary_page(text: str) -> str:
-    """``docs/GLOSSARY.md`` without its title, which the wiki shows from the page name."""
+    """``docs/GLOSSARY.md`` without its title, which the docs show from the page name."""
     return re.sub(r"\A# [^\n]*\n+", "", text)
 
 
@@ -175,7 +173,7 @@ def build(out: Path) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("out", type=Path, nargs="?", default=Path("build/wiki"))
+    parser.add_argument("out", type=Path, nargs="?", default=Path("build/pages"))
     args = parser.parse_args()
     pages = build(args.out)
     print(f"{len(pages)} pages -> {args.out}")

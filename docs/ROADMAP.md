@@ -80,10 +80,10 @@ and the exit criteria that need them.
 
 ---
 
-## v0.4.0 solem, weights, solver, and the wiki (L)
+## v0.4.0 solem, weights, solver, and the docs (L)
 
 **Goal:** a fresh install answers real intro problems with solem, and
-explains itself in a wiki.
+explains itself in its docs.
 
 **Deliverables**
 - Train `fermi-solem-1` with the prose stage, and `fermi-celeste-1` (~120M)
@@ -101,14 +101,12 @@ explains itself in a wiki.
 - Offset units (Celsius, Fahrenheit) converted before substitution.
 - 15+ worked examples.
 - Factory regenerated from the bigger database; models retrained.
-- **The Ask Physics Wiki**, one source with two homes:
-  - Pages live in this repo under `docs/wiki/`: guides, FAQ, glossary, the
+- **Ask Physics Docs** at askphysics.vercel.app/docs/, built from one source:
+  - Pages live in this repo under `docs/pages/`: guides, FAQ, glossary, the
     model cards, and a page per equation generated from the database
     (formula, variables with units, validity conditions, source, license).
-  - A CI workflow publishes them to the repo's GitHub Wiki.
-  - The website (Ask Physics Docs) renders the same pages at askphysics.vercel.app/docs/, with
-    rendered math, linked from answer cards (each equation id links to its
-    page).
+  - Rendered math, search, and a link from each equation id on an answer card
+    to its page.
 
 **Exit criteria**
 - On a held-out set of factory-style questions (unseen templates), solem

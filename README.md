@@ -204,7 +204,7 @@ implementation.
 ## Roadmap
 
 v0.2 Fermi model foundations, v0.3 Fermi models wired in, v0.4 solem,
-shipped weights, solver expansion, and the wiki, v0.5 eval harness, v0.6 retrieval and data expansion, v0.7
+shipped weights, solver expansion, and the docs, v0.5 eval harness, v0.6 retrieval and data expansion, v0.7
 Fermi engine, v0.8 self-verification, v0.9 hardening, v1.0 release. After
 v1.0 comes the hosted API. The CLI is the main interface, and
 [askphysics.vercel.app](https://askphysics.vercel.app) runs the same package in your browser (ADR-013). Details, deliverables, and exit criteria are in
@@ -213,7 +213,7 @@ v1.0 comes the hosted API. The CLI is the main interface, and
 
 ## Documentation
 
-- Ask Physics Docs, [on the website](https://askphysics.vercel.app/docs/) and [as the GitHub Wiki](https://github.com/shankar-sachin/ask-physics/wiki): guides, FAQ, and a page for every equation
+- [Ask Physics Docs](https://askphysics.vercel.app/docs/): guides, FAQ, and a page for every equation
 - [`PLAN.md`](PLAN.md): vision, pipeline, Fermi and refusal policies, confidence model
 - [`docs/MODELS.md`](docs/MODELS.md): the Fermi model family, its architecture, data, training, and routing
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): modules, interfaces, one question traced through every stage

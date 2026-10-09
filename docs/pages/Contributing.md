@@ -18,7 +18,7 @@ Equations live in
 Each needs an id, a name, LaTeX, a SymPy expression with exactly one `=`, every variable
 with its unit, description, and usual range, assumptions, validity conditions, tags (the
 words that find it), a source, and a license. Run `askphysics validate-data`, and the
-equation gets its own page in this wiki when the change reaches main.
+equation gets its own page in these docs when the change reaches main.
 
 ## Before a pull request
 
@@ -32,9 +32,9 @@ askphysics validate-data
 All four must pass. Branch from `main` with a prefix (`feat/`, `fix/`, `docs/`, `data/`,
 ...) and fill in the pull request template.
 
-## Editing this wiki
+## Editing the docs
 
-Wiki pages live in
-[`docs/wiki/`](https://github.com/shankar-sachin/ask-physics/tree/main/docs/wiki), and
-the equation pages are generated from the database. Edits made directly on the wiki are
-overwritten by the next publish, so change the repository instead.
+Pages live in
+[`docs/pages/`](https://github.com/shankar-sachin/ask-physics/tree/main/docs/pages), and
+the equation pages are generated from the database. Change a page there in a pull
+request; the website rebuilds the docs on every push to main.
