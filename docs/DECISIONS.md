@@ -837,3 +837,52 @@ the same CI, and the same release.
 own. The cost is three release trains and cross-repo changes, which is why it
 waits until the models stop changing weekly.
 
+## ADR-019: Train on Apple Silicon with MLX; PyTorch stays for inference and other platforms
+
+**Status:** Proposed by the maintainer's request; implemented on `feat/mlx-trainer`, to be
+confirmed by the first full runs on the M5 Pro
+
+**Context.** The maintainer trains the Fermi models on an M5 Pro with 48 GB. Training with
+torch's MPS backend grew past 40 GB of process memory and then swapped, and throughput fell to
+about 256 target tokens per second. Attention is the main cost: with batch 16 at 1024 tokens,
+each layer's (heads, T, T) attention matrix is about 0.5 to 1 GB, so the activations of
+`fermi-celeste-1` alone need more memory than the machine has. MLX is Apple's array framework
+for Apple Silicon (MIT licensed, `pip install mlx`). It keeps unified-memory use under control
+with a hard memory limit and a cache limit, and it can recompute each block's activations in
+the backward pass.
+
+**Decision.**
+
+- Training on an arm64 Mac uses MLX. `askphysics model train --backend auto` (the default)
+  picks MLX when `mlx.core` imports on an arm64 Mac and `--device` is not `cpu` or `cuda`, and
+  torch otherwise. `--backend torch` forces torch; `--backend mlx` fails with a clear message
+  when mlx is missing. `askphysics model backend` prints the choice, and `scripts/train.sh`
+  passes it through.
+- Inference (`ask`, `model eval`, the website), and training on Linux and Windows, stay on
+  torch. Nothing else in the package imports mlx, and the MLX modules are imported only when
+  the MLX backend is chosen.
+- The weights format is unchanged. `lm/mlx_model.py` uses the torch parameter names and
+  shapes, `lm/mlx_train.py` writes `model.safetensors`, `config.json`, and `tokenizer.json`
+  through the same helpers as `lm/checkpoints.py`, and `load_model` in torch reads them.
+  Logits and loss agree with torch within 1e-4 in fp32, and a test checks it.
+- The two trainers share the data preparation, the batch sampler (so one seed gives the same
+  batches on either), the learning-rate schedule, the metric keys, and the training summary.
+  The optimizer state differs (MLX keeps its moments under `m.<param>` and `v.<param>`), so
+  `train_state.json` records `"backend"`, and a run resumes only on the backend that wrote it.
+- Memory on MLX: a memory limit (`mx.set_memory_limit`, 70% of system RAM by default,
+  `--mlx-memory-gb` to change it), a cap on the cache kept for reuse (`--mlx-cache-gb`, 4 GB by
+  default), and `--checkpoint-blocks` to recompute each block's activations in the backward
+  pass (`mx.checkpoint`). The loss upcasts the logits to fp32 once and does not materialize a
+  log-softmax copy. The optimizer step runs under `mx.compile`, which is on by default.
+- Precision: parameters are always fp32. `bf16` (and `auto`) run the forward pass in bfloat16
+  with fp32 master weights and an fp32 loss, as torch autocast does on MPS.
+
+**Consequences.** Two training loops must stay in step: a change to the batch, schedule, or
+logging code lands in `lm/train.py` and is shared where possible, but the model and optimizer
+steps exist twice, and `tests/test_lm_mlx_train.py` checks one step of each against the other.
+The MLX trainer is new code on a young framework, so the torch trainer remains the reference
+and the fallback. Weights are unchanged, so a model trained either way is installed, evaluated,
+and packaged the same way. MLX is MIT licensed, so it adds no license obligation beyond the
+attribution in `THIRD_PARTY_LICENSES.md`. Linux and Windows users see no change: the
+`[mlx]` extra is Mac-only, and `auto` resolves to torch there. CI tests the MLX code on CPU
+through `mlx[cpu]`.

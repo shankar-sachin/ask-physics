@@ -44,6 +44,7 @@ dependencies).
 | NetworkX | BSD-3-Clause | NetworkX Developers | <https://github.com/networkx/networkx> |
 | setuptools | MIT | Jason R. Coombs and contributors | <https://github.com/pypa/setuptools> |
 | safetensors | Apache-2.0 | Hugging Face | <https://github.com/huggingface/safetensors> |
+| MLX (`mlx`, arm64 Macs only, the `mlx` extra; training on Apple Silicon, ADR-019) | MIT | Apple Inc. and the MLX contributors | <https://github.com/ml-explore/mlx> |
 | Typer | MIT | Sebastián Ramírez | <https://github.com/fastapi/typer> |
 | annotated-doc | MIT | Sebastián Ramírez | <https://github.com/fastapi/annotated-doc> |
 | shellingham | ISC | Tzu-ping Chung | <https://github.com/sarugaku/shellingham> |

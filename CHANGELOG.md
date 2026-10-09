@@ -8,6 +8,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Training on Apple Silicon uses MLX (ADR-019). On an arm64 Mac, `askphysics model train`
+  runs on MLX by default (`--backend auto`): it stays inside a memory limit (70% of RAM by
+  default, `--mlx-memory-gb`) where torch's MPS backend grew past 40 GB and swapped. The
+  options are `--backend torch|mlx`, `--mlx-cache-gb`, and `--checkpoint-blocks` (recompute each
+  block's activations in the backward pass, for models whose activations don't fit). Weights,
+  metrics, and checkpoints are the same format either way, so a model trained on MLX loads
+  unchanged; a run resumes only on the backend that started it. `askphysics model backend`
+  prints the choice, and `scripts/train.sh` takes `--backend` and `--checkpoint-blocks`. The
+  `mlx` extra is Mac-only; Linux and Windows keep torch.
 - `askphysics model train --grad-accum N` (and `scripts/train.sh --grad-accum N`)
   runs N micro-batches per optimizer step, so celeste can train at an effective
   batch of 32 when 32 at once doesn't fit in memory.
