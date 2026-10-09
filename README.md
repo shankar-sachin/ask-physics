@@ -12,7 +12,9 @@
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-pre--alpha-red.svg" alt="Status: pre-alpha"></a>
 </p>
 
-<p align="center"><b><a href="https://askphysics.vercel.app">Try it in your browser at askphysics.vercel.app</a></b>: no install, no account.</p>
+<p align="center">🔗 <a href="https://askphysics.vercel.app"><b>askphysics.vercel.app</b></a></p>
+
+<p align="center"><b><em>100% free, forever. That's why it's the best way to go.</em></b></p>
 
 Ask any physics question, from a textbook problem to "how many rubber ducks
 would it take to stop a freight train?", and get an answer you can check: the
@@ -211,7 +213,7 @@ v1.0 comes the hosted API. The CLI is the main interface, and
 
 ## Documentation
 
-- The Ask Physics Wiki, [on GitHub](https://github.com/shankar-sachin/ask-physics/wiki) and [on the website](https://askphysics.vercel.app/wiki/): guides, FAQ, and a page for every equation
+- Ask Physics Docs, [on the website](https://askphysics.vercel.app/docs/) and [as the GitHub Wiki](https://github.com/shankar-sachin/ask-physics/wiki): guides, FAQ, and a page for every equation
 - [`PLAN.md`](PLAN.md): vision, pipeline, Fermi and refusal policies, confidence model
 - [`docs/MODELS.md`](docs/MODELS.md): the Fermi model family, its architecture, data, training, and routing
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): modules, interfaces, one question traced through every stage
