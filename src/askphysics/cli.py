@@ -248,6 +248,14 @@ def train_cmd(
     ] = None,
     steps: Annotated[int, typer.Option(min=1)] = 1000,
     batch_size: Annotated[int, typer.Option(min=1)] = 16,
+    grad_accum: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            help="Micro-batches per optimizer step; the effective batch is batch-size x this. "
+            "Use it when a full batch doesn't fit in memory.",
+        ),
+    ] = 1,
     lr: Annotated[
         float | None, typer.Option(help="Peak learning rate (default per model).")
     ] = None,
@@ -284,6 +292,7 @@ def train_cmd(
     cfg = TrainConfig(
         steps=steps,
         batch_size=batch_size,
+        grad_accum=grad_accum,
         lr=lr or DEFAULT_LR.get(config.name, 1e-3),
         warmup_steps=max(1, min(500, steps // 20)),
         eval_every=max(1, min(500, steps // 10)),
@@ -456,10 +465,19 @@ def eval_cmd(
         Path,
         typer.Option(help="Real textbook questions with gold plans; skipped if missing."),
     ] = REAL_QUESTIONS,
+    rescue_with: Annotated[
+        str | None,
+        typer.Option(help="Bigger installed model to retry the questions this one misses."),
+    ] = None,
+    rescue_directory: Annotated[
+        Path | None,
+        typer.Option(help="Rescue model directory (default: the installed models dir)."),
+    ] = None,
 ) -> None:
     """Score a model on held-out questions: right category, plans that compute right, and
     how often the answer `ask` would give is wrong while passing every check. Then ask the
-    real textbook questions through the whole pipeline, the model doing every stage."""
+    real textbook questions through the whole pipeline, the model doing every stage.
+    With --rescue-with, a bigger model also plans the misses, as ask's escalation does."""
     from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 
     from askphysics.lm.checkpoints import default_model_dir, load_model
@@ -482,6 +500,16 @@ def eval_cmd(
     if not picked:
         raise _fail(f"no validation examples in {data / 'val'}; run build-data first")
     decoder = Decoder(loaded, tokenizer)
+    if rescue_directory is not None and rescue_with is None:
+        raise _fail("--rescue-directory needs --rescue-with")
+    rescue: Decoder | None = None
+    if rescue_with is not None:
+        rescue_dir = rescue_directory or default_model_dir() / rescue_with
+        try:
+            rescuer, rescue_tokenizer = load_model(rescue_dir, select_device(device))
+        except AskPhysicsError as exc:
+            raise _fail(str(exc)) from exc
+        rescue = Decoder(rescuer, rescue_tokenizer)
     store = load_all()
     with Progress(
         TextColumn(f"[brand]scoring {model}"),
@@ -495,6 +523,7 @@ def eval_cmd(
             picked,
             store,
             attempts=attempts,
+            rescue=rescue,
             on_progress=lambda n: progress.update(task, completed=n),
         )
     real_report = None
@@ -552,6 +581,13 @@ def eval_cmd(
     )
     table.add_row("wrong, but flagged or refused", f"{report.flagged_wrong_rate:.1%}")
     table.add_row("[bad]confidently wrong[/]", f"{report.confidently_wrong_rate:.1%}")
+    if rescue_with is not None:
+        table.add_section()
+        table.add_row(f"{safe(rescue_with)} tried on {report.rescue_tried} misses", "")
+        table.add_row("rescued", f"{report.rescue_rate:.1%}")
+        table.add_row("right after escalation", f"{report.routed_with_rescue_rate:.1%}")
+        table.add_row("[bad]confidently wrong rescues[/]", str(report.rescue_confidently_wrong))
+        table.add_row("[muted]v0.4 target: rescues at least a third of the misses[/]", "")
     console.print(table)
     for f in report.confidently_wrong[:5]:
         console.print(f"  [bad]confidently wrong:[/] {safe(f['question'])}")

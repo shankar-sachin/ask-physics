@@ -18,6 +18,8 @@
 #   --steps N            total steps, prose included (tellus 1500; solem and celeste
 #                        5000: 2000 prose-only, then 3000 on the tasks)
 #   --batch-size N       default 32
+#   --grad-accum N       micro-batches per optimizer step (default 1); the effective batch
+#                        is --batch-size x N, for when a full batch doesn't fit in memory
 #   --data DIR           default build/data
 #   --examples N         examples when building data (default 1000000)
 #   --workers N          processes when building data (default 10)
@@ -53,7 +55,7 @@ case $model in
   fermi-luna-1) steps=300 wants_prose=0 ;;
   *) fail "unknown model $model (fermi-tellus-1, fermi-solem-1, fermi-celeste-1, fermi-luna-1)" ;;
 esac
-batch=32 data=build/data examples=1000000 workers=10 tokenizer=build/tokenizer.json
+batch=32 grad_accum=1 data=build/data examples=1000000 workers=10 tokenizer=build/tokenizer.json
 prose="" prose_steps="" prose_share="" fresh_data=0 fresh_tokenizer=0 resume=0
 eval_examples=3000 evaluate=1 device="" precision=auto bench=1
 
@@ -61,6 +63,7 @@ while [ $# -gt 0 ]; do
   case $1 in
     --steps) steps=$2 && shift ;;
     --batch-size) batch=$2 && shift ;;
+    --grad-accum) grad_accum=$2 && shift ;;
     --data) data=$2 && shift ;;
     --examples) examples=$2 && shift ;;
     --workers) workers=$2 && shift ;;
@@ -86,6 +89,9 @@ done
 case $precision in
   auto | bf16 | fp32) ;;
   *) fail "unknown --precision $precision (choose auto, bf16, or fp32)" ;;
+esac
+case $grad_accum in
+  ''|*[!0-9]*|0) fail "--grad-accum must be a positive integer, not $grad_accum" ;;
 esac
 
 to_repo_root
@@ -155,6 +161,7 @@ if [ "$wants_prose" = 1 ]; then
   set -- "$@" --prose "$prose" --prose-steps "$prose_steps" --prose-share "$prose_share"
 fi
 [ -n "$device" ] && set -- "$@" --device "$device"
+[ "$grad_accum" = 1 ] || set -- "$@" --grad-accum "$grad_accum"
 set -- "$@" --precision "$precision"
 [ "$resume" = 1 ] && set -- "$@" --resume
 awake "$@"

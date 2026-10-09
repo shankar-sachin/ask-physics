@@ -49,7 +49,8 @@ class TrainConfig:
     """Knobs for one training run. Defaults suit fermi-luna-1 on a laptop CPU."""
 
     steps: int = 1000
-    batch_size: int = 16
+    batch_size: int = 16  # micro-batch size; the effective batch is batch_size * grad_accum
+    grad_accum: int = 1  # micro-batches per optimizer step
     lr: float = 1e-3
     min_lr_ratio: float = 0.1
     warmup_steps: int = 100
@@ -334,6 +335,33 @@ def _resume_lr(directory: Path, step: int) -> float | None:
     return logged
 
 
+def _optimizer_step(
+    model: FermiLM,
+    opt: torch.optim.Optimizer,
+    micro_batches: Sequence[tuple[Tensor, Tensor]],
+    cfg: TrainConfig,
+    device: torch.device,
+    dtype: torch.dtype | None,
+) -> Tensor:
+    """One optimizer step over ``micro_batches`` of (inputs, labels).
+
+    Each micro-batch's loss is divided by their count, so the accumulated gradient is the
+    mean over all of them. Returns the mean loss, detached and still on ``device``.
+    """
+    scale = len(micro_batches)
+    opt.zero_grad(set_to_none=True)
+    total = torch.zeros((), device=device)
+    for inputs, labels in micro_batches:
+        with torch.autocast(device.type, dtype=dtype or torch.bfloat16, enabled=dtype is not None):
+            _, loss = model(inputs, labels)
+        assert loss is not None
+        (loss / scale).backward()
+        total += loss.detach() / scale
+    torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+    opt.step()
+    return total
+
+
 def _load_optimizer(opt: torch.optim.Optimizer, directory: Path) -> int:
     meta = json.loads((directory / STATE_FILE).read_text(encoding="utf-8"))
     tensors = load_file(str(directory / OPTIMIZER_FILE))
@@ -408,6 +436,8 @@ def train(
     stage on them, and ``cfg.prose_share`` of later batches mix them back in (ADR-016).
     Their held-out paragraphs are reported as ``val_loss_prose``, apart from ``val_loss``.
     """
+    if cfg.grad_accum < 1:
+        raise ValueError(f"grad_accum must be at least 1, not {cfg.grad_accum}")
     if tokenizer.vocab_size > config.vocab_size:
         raise ValueError(
             f"tokenizer has {tokenizer.vocab_size} tokens; {config.name} only {config.vocab_size}"
@@ -463,7 +493,7 @@ def train(
     dtype = autocast_dtype(device, cfg.precision)
     order = list(range(len(train_set)))
     rng.shuffle(order)
-    cursor = (start * cfg.batch_size) % len(order)
+    cursor = (start * cfg.batch_size * cfg.grad_accum) % len(order)
     metrics: list[dict[str, Any]] = []
     out_dir.mkdir(parents=True, exist_ok=True)
     if start == 0:
@@ -485,38 +515,37 @@ def train(
         _save_optimizer(opt, step, out_dir, lr=lr_at(max(0, step - 1), cfg, resumed))
 
     for step in range(start, cfg.steps):
-        if prose_train.rows and (step < cfg.prose_steps or rng.random() < cfg.prose_share):
-            rows = rng.sample(prose_train.rows, min(cfg.batch_size, len(prose_train.rows)))
-        else:
-            if cursor + cfg.batch_size > len(order):
-                rng.shuffle(order)
-                cursor = 0
-            rows = [train_set.rows[i] for i in order[cursor : cursor + cfg.batch_size]]
-            cursor += cfg.batch_size
-        inputs, labels = make_batch(
-            rows,
-            tokenizer.pad_id,
-            device,
-            multiple=cfg.pad_multiple,
-            max_width=config.context_length,
-        )
+        micro_batches: list[tuple[Tensor, Tensor]] = []
+        for _ in range(cfg.grad_accum):
+            if prose_train.rows and (step < cfg.prose_steps or rng.random() < cfg.prose_share):
+                rows = rng.sample(prose_train.rows, min(cfg.batch_size, len(prose_train.rows)))
+            else:
+                if cursor + cfg.batch_size > len(order):
+                    rng.shuffle(order)
+                    cursor = 0
+                rows = [train_set.rows[i] for i in order[cursor : cursor + cfg.batch_size]]
+                cursor += cfg.batch_size
+            micro_batches.append(
+                make_batch(
+                    rows,
+                    tokenizer.pad_id,
+                    device,
+                    multiple=cfg.pad_multiple,
+                    max_width=config.context_length,
+                )
+            )
         for group in opt.param_groups:
             group["lr"] = lr_at(step, cfg, resumed)
-        with torch.autocast(device.type, dtype=dtype or torch.bfloat16, enabled=dtype is not None):
-            _, loss = model(inputs, labels)
-        assert loss is not None
-        opt.zero_grad(set_to_none=True)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-        opt.step()
-        tokens_seen += (labels != IGNORE_INDEX).sum()
+        loss = _optimizer_step(model, opt, micro_batches, cfg, device, dtype)
+        for _, labels in micro_batches:
+            tokens_seen += (labels != IGNORE_INDEX).sum()
 
         done = step + 1
         if done % cfg.log_every == 0 or done == cfg.steps:
             now, total = time.perf_counter(), int(tokens_seen)
             rate = (total - window_tokens) / max(now - window_t0, 1e-9)
             window_tokens, window_t0 = total, now
-            log({"step": done, "loss": round(float(loss.detach()), 4),
+            log({"step": done, "loss": round(float(loss), 4),
                  "lr": lr_at(step, cfg, resumed),
                  "target_tokens_per_s": round(rate, 1),
                  "mem_gb": _peak_memory_gb()})  # fmt: skip

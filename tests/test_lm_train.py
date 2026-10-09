@@ -1,5 +1,6 @@
 import json
 import random
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from askphysics.lm.train import (
     TrainConfig,
     _load_optimizer,
     _optimizer,
+    _optimizer_step,
     _peak_memory_gb,
     _save_optimizer,
     bucket_width,
@@ -247,6 +249,57 @@ def test_resume_continues_from_the_checkpoint(
     assert rates == sorted(rates, reverse=True) and rates[0] <= lr_at(9, first)
     logged = [json.loads(line)["step"] for line in (out / "metrics.jsonl").read_text().splitlines()]
     assert min(logged) <= 10 < max(logged)  # resuming keeps the earlier log
+
+
+def test_grad_accum_must_be_positive(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:
+    cfg = TrainConfig(**{**FAST.__dict__, "grad_accum": 0})
+    with pytest.raises(ValueError, match="grad_accum"):
+        train(LUNA, tokenizer, dataset, tmp_path / "x", cfg)
+
+
+def test_accumulated_step_matches_one_big_batch() -> None:
+    # Four rows with the same number of target tokens: one step on all four gives the same
+    # parameters and loss as one step on two micro-batches of two, each weighted by 1/2.
+    config = ModelConfig(
+        name="t", vocab_size=64, d_model=16, n_layers=1, n_heads=2, context_length=8
+    )
+    cpu = torch.device("cpu")
+    gen = torch.Generator().manual_seed(1)
+    rows = [(torch.randint(0, 64, (6,), generator=gen).tolist(), 3) for _ in range(4)]
+    cfg = TrainConfig(lr=1e-2)
+
+    torch.manual_seed(0)
+    whole = FermiLM(config)
+    accum = FermiLM(config)
+    accum.load_state_dict(whole.state_dict())
+    opt_whole, opt_accum = _optimizer(whole, cfg), _optimizer(accum, cfg)
+    width = {"max_width": config.context_length}
+    big = _optimizer_step(whole, opt_whole, [make_batch(rows, 0, cpu, **width)], cfg, cpu, None)
+    micro = [make_batch(rows[:2], 0, cpu, **width), make_batch(rows[2:], 0, cpu, **width)]
+    small = _optimizer_step(accum, opt_accum, micro, cfg, cpu, None)
+
+    assert torch.allclose(big, small, atol=1e-5)
+    for p, q in zip(whole.parameters(), accum.parameters(), strict=True):
+        assert torch.allclose(p, q, atol=1e-5)
+
+
+def test_grad_accum_trains_and_is_recorded(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    cfg = TrainConfig(**{**FAST.__dict__, "steps": 10, "log_every": 5, "grad_accum": 2})
+    metrics = train(LUNA, tokenizer, dataset, tmp_path / "luna", cfg)
+    logged = [m for m in metrics if "loss" in m]
+    assert [m["step"] for m in logged] == [5, 10]
+    summary = json.loads((tmp_path / "luna" / "training_summary.json").read_text())
+    assert summary["train"]["grad_accum"] == 2
+    assert summary["train"]["batch_size"] == cfg.batch_size
+
+
+def test_cli_rejects_zero_grad_accum() -> None:
+    r = CliRunner().invoke(cli.app, ["model", "train", "--grad-accum", "0"])
+    # CI forces color, and rich styles each hyphen of the option name on its own.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", r.output)
+    assert r.exit_code != 0 and "--grad-accum" in plain
 
 
 def test_optimizer_state_round_trips(tmp_path: Path) -> None:

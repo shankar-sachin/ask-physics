@@ -97,7 +97,9 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
       are installed (#51).
 
 ### Evals
-- [ ] Celeste rescue rate on the held-out factory set.
+- [x] `model eval --rescue-with` measures how many of solem's misses celeste
+      rescues; `--grad-accum` lets celeste train in half batches.
+- [ ] Celeste rescue rate on the held-out factory set (needs a trained celeste).
 - [x] Real-question eval from OpenStax *Physics* exercises, with
       project-written gold plans (ADR-016): 49 questions, each gold answer
       checked against the book's answer key, run by `model eval`.

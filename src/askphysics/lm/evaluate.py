@@ -74,6 +74,12 @@ class EvalReport:
     flagged_wrong_rate: float = 0.0  # wrong, but degraded or flagged by a sanity check
     confidently_wrong_rate: float = 0.0  # wrong, and every check passed
     mean_tries: float = 0.0
+    # The rescue run (``rescue`` in ``evaluate_tasks``): a bigger model tries the misses.
+    rescue_tried: int = 0  # main-model misses the rescuer attempted
+    rescued: int = 0  # ...and got right, by the same rule as the main model
+    rescue_rate: float = 0.0  # rescued / rescue_tried
+    rescue_confidently_wrong: int = 0  # rescuer answers that passed every check but are wrong
+    routed_with_rescue_rate: float = 0.0  # right after escalation, over all plan examples
     failures: list[dict[str, Any]] = field(default_factory=list)
     confidently_wrong: list[dict[str, Any]] = field(default_factory=list)
     real: dict[str, Any] | None = None
@@ -183,6 +189,16 @@ def route_plan(
     return Routed(plan=None, answer=None, possible=False, passed=False, tries=attempts)
 
 
+def _is_right(routed: Routed, want: Quantity | None) -> bool:
+    """The router's answer is the gold answer, and it is a possible one."""
+    return (
+        want is not None
+        and routed.answer is not None
+        and routed.possible
+        and _same_quantity(routed.answer, want)
+    )
+
+
 def score_classification(predicted: Classification, gold: Classification) -> bool:
     return predicted.category == gold.category
 
@@ -207,17 +223,24 @@ def evaluate_tasks(
     *,
     attempts: int = 1,
     max_failures: int = 10,
+    rescue: Decoder | None = None,
+    rescue_attempts: int = 1,
     on_progress: Callable[[int], None] | None = None,
 ) -> EvalReport:
     """Decode every example and score it against its gold target.
 
     ``attempts`` above 1 also runs each plan through the router (``route_plan``) and
     sorts the answers into right, flagged wrong, and confidently wrong.
+
+    ``rescue`` is a bigger model that plans every question the main model did not get
+    right, as the pipeline's escalation does. Its router answer counts as rescued when it
+    is right by the same rule.
     """
     report = EvalReport(attempts=attempts)
     category_hits = 0
     plan_hits = {"equation": 0, "target": 0, "knowns": 0, "answer": 0}
     routed_hits = {"right": 0, "flagged": 0, "confident": 0, "tries": 0}
+    rescue_hits = {"tried": 0, "rescued": 0, "confident": 0}
     for done, e in enumerate(examples, start=1):
         if e.task == "classify":
             question = _payload(e.prompt, CLASSIFY)["question"]
@@ -250,12 +273,7 @@ def evaluate_tasks(
                 plan_hits[key] += int(getattr(score, key))
             routed = route_plan(decoder, payload, store, attempts, first=predicted_p)
             want = _answer(gold_p, store)
-            right = (
-                want is not None
-                and routed.answer is not None
-                and routed.possible
-                and _same_quantity(routed.answer, want)
-            )
+            right = _is_right(routed, want)
             routed_hits["tries"] += routed.tries
             if right:
                 routed_hits["right"] += 1
@@ -272,6 +290,13 @@ def evaluate_tasks(
                     )
             else:
                 routed_hits["flagged"] += 1
+            if rescue is not None and not right:
+                rescue_hits["tried"] += 1
+                saved = route_plan(rescue, payload, store, rescue_attempts)
+                if _is_right(saved, want):
+                    rescue_hits["rescued"] += 1
+                elif saved.passed:
+                    rescue_hits["confident"] += 1
             if not score.answer and len(report.failures) < max_failures:
                 report.failures.append(
                     {
@@ -296,6 +321,13 @@ def evaluate_tasks(
         report.flagged_wrong_rate = routed_hits["flagged"] / n
         report.confidently_wrong_rate = routed_hits["confident"] / n
         report.mean_tries = routed_hits["tries"] / n
+        if rescue is not None:
+            tried, rescued = rescue_hits["tried"], rescue_hits["rescued"]
+            report.rescue_tried = tried
+            report.rescued = rescued
+            report.rescue_rate = rescued / tried if tried else 0.0
+            report.rescue_confidently_wrong = rescue_hits["confident"]
+            report.routed_with_rescue_rate = (routed_hits["right"] + rescued) / n
     return report
 
 
