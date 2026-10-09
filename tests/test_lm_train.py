@@ -1,5 +1,6 @@
 import json
 import random
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -296,7 +297,9 @@ def test_grad_accum_trains_and_is_recorded(
 
 def test_cli_rejects_zero_grad_accum() -> None:
     r = CliRunner().invoke(cli.app, ["model", "train", "--grad-accum", "0"])
-    assert r.exit_code != 0 and "--grad-accum" in r.output
+    # CI forces color, and rich styles each hyphen of the option name on its own.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", r.output)
+    assert r.exit_code != 0 and "--grad-accum" in plain
 
 
 def test_optimizer_state_round_trips(tmp_path: Path) -> None:
