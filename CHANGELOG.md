@@ -75,6 +75,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Training: `askphysics model bench` times a few training steps for each device and
+  precision your machine has and says how long a run will take, and `train.sh` runs it
+  before every training run; `model train --precision auto|bf16|fp32` picks the fastest.
+  A resumed run now keeps decaying from its own learning rate: resuming with more
+  `--steps` used to double the rate and undo hours of training.
+
 - Real textbook phrasings that read wrong: "two points" was two typographic
   points, "10 m / s^2" was 10 m, "Q = - 25 nC" lost its sign, a value stated
   twice ("for 5.0 s ... during the 5.0 s") had to be used twice, and a "40

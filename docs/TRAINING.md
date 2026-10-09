@@ -23,6 +23,15 @@ a step when the one before it worked. Each prints its options with `--help`, and
 | `sh scripts/release_weights.sh models-v0.4.0` | Packages each installed model and scores the packaged copy (see `RELEASING.md`) |
 
 `python3 scripts/compare_evals.py OLD/eval.json NEW/eval.json` compares any two reports.
+
+`train.sh` starts with a one-minute speed check (`askphysics model bench`). It times a few
+training steps on each device and precision this machine has, and prints the tokens per
+second for each and how many hours the run will take. If the projection is far longer than
+a night, stop and find out why rather than leaving it running. On a Mac, train plugged in
+with the lid open: on battery macOS throttles the GPU and sleeps even under `caffeinate`.
+`--precision fp32` (or `bf16`) trains in the format the check found fastest, and
+`--no-bench` skips the check.
+
 The rest of this page is what those scripts run, step by step.
 
 ## 1. Set up
