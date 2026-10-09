@@ -10,8 +10,9 @@
 #   2. build the training data, if missing (or --fresh-data)
 #   3. train the tokenizer, if missing (or --fresh-tokenizer), on the corpus when built
 #   4. score the backed-up model, so there is a baseline on the same data
-#   5. train (solem and celeste read the prose corpus first, when it is built)
-#   6. score the new model and compare it with the baseline
+#   5. check the training speed (about a minute), unless --no-bench
+#   6. train (solem and celeste read the prose corpus first, when it is built)
+#   7. score the new model and compare it with the baseline
 #
 # Options:
 #   --steps N            total steps, prose included (tellus 1500; solem and celeste
@@ -31,6 +32,9 @@
 #   --resume             continue an interrupted run (no backup, no rebuilds)
 #   --eval-examples N    questions per task when scoring (default 3000)
 #   --no-eval            skip both evals
+#   --device D           mps, cuda, or cpu, passed to model train (default: the best here)
+#   --precision P        auto, bf16, or fp32 (default auto), passed to model train
+#   --no-bench           skip the one-minute speed check before training
 #
 # DRY_RUN=1 prints every command instead of running it.
 set -eu
@@ -51,7 +55,7 @@ case $model in
 esac
 batch=32 data=build/data examples=1000000 workers=10 tokenizer=build/tokenizer.json
 prose="" prose_steps="" prose_share="" fresh_data=0 fresh_tokenizer=0 resume=0
-eval_examples=3000 evaluate=1
+eval_examples=3000 evaluate=1 device="" precision=auto bench=1
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -70,11 +74,19 @@ while [ $# -gt 0 ]; do
     --resume) resume=1 ;;
     --eval-examples) eval_examples=$2 && shift ;;
     --no-eval) evaluate=0 ;;
+    --device) device=$2 && shift ;;
+    --precision) precision=$2 && shift ;;
+    --no-bench) bench=0 ;;
     -h | --help) usage 0 ;;
     *) fail "unknown option $1 (see --help)" ;;
   esac
   shift
 done
+
+case $precision in
+  auto | bf16 | fp32) ;;
+  *) fail "unknown --precision $precision (choose auto, bf16, or fp32)" ;;
+esac
 
 to_repo_root
 need_askphysics
@@ -131,12 +143,19 @@ else
   fi
 fi
 
+if [ "$bench" = 1 ]; then
+  info "Checking training speed (about a minute)"
+  awake askphysics model bench --model "$model" --batch-size "$batch" --plan-steps "$steps"
+fi
+
 info "Training $model ($steps steps)"
 set -- askphysics model train --model "$model" --data "$data" --tokenizer "$tokenizer" \
   --steps "$steps" --batch-size "$batch"
 if [ "$wants_prose" = 1 ]; then
   set -- "$@" --prose "$prose" --prose-steps "$prose_steps" --prose-share "$prose_share"
 fi
+[ -n "$device" ] && set -- "$@" --device "$device"
+set -- "$@" --precision "$precision"
 [ "$resume" = 1 ] && set -- "$@" --resume
 awake "$@"
 

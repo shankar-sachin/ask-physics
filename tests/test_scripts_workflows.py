@@ -62,6 +62,7 @@ def test_train_backs_up_scores_both_and_compares(tmp_path: Path) -> None:
         ["askphysics", "model", "build-data"],
         ["askphysics", "model", "train-tokenizer"],
         ["askphysics", "model", "eval"],  # the backed-up model: the baseline
+        ["askphysics", "model", "bench"],
         ["askphysics", "model", "train"],
         ["askphysics", "model", "eval"],  # the new one
         ["python3", str(SCRIPTS / "compare_evals.py"), steps[-1][2]],
@@ -70,6 +71,7 @@ def test_train_backs_up_scores_both_and_compares(tmp_path: Path) -> None:
     train = next(c for c in _commands(result) if c.startswith("askphysics model train "))
     assert f"--prose {prose} --prose-steps 2000 --prose-share 0.1" in train
     assert "--steps 5000" in train and "--resume" not in train
+    assert train.endswith("--precision auto")
 
 
 def test_train_refuses_a_run_with_no_task_steps(tmp_path: Path) -> None:
@@ -86,11 +88,27 @@ def test_train_resume_skips_backup_and_rebuilds(tmp_path: Path) -> None:
     result = _run("train.sh", "fermi-tellus-1", "--resume", "--no-eval", tmp_path=tmp_path)
     assert result.returncode == 0, result.stderr
     assert _commands(result) == [
+        "askphysics model bench --model fermi-tellus-1 --batch-size 32 --plan-steps 1500",
         "askphysics model train --model fermi-tellus-1 --data build/data --tokenizer "
-        "build/tokenizer.json --steps 1500 --batch-size 32 --resume"
+        "build/tokenizer.json --steps 1500 --batch-size 32 --precision auto --resume",
     ]
     refused = _run("train.sh", "fermi-tellus-1", "--resume", "--fresh-data", tmp_path=tmp_path)
     assert refused.returncode != 0 and "--resume can't rebuild" in refused.stderr
+
+
+def test_train_precision_and_no_bench(tmp_path: Path) -> None:
+    result = _run("train.sh", "fermi-tellus-1", "--precision", "fp32", "--no-bench", "--no-eval",
+                  tmp_path=tmp_path)  # fmt: skip
+    assert result.returncode == 0, result.stderr
+    commands = _commands(result)
+    assert not any(c.startswith("askphysics model bench") for c in commands)
+    train = next(c for c in commands if c.startswith("askphysics model train "))
+    assert train.endswith("--batch-size 32 --precision fp32")
+
+
+def test_train_rejects_unknown_precision(tmp_path: Path) -> None:
+    result = _run("train.sh", "fermi-tellus-1", "--precision", "fp16", tmp_path=tmp_path)
+    assert result.returncode != 0 and "precision" in result.stderr
 
 
 def test_train_rejects_unknown_models_and_options(tmp_path: Path) -> None:

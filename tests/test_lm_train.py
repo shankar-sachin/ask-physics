@@ -102,6 +102,17 @@ def test_lr_schedule() -> None:
     assert lr_at(55, cfg) < lr_at(20, cfg)
 
 
+def test_a_longer_resume_carries_on_from_its_learning_rate() -> None:
+    # Resuming a 3000-step run at step 1500 as a 6000-step run once doubled the rate
+    # (0.00028 -> 0.00054) and knocked the loss from 4.2 back to 6.4.
+    old, longer = TrainConfig(steps=3000, lr=6e-4), TrainConfig(steps=6000, lr=6e-4)
+    at = lr_at(1499, old)
+    assert lr_at(1500, longer) > at * 1.2  # what a plain schedule would do
+    assert lr_at(1500, longer, (1500, at)) == pytest.approx(at)
+    assert lr_at(1501, longer, (1500, at)) < at
+    assert lr_at(5999, longer, (1500, at)) == pytest.approx(6e-5, rel=1e-3)
+
+
 def test_luna_trains_and_loss_drops(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:
     out = tmp_path / "luna"
     metrics = train(LUNA, tokenizer, dataset, out, FAST)
@@ -117,6 +128,15 @@ def test_luna_trains_and_loss_drops(dataset: Path, tokenizer: Tokenizer, tmp_pat
     assert loaded_tok.merges == tokenizer.merges
     summary = json.loads((out / "training_summary.json").read_text())
     assert summary["config"] == "fermi-luna-1"
+
+
+def test_fp32_precision_trains_and_is_recorded(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    cfg = TrainConfig(**{**FAST.__dict__, "steps": 5, "precision": "fp32"})
+    train(LUNA, tokenizer, dataset, tmp_path / "fp32", cfg)
+    summary = json.loads((tmp_path / "fp32" / "training_summary.json").read_text())
+    assert summary["train"]["precision"] == "fp32"
 
 
 def test_val_sample_is_fixed_and_per_task(dataset: Path, tokenizer: Tokenizer) -> None:
@@ -152,7 +172,11 @@ def test_resume_continues_from_the_checkpoint(
     more = TrainConfig(**{**FAST.__dict__, "steps": 20})
     metrics = train(LUNA, tokenizer, dataset, out, more, resume=True)
     assert min(m["step"] for m in metrics) > 10
-    assert json.loads((out / STATE_FILE).read_text())["step"] == 20
+    state = json.loads((out / STATE_FILE).read_text())
+    assert state["step"] == 20 and state["lr"] is not None
+    # The resumed run starts from the rate the first one ended at, and only goes down.
+    rates = [m["lr"] for m in metrics if "lr" in m]
+    assert rates == sorted(rates, reverse=True) and rates[0] <= lr_at(9, first)
     logged = [json.loads(line)["step"] for line in (out / "metrics.jsonl").read_text().splitlines()]
     assert min(logged) <= 10 < max(logged)  # resuming keeps the earlier log
 

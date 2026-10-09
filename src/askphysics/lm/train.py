@@ -58,6 +58,7 @@ class TrainConfig:
     log_every: int = 20
     seed: int = 0
     device: str | None = None
+    precision: str = "auto"  # auto, bf16, or fp32 (see autocast_dtype)
     pad_multiple: int = 64  # batch widths come in a few fixed sizes (see make_batch)
     # Real prose (ADR-016): the first ``prose_steps`` steps train on it alone, then a
     # ``prose_share`` of later batches keep it from fading. Both need ``prose`` texts.
@@ -149,8 +150,38 @@ def _release_cached_memory(device: torch.device) -> None:
         torch.cuda.empty_cache()
 
 
-def lr_at(step: int, cfg: TrainConfig) -> float:
-    """Linear warmup, then cosine decay to ``min_lr_ratio * lr``."""
+PRECISIONS = ("auto", "bf16", "fp32")
+
+
+def autocast_dtype(device: torch.device, precision: str) -> torch.dtype | None:
+    """The autocast dtype for ``precision`` on ``device``; ``None`` means plain fp32.
+
+    ``auto`` is bf16 on MPS and CUDA and fp32 on CPU.
+
+    Raises:
+        ValueError: ``precision`` is not one of ``PRECISIONS``.
+    """
+    if precision not in PRECISIONS:
+        raise ValueError(f"unknown precision {precision!r}; choose from {', '.join(PRECISIONS)}")
+    if precision == "bf16":
+        return torch.bfloat16
+    if precision == "auto" and device.type in {"mps", "cuda"}:
+        return torch.bfloat16
+    return None
+
+
+def lr_at(step: int, cfg: TrainConfig, resumed: tuple[int, float] | None = None) -> float:
+    """Linear warmup, then cosine decay to ``min_lr_ratio * lr``.
+
+    ``resumed`` is (step, learning rate) where a resumed run picked up. From there the rate
+    decays from that value over the steps left, so a resume that adds steps (3000 to 6000)
+    carries on smoothly instead of jumping back up the schedule a longer run would have.
+    """
+    floor = cfg.lr * cfg.min_lr_ratio
+    if resumed is not None and step >= resumed[0]:
+        start, at = resumed
+        progress = (step - start) / max(1, cfg.steps - start)
+        return floor + (at - floor) * 0.5 * (1 + math.cos(math.pi * min(1.0, progress)))
     if step < cfg.warmup_steps:
         return cfg.lr * (step + 1) / cfg.warmup_steps
     progress = (step - cfg.warmup_steps) / max(1, cfg.steps - cfg.warmup_steps)
@@ -168,18 +199,36 @@ def _optimizer(model: FermiLM, cfg: TrainConfig) -> torch.optim.AdamW:
     return torch.optim.AdamW(groups, lr=cfg.lr, betas=(0.9, 0.95))
 
 
-def _save_optimizer(opt: torch.optim.Optimizer, step: int, directory: Path) -> None:
+def _save_optimizer(
+    opt: torch.optim.Optimizer, step: int, directory: Path, lr: float | None = None
+) -> None:
     state = opt.state_dict()
     tensors: dict[str, Tensor] = {}
     for idx, slots in state["state"].items():
         for name, value in slots.items():
             tensors[f"{idx}.{name}"] = torch.as_tensor(value).detach().to("cpu").contiguous()
     save_file(tensors, str(directory / OPTIMIZER_FILE))
-    meta = {"step": step, "param_groups": [
+    meta = {"step": step, "lr": lr, "param_groups": [
         {k: v for k, v in g.items() if k != "params"} | {"params": g["params"]}
         for g in state["param_groups"]
     ]}  # fmt: skip
     (directory / STATE_FILE).write_text(json.dumps(meta), encoding="utf-8")
+
+
+def _resume_lr(directory: Path, step: int) -> float | None:
+    """The learning rate a run had reached at ``step``: saved with the checkpoint, or, for
+    checkpoints from before that, the last rate logged at or before it."""
+    meta = json.loads((directory / STATE_FILE).read_text(encoding="utf-8"))
+    if meta.get("lr") is not None:
+        return float(meta["lr"])
+    logged = None
+    metrics = directory / METRICS_FILE
+    if metrics.exists():
+        for line in metrics.read_text(encoding="utf-8").splitlines():
+            entry = json.loads(line)
+            if "lr" in entry and entry["step"] <= step:
+                logged = float(entry["lr"])
+    return logged
 
 
 def _load_optimizer(opt: torch.optim.Optimizer, directory: Path) -> int:
@@ -290,15 +339,19 @@ def train(
     model = FermiLM(config).to(device)
     opt = _optimizer(model, cfg)
     start = 0
+    resumed: tuple[int, float] | None = None
     if resume and (out_dir / STATE_FILE).exists():
         from askphysics.lm.checkpoints import load_model
 
         loaded, _ = load_model(out_dir, device)
         model.load_state_dict(loaded.state_dict())
         start = _load_optimizer(opt, out_dir)
+        at = _resume_lr(out_dir, start)
+        if at is not None and start >= cfg.warmup_steps:
+            resumed = (start, at)
     model.train()
 
-    use_autocast = device.type in {"mps", "cuda"}
+    dtype = autocast_dtype(device, cfg.precision)
     order = list(range(len(train_set)))
     rng.shuffle(order)
     cursor = (start * cfg.batch_size) % len(order)
@@ -317,7 +370,7 @@ def train(
 
     def checkpoint(step: int) -> None:
         save_model(model, tokenizer, out_dir)
-        _save_optimizer(opt, step, out_dir)
+        _save_optimizer(opt, step, out_dir, lr=lr_at(max(0, step - 1), cfg, resumed))
 
     for step in range(start, cfg.steps):
         if prose_train.rows and (step < cfg.prose_steps or rng.random() < cfg.prose_share):
@@ -336,8 +389,8 @@ def train(
             max_width=config.context_length,
         )
         for group in opt.param_groups:
-            group["lr"] = lr_at(step, cfg)
-        with torch.autocast(device.type, dtype=torch.bfloat16, enabled=use_autocast):
+            group["lr"] = lr_at(step, cfg, resumed)
+        with torch.autocast(device.type, dtype=dtype or torch.bfloat16, enabled=dtype is not None):
             _, loss = model(inputs, labels)
         assert loss is not None
         opt.zero_grad(set_to_none=True)
@@ -349,7 +402,8 @@ def train(
         done = step + 1
         if done % cfg.log_every == 0 or done == cfg.steps:
             elapsed = time.perf_counter() - t0
-            log({"step": done, "loss": round(float(loss.detach()), 4), "lr": lr_at(step, cfg),
+            log({"step": done, "loss": round(float(loss.detach()), 4),
+                 "lr": lr_at(step, cfg, resumed),
                  "target_tokens_per_s": round(tokens_seen / elapsed, 1)})  # fmt: skip
         if val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
             scores = evaluate_by_task(model, val_samples, cfg, tokenizer.pad_id, device)
