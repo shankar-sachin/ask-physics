@@ -170,6 +170,55 @@ caffeinate -dims askphysics model train --model fermi-solem-1 \
 - tellus only classifies, so it can skip this stage. It can still use the
   tokenizer trained with `--prose`; each model saves its own copy anyway.
 
+### celeste (after solem)
+
+celeste (119.6M parameters) exists to rescue the questions solem gets wrong:
+when all of solem's plan attempts fail, celeste gets one more (ADR-010). Train
+it only once solem is trained and scored, and keep it only if it earns its
+size (open question Q16): the v0.4 bar is that it rescues at least a third of
+solem's misses.
+
+1. Score solem and look at what it misses:
+
+   ```bash
+   sh scripts/eval.sh fermi-solem-1 --examples 500
+   ```
+
+   If solem is already right on nearly everything, celeste has little to
+   rescue; stop here.
+
+2. Check celeste's speed and memory at full width (about two minutes):
+
+   ```bash
+   askphysics model bench --model fermi-celeste-1 --width 1024 --batch-size 32
+   ```
+
+   It has four times solem's parameters, so expect roughly a quarter of solem's
+   tokens per second. If a setting fails or its GPU memory is more than about
+   30 GB, try `--batch-size 16` and train with `--batch-size 16 --grad-accum 2`:
+   the same 32 sequences per step, in two halves, so less memory at the same
+   quality.
+
+3. Train it, plugged in with the lid open, on the same data and tokenizer as
+   solem (2000 prose steps, then 3000 on the tasks):
+
+   ```bash
+   sh scripts/train.sh fermi-celeste-1 --device mps --precision bf16 --no-eval
+   ```
+
+   Add `--batch-size 16 --grad-accum 2` if step 2 said so. The speed check
+   before training prints the projected hours; if it is far longer than a
+   night, stop and send the bench table.
+
+4. Measure the rescue rate: solem answers, and every question it misses goes to
+   celeste.
+
+   ```bash
+   sh scripts/eval.sh fermi-solem-1 --examples 500 --rescue-with fermi-celeste-1
+   ```
+
+   The table's "rescued" row is the number that decides whether celeste ships.
+
 ## 6. Check the results
 
 ```bash
