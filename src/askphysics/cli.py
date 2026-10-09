@@ -252,6 +252,9 @@ def train_cmd(
         float | None, typer.Option(help="Peak learning rate (default per model).")
     ] = None,
     device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu (default: best).")] = None,
+    precision: Annotated[
+        str, typer.Option(help="auto (bf16 on mps/cuda, fp32 on cpu), bf16, or fp32.")
+    ] = "auto",
     seed: Annotated[int, typer.Option()] = 0,
     resume: Annotated[bool, typer.Option(help="Continue from a checkpoint in --out.")] = False,
     prose: Annotated[
@@ -269,13 +272,15 @@ def train_cmd(
     from askphysics.lm.checkpoints import default_model_dir
     from askphysics.lm.config import get_config
     from askphysics.lm.tokenizer import Tokenizer
-    from askphysics.lm.train import DEFAULT_LR, TrainConfig, train
+    from askphysics.lm.train import DEFAULT_LR, PRECISIONS, TrainConfig, train
 
     try:
         config = get_config(model)
     except KeyError as exc:
         raise _fail(str(exc.args[0])) from exc
     out_dir = out or default_model_dir() / config.name
+    if precision not in PRECISIONS:
+        raise _fail(f"unknown --precision {precision!r}; choose from {', '.join(PRECISIONS)}")
     cfg = TrainConfig(
         steps=steps,
         batch_size=batch_size,
@@ -286,6 +291,7 @@ def train_cmd(
         log_every=max(1, min(50, steps // 100)),
         seed=seed,
         device=device,
+        precision=precision,
         prose_steps=prose_steps,
         prose_share=prose_share,
     )
@@ -342,6 +348,75 @@ def train_cmd(
     if by_task:
         console.print("  val loss by task: " + " · ".join(by_task), style="muted")
     console.print(f"[ok]✓[/] {config.name} saved to {safe(str(out_dir))}")
+
+
+@model_app.command("bench")
+def bench_cmd(
+    model: Annotated[str, typer.Option(help="Model preset, e.g. fermi-solem-1.")] = "fermi-solem-1",
+    batch_size: Annotated[int, typer.Option(min=1)] = 32,
+    width: Annotated[int, typer.Option(help="Tokens per row (8 to the model's context).")] = 512,
+    steps: Annotated[int, typer.Option(min=1, help="Timed steps per setting.")] = 5,
+    warmup: Annotated[int, typer.Option(min=0, help="Untimed steps per setting.")] = 2,
+    device: Annotated[str | None, typer.Option(help="Only bench this device.")] = None,
+    plan_steps: Annotated[
+        int, typer.Option(min=1, help="Training length to project hours for.")
+    ] = 5000,
+) -> None:
+    """Time training steps on each device and precision and name the fastest."""
+    from askphysics.lm.bench import available_settings, bench, format_hours, projected_hours
+    from askphysics.lm.config import get_config
+
+    try:
+        config = get_config(model)
+    except KeyError as exc:
+        raise _fail(str(exc.args[0])) from exc
+    if not 8 <= width <= config.context_length:
+        raise _fail(f"--width must be between 8 and {config.context_length} for {model}")
+    settings = [s for s in available_settings() if device in (None, s[0])]
+    if not settings:
+        raise _fail(f"no benchmarkable setting for device {device!r}")
+    console.print(
+        f"  [muted]benchmarking {model}: batch {batch_size} x {width} tokens, "
+        f"{warmup} warmup + {steps} timed steps each[/]"
+    )
+    results = bench(
+        config, batch_size=batch_size, width=width, steps=steps, warmup=warmup, settings=settings
+    )
+    table = Table(
+        title=Text(f"{model} training speed", style="brand"),
+        title_justify="left",
+        border_style="muted",
+        header_style="label",
+    )
+    table.add_column("device")
+    table.add_column("precision")
+    table.add_column("s/step", justify="right")
+    table.add_column("tokens/s", justify="right")
+    table.add_column(f"{plan_steps:,} steps", justify="right")
+    for r in results:
+        if r.error is not None:
+            table.add_row(r.device, r.precision, "[bad]failed[/]", "", "")
+            continue
+        hours = projected_hours(r.tokens_per_s, plan_steps, batch_size, width)
+        table.add_row(
+            r.device,
+            r.precision,
+            f"{r.seconds_per_step:.3f}",
+            f"{r.tokens_per_s:,.0f}",
+            format_hours(hours),
+        )
+    console.print(table)
+    for r in results:
+        if r.error is not None:
+            console.print(f"  [bad]{r.device} {r.precision}:[/] {safe(r.error)}")
+    ok = [r for r in results if r.error is None]
+    if not ok:
+        raise typer.Exit(1)
+    best = max(ok, key=lambda r: r.tokens_per_s)
+    console.print(
+        f"[ok]fastest: {best.device} {best.precision} ({best.tokens_per_s:,.0f} tokens/s).[/] "
+        f"Train with --device {best.device} --precision {best.precision}"
+    )
 
 
 @model_app.command("eval")
