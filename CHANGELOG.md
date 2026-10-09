@@ -8,6 +8,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `askphysics model train --grad-accum N` (and `scripts/train.sh --grad-accum N`)
+  runs N micro-batches per optimizer step, so celeste can train at an effective
+  batch of 32 when 32 at once doesn't fit in memory.
+- `askphysics model eval --rescue-with MODEL` (and `scripts/eval.sh
+  --rescue-with`) lets a bigger model re-plan the questions the first one
+  misses, as `ask`'s escalation does, and reports the rescue rate against the
+  v0.4 target of a third. `docs/TRAINING.md` walks through training celeste
+  and deciding whether it ships.
 - 16 more worked examples (20 in all) across mechanics, circuits, heat,
   waves, optics, fluids, and modern physics, including a two-step problem and
   two in Celsius. A test re-solves every example through Noether and checks it

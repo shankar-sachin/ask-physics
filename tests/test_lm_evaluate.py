@@ -1,6 +1,8 @@
 import json
 import math
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -176,6 +178,95 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
     assert report["plan_examples"] == 1 and report["real"]["questions"] == 1
     r = CliRunner().invoke(cli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
     assert r.exit_code == 1
+
+
+def test_cli_eval_with_a_rescuer(dataset: Path, tmp_path: Path) -> None:
+    real = tmp_path / "real.jsonl"
+    real.write_text((OPENSTAX / "real_eval.jsonl").read_text().splitlines()[0] + "\n")
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    save_model(FermiLM(LUNA), tokenizer, tmp_path / "luna")
+    r = CliRunner().invoke(
+        cli.app,
+        [
+            "model",
+            "eval",
+            "--model",
+            "fermi-luna-1",
+            "--directory",
+            str(tmp_path / "luna"),
+            "--data",
+            str(dataset),
+            "--examples",
+            "1",
+            "--device",
+            "cpu",
+            "--attempts",
+            "1",
+            "--real",
+            str(real),
+            "--rescue-with",
+            "fermi-luna-1",
+            "--rescue-directory",
+            str(tmp_path / "luna"),
+        ],
+    )
+    assert r.exit_code == 0, r.output
+    assert "tried on" in r.output and "rescued" in r.output
+    assert "right after escalation" in r.output
+    report = json.loads((tmp_path / "luna" / "eval.json").read_text())
+    assert report["rescue_tried"] <= report["plan_examples"]
+    assert "routed_with_rescue_rate" in report
+
+
+def test_the_rescue_fields_stay_zero_without_a_rescuer(store: DataStore, dataset: Path) -> None:
+    torch.manual_seed(0)
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    decoder = Decoder(FermiLM(LUNA).eval(), tokenizer, max_slot_tokens=8)
+    picked = [
+        e for e in sample_examples(read_examples(dataset / "val"), per_task=3) if e.task == "plan"
+    ]
+    report = evaluate_tasks(decoder, picked, store, attempts=2)
+    assert report.plan_examples > 0
+    assert report.rescue_tried == report.rescued == report.rescue_confidently_wrong == 0
+    assert report.rescue_rate == report.routed_with_rescue_rate == 0.0
+
+
+def test_a_rescue_run_retries_exactly_the_misses(store: DataStore, dataset: Path) -> None:
+    torch.manual_seed(0)
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    decoder = Decoder(FermiLM(LUNA).eval(), tokenizer, max_slot_tokens=8)
+    picked = [
+        e for e in sample_examples(read_examples(dataset / "val"), per_task=4) if e.task == "plan"
+    ]
+    report = evaluate_tasks(decoder, picked, store, attempts=2, rescue=decoder)
+    n = report.plan_examples
+    main_right = round(report.routed_right_rate * n)
+    assert report.rescue_tried + main_right == n
+    assert 0 <= report.rescued <= report.rescue_tried
+    assert report.rescue_confidently_wrong <= report.rescue_tried - report.rescued
+    assert report.rescue_rate == pytest.approx(
+        report.rescued / report.rescue_tried if report.rescue_tried else 0.0
+    )
+    assert report.routed_with_rescue_rate == pytest.approx((main_right + report.rescued) / n)
+    assert report.routed_with_rescue_rate >= report.routed_right_rate
+    assert json.loads(report.to_json())["rescue_tried"] == report.rescue_tried
+
+
+def test_eval_sh_passes_the_rescuer_through() -> None:
+    script = Path(__file__).resolve().parents[1] / "scripts" / "eval.sh"
+    env = {**os.environ, "DRY_RUN": "1"}
+    with_rescue = subprocess.run(
+        ["sh", str(script), "fermi-solem-1", "--rescue-with", "fermi-celeste-1"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    assert "--rescue-with fermi-celeste-1" in with_rescue.stdout
+    plain = subprocess.run(
+        ["sh", str(script), "fermi-solem-1"], capture_output=True, text=True, env=env, check=True
+    )
+    assert "--rescue-with" not in plain.stdout
 
 
 def _resistor_payload(question: str, store: DataStore) -> dict[str, object]:

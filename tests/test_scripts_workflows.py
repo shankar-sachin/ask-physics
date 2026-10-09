@@ -106,6 +106,24 @@ def test_train_precision_and_no_bench(tmp_path: Path) -> None:
     assert train.endswith("--batch-size 32 --precision fp32")
 
 
+def test_train_grad_accum_is_passed_only_when_set(tmp_path: Path) -> None:
+    flags = ["--no-bench", "--no-eval", "--no-prose"]
+    result = _run("train.sh", "fermi-celeste-1", "--grad-accum", "2", *flags, tmp_path=tmp_path)
+    assert result.returncode == 0, result.stderr
+    train = next(c for c in _commands(result) if c.startswith("askphysics model train "))
+    assert "--grad-accum 2" in train
+    assert train.index("--grad-accum 2") < train.index("--precision")
+    plain = _run("train.sh", "fermi-celeste-1", *flags, tmp_path=tmp_path)
+    train = next(c for c in _commands(plain) if c.startswith("askphysics model train "))
+    assert "--grad-accum" not in train
+    for bad in ("0", "-1", "two"):
+        refused = _run("train.sh", "fermi-celeste-1", "--grad-accum", bad, *flags,
+                       tmp_path=tmp_path)  # fmt: skip
+        assert (
+            refused.returncode != 0 and "--grad-accum must be a positive integer" in refused.stderr
+        )
+
+
 def test_train_rejects_unknown_precision(tmp_path: Path) -> None:
     result = _run("train.sh", "fermi-tellus-1", "--precision", "fp16", tmp_path=tmp_path)
     assert result.returncode != 0 and "precision" in result.stderr
