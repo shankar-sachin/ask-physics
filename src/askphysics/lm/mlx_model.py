@@ -147,32 +147,67 @@ class FermiLM(Module):
             total += int(p.size)
         return total
 
-    def __call__(self, ids: mx.array, dtype: mx.Dtype = mx.float32) -> mx.array:
-        """Logits of shape ``(batch, time, vocab_size)`` for ``ids`` of shape (batch, time)."""
+    def __call__(
+        self, ids: mx.array, dtype: mx.Dtype = mx.float32, checkpoint_blocks: bool = False
+    ) -> mx.array:
+        """Logits of shape ``(batch, time, vocab_size)`` for ``ids`` of shape (batch, time).
+
+        With ``checkpoint_blocks``, each block's activations are recomputed in the backward
+        pass instead of being stored (see ``_checkpointed_block``).
+        """
         t = ids.shape[1]
         if t > self.config.context_length:
             raise ValueError(f"sequence of {t} tokens exceeds context {self.config.context_length}")
         cos, sin = rope_tables(self.config.head_dim, t, self.config.rope_theta)
         x = self.embed(ids)
         for block in self.blocks:
-            x = block(x, cos, sin, dtype)
+            if checkpoint_blocks:
+                x = _checkpointed_block(block, x, cos, sin, dtype)
+            else:
+                x = block(x, cos, sin, dtype)
         return _project(self.norm(x), self.embed.weight, dtype)  # tied output head
 
-    def loss(self, ids: mx.array, targets: mx.array, dtype: mx.Dtype = mx.float32) -> mx.array:
+    def loss(
+        self,
+        ids: mx.array,
+        targets: mx.array,
+        dtype: mx.Dtype = mx.float32,
+        checkpoint_blocks: bool = False,
+    ) -> mx.array:
         """Mean cross-entropy over target tokens; ``IGNORE_INDEX`` positions don't count."""
-        return cross_entropy(self(ids, dtype), targets)
+        return cross_entropy(self(ids, dtype, checkpoint_blocks), targets)
+
+
+def _checkpointed_block(
+    block: Block, x: mx.array, cos: mx.array, sin: mx.array, dtype: mx.Dtype
+) -> mx.array:
+    """Run ``block`` under ``mx.checkpoint``: its intermediate activations (the attention and
+    MLP inputs and outputs) are dropped after the forward pass and recomputed in the backward
+    pass, so only the block's input is kept per layer. The parameters go through the
+    checkpointed function as arguments, so gradients still reach them (the mlx-lm pattern)."""
+
+    def inner(params: Any, h: mx.array, c: mx.array, s: mx.array) -> mx.array:
+        block.update(params)
+        return block(h, c, s, dtype)
+
+    return mx.checkpoint(inner)(block.parameters(), x, cos, sin)
 
 
 def cross_entropy(logits: mx.array, targets: mx.array) -> mx.array:
-    """Mean negative log-likelihood over the non-ignored targets, computed in fp32."""
+    """Mean negative log-likelihood over the non-ignored targets, computed in fp32.
+
+    The logits are upcast once, to fp32 (the one (batch, time, vocab) tensor the loss needs).
+    The log-softmax is not materialized: the target logit is gathered from the upcast logits
+    and subtracted from their logsumexp, one reduction per row.
+    """
     vocab = logits.shape[-1]
     flat = logits.astype(mx.float32).reshape(-1, vocab)
     labels = targets.reshape(-1)
     valid = (labels != IGNORE_INDEX).astype(mx.float32)
     safe = mx.where(labels != IGNORE_INDEX, labels, 0)
-    logp = flat - mx.logsumexp(flat, axis=-1, keepdims=True)
-    picked = mx.take_along_axis(logp, safe[:, None], axis=-1)[:, 0]
-    return -mx.sum(picked * valid) / mx.maximum(mx.sum(valid), 1.0)
+    picked = mx.take_along_axis(flat, safe[:, None], axis=-1)[:, 0]
+    nll = mx.logsumexp(flat, axis=-1) - picked
+    return mx.sum(nll * valid) / mx.maximum(mx.sum(valid), 1.0)
 
 
 def export_params(model: FermiLM) -> dict[str, np.ndarray]:

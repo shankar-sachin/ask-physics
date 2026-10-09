@@ -123,3 +123,27 @@ def test_context_length_is_enforced() -> None:
     model = FermiLM(TINY)
     with pytest.raises(ValueError, match="exceeds context"):
         model(mx.zeros((1, TINY.context_length + 1), dtype=mx.int32))
+
+
+def test_block_checkpointing_leaves_loss_and_grads_unchanged() -> None:
+    from mlx.nn.utils import value_and_grad
+    from mlx.utils import tree_flatten
+
+    model = FermiLM(LUNA)
+    rng = np.random.default_rng(6)
+    ids = mx.array(rng.integers(0, LUNA.vocab_size, (2, 20)).astype(np.int32))
+    targets = mx.array(rng.integers(0, LUNA.vocab_size, (2, 20)).astype(np.int32))
+
+    def run(checkpoint: bool) -> tuple[float, dict[str, np.ndarray]]:
+        def loss(i: mx.array, t: mx.array) -> mx.array:
+            return model.loss(i, t, mx.float32, checkpoint)
+
+        value, grads = value_and_grad(model, loss)(ids, targets)
+        return float(value), {k: np.array(g) for k, g in tree_flatten(grads)}
+
+    plain_loss, plain = run(False)
+    ckpt_loss, ckpt = run(True)
+    assert ckpt_loss == pytest.approx(plain_loss, abs=1e-6)
+    assert plain.keys() == ckpt.keys()
+    for name in plain:
+        assert np.allclose(plain[name], ckpt[name], atol=1e-5), name
