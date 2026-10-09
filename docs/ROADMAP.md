@@ -106,7 +106,7 @@ explains itself in a wiki.
     model cards, and a page per equation generated from the database
     (formula, variables with units, validity conditions, source, license).
   - A CI workflow publishes them to the repo's GitHub Wiki.
-  - The website renders the same pages at askphysics.vercel.app/wiki/, with
+  - The website (Ask Physics Docs) renders the same pages at askphysics.vercel.app/docs/, with
     rendered math, linked from answer cards (each equation id links to its
     page).
 

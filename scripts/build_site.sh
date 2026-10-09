@@ -28,13 +28,13 @@ for f in $lm_shipped; do
 done
 gzip -9 "$out/py/askphysics.tar"
 
-# The wiki, rendered from docs/wiki/ and the equation database (scripts/wiki_site.py).
-# It needs Python 3.9+; without it the site still builds, just without /wiki/.
+# The docs, rendered from docs/wiki/ and the equation database (scripts/docs_site.py).
+# It needs Python 3.9+; without it the site still builds, just without /docs/.
 if command -v python3 >/dev/null 2>&1 \
   && python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
-  python3 scripts/wiki_site.py "$out/wiki"
+  python3 scripts/docs_site.py "$out/docs"
 else
-  echo "no Python 3.9+: building the site without /wiki/" >&2
+  echo "no Python 3.9+: building the site without /docs/" >&2
 fi
 
 echo "built $out"

@@ -42,9 +42,20 @@ code { font-family: var(--mono); font-size: 0.9em; }
   background: rgba(7, 8, 15, 0.82); backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--text); font: 700 18px var(--display); }
-.brand:hover { text-decoration: none; }
-.brand b { color: var(--cyan); }
+.brand {
+  display: inline-flex; align-items: center; gap: 10px; color: var(--text);
+  font: 700 21px var(--display); letter-spacing: -0.02em; line-height: 1; white-space: nowrap;
+}
+.brand:hover { text-decoration: none; filter: brightness(1.08); }
+.brand img { width: 38px; height: 38px; flex: none; filter: drop-shadow(0 0 10px rgba(139, 233, 253, 0.35)); }
+.brand b {
+  background: linear-gradient(90deg, #8be9fd, #a5b4fc 55%, #bd93f9);
+  -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700;
+}
+.brand-sub {
+  display: inline-flex; align-items: center; height: 22px; padding-left: 10px; margin-left: 2px;
+  border-left: 1px solid var(--line); font-weight: 500; color: var(--label);
+}
 .nav nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; }
 .nav nav a { color: var(--label); }
 .nav nav a:hover { color: var(--text); text-decoration: none; }
@@ -177,6 +188,8 @@ footer .credits { font-size: 12px; }
   section { padding-top: 48px; }
   section[id] { scroll-margin-top: 100px; }
   .hero { padding-top: 40px; }
+  .brand { font-size: 19px; }
+  .brand img { width: 32px; height: 32px; }
   .lede { font-size: 17px; }
   #ask-form { flex-direction: column; }
   .examples button { text-align: left; }
