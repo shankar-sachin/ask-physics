@@ -4,6 +4,10 @@
   "installCommand": "true",
   "buildCommand": "sh scripts/build_site.sh",
   "outputDirectory": "build/site",
+  "redirects": [
+    { "source": "/wiki", "destination": "/docs/", "permanent": true },
+    { "source": "/wiki/:path*", "destination": "/docs/:path*", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",

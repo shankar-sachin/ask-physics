@@ -123,5 +123,5 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 - [x] Generate an equation page per database entry (formula, variables with
       units, validity, source, license) (#50).
 - [x] CI workflow that publishes `docs/wiki/` to the GitHub Wiki (#50).
-- [ ] Website wiki at `/wiki/` built from the same pages, with rendered math
+- [x] Ask Physics Docs at `/docs/` built from the same pages, with rendered math
       and search; link each equation id on the answer card to its page.

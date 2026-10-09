@@ -32,6 +32,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   GitHub Wiki, built from the same sources, with formulas typeset by KaTeX,
   and each equation on an answer card links to its page. The site's notes
   about the stand-in model and its version are up to date.
+- Ask Physics Docs: the website's documentation moved to askphysics.vercel.app/docs/
+  (old /wiki/ links redirect) and got a proper docs layout: a search box (press /),
+  section tabs, a sidebar for each section, an "On this page" outline that follows
+  you down the page, a "Copy page" button that copies its Markdown, callout boxes,
+  and previous and next links. The header shows the Ask Physics wordmark from the
+  banner art, with "Docs" beside it on the docs pages.
 - The website works on a phone: the nav keeps every link (it used to hide
   all but GitHub, so the wiki and the sections were unreachable), the model
   pictures sit two to a row, install commands wrap instead of being cut
