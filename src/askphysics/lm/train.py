@@ -12,11 +12,14 @@ from __future__ import annotations
 import json
 import math
 import random
+import resource
+import sys
 import time
-from collections.abc import Callable, Iterator, Sequence
+from array import array
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, overload
 
 import torch
 from safetensors.torch import load_file, save_file
@@ -59,23 +62,82 @@ class TrainConfig:
     seed: int = 0
     device: str | None = None
     precision: str = "auto"  # auto, bf16, or fp32 (see autocast_dtype)
-    pad_multiple: int = 64  # batch widths come in a few fixed sizes (see make_batch)
+    pad_multiple: int = 64  # smallest batch width; wider ones step by 1.5x and 2x (bucket_width)
+    flush_every: int = 100  # steps between releases of cached device memory; 0 disables
     # Real prose (ADR-016): the first ``prose_steps`` steps train on it alone, then a
     # ``prose_share`` of later batches keep it from fading. Both need ``prose`` texts.
     prose_steps: int = 0
     prose_share: float = 0.0
 
 
+Row = tuple[list[int], int]  # token ids, index of the first target token
+
+
+class _RowView(Sequence[Row]):
+    """Read-only view of a ``TokenizedSet``'s rows. Rows are built on access, so the view
+    holds no copy of the data. It compares equal to any sequence with the same rows."""
+
+    def __init__(self, data: TokenizedSet) -> None:
+        self._data = data
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    @overload
+    def __getitem__(self, index: int) -> Row: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[Row]: ...
+
+    def __getitem__(self, index: int | slice) -> Row | list[Row]:
+        if isinstance(index, slice):
+            return [self._data.row(i) for i in range(*index.indices(len(self)))]
+        if not -len(self) <= index < len(self):
+            raise IndexError(f"row {index} out of range for {len(self)} rows")
+        return self._data.row(index % len(self))
+
+    def __iter__(self) -> Iterator[Row]:
+        for i in range(len(self)):
+            yield self._data.row(i)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Sequence):
+            return NotImplemented
+        return list(self) == list(other)
+
+
 @dataclass
 class TokenizedSet:
-    """Examples as (token ids, index of the first target token), with each one's task."""
+    """Examples as token ids, the index of each one's first target token, and its task.
 
-    rows: list[tuple[list[int], int]] = field(default_factory=list)
+    The ids sit in one flat array of 4-byte ints, with row boundaries in ``offsets``. A
+    Python list of lists costs about 36 bytes per int, which would take over 10 GB for a
+    full training split.
+    """
+
+    tokens: array[int] = field(default_factory=lambda: array("i"))
+    offsets: array[int] = field(default_factory=lambda: array("q", [0]))
+    starts: array[int] = field(default_factory=lambda: array("i"))
     tasks: list[str] = field(default_factory=list)
     skipped: int = 0
 
     def __len__(self) -> int:
-        return len(self.rows)
+        return len(self.starts)
+
+    @property
+    def rows(self) -> _RowView:
+        """The rows as (token ids, target start) tuples, read-only."""
+        return _RowView(self)
+
+    def add(self, ids: Sequence[int], target_start: int, task: str) -> None:
+        self.tokens.extend(ids)
+        self.offsets.append(len(self.tokens))
+        self.starts.append(target_start)
+        self.tasks.append(task)
+
+    def row(self, i: int) -> Row:
+        """Row ``i`` (0 <= i < len) as (token ids, index of the first target token)."""
+        return self.tokens[self.offsets[i] : self.offsets[i + 1]].tolist(), self.starts[i]
 
 
 def tokenize_examples(
@@ -90,8 +152,7 @@ def tokenize_examples(
         if len(ids) > context_length + 1:
             out.skipped += 1
             continue
-        out.rows.append((ids, len(prompt)))
-        out.tasks.append(e.task)
+        out.add(ids, len(prompt), e.task)
     return out
 
 
@@ -108,13 +169,48 @@ def val_sample(data: TokenizedSet, per_task: int, seed: int = 0) -> dict[str, To
         task = data.tasks[i]
         sample = out.setdefault(task, TokenizedSet())
         if len(sample) < per_task:
-            sample.rows.append(data.rows[i])
-            sample.tasks.append(task)
+            ids, start = data.row(i)
+            sample.add(ids, start, task)
     return dict(sorted(out.items()))
 
 
+def sample_examples_by_task(examples: Iterable[Example], per_task: int, seed: int) -> list[Example]:
+    """Up to ``per_task`` examples of each task, chosen uniformly at random (reservoir sampling).
+
+    Only the reservoirs are kept in memory, so a whole split can be streamed through. The
+    result is fixed for a given seed and input order, ordered by task and then by reservoir.
+    """
+    rng = random.Random(seed)
+    reservoirs: dict[str, list[Example]] = {}
+    seen: dict[str, int] = {}
+    for e in examples:
+        n = seen.get(e.task, 0)
+        seen[e.task] = n + 1
+        reservoir = reservoirs.setdefault(e.task, [])
+        if len(reservoir) < per_task:
+            reservoir.append(e)
+        else:
+            j = rng.randrange(n + 1)
+            if j < per_task:
+                reservoir[j] = e
+    return [e for task in sorted(reservoirs) for e in reservoirs[task]]
+
+
+def bucket_width(n: int, smallest: int) -> int:
+    """The smallest of ``smallest`` times 1, 1.5, 2, 3, 4, 6, ... that holds ``n`` tokens.
+
+    Few shapes (nine from 64 to 1024) and at most a third of a batch spent on padding;
+    powers of two alone would waste up to half (513 tokens padded to 1024).
+    """
+    width, half_step = max(2, smallest), True
+    while width < n:
+        width = width * 3 // 2 if half_step else width * 4 // 3
+        half_step = not half_step
+    return width
+
+
 def make_batch(
-    rows: Sequence[tuple[list[int], int]],
+    rows: Sequence[Row],
     pad_id: int,
     device: torch.device,
     *,
@@ -123,14 +219,15 @@ def make_batch(
 ) -> tuple[Tensor, Tensor]:
     """Inputs and next-token labels; prompt and padding positions are ignored by the loss.
 
-    The width is rounded up to ``multiple`` (capped at ``max_width``) so batches come in
-    a handful of shapes. On Apple GPUs (MPS) every new shape grows a per-shape cache, and
-    hundreds of distinct widths exhaust memory within a few hundred steps.
+    The width comes from ``bucket_width``: with the default 64 it is one of 64, 96, 128,
+    192, 256, 384, 512, 768, or 1024. It is capped at ``max_width`` but never cut below
+    the longest row. On Apple GPUs (MPS) every new shape grows a per-shape cache, so a
+    handful of shapes keeps memory flat.
     """
-    width = max(len(ids) for ids, _ in rows) - 1
-    width = -(-width // multiple) * multiple
+    longest = max(len(ids) for ids, _ in rows) - 1
+    width = bucket_width(longest, multiple)
     if max_width is not None:
-        width = max(min(width, max_width), max(len(ids) for ids, _ in rows) - 1)
+        width = max(min(width, max_width), longest)
     inputs = torch.full((len(rows), width), pad_id, dtype=torch.long)
     labels = torch.full((len(rows), width), IGNORE_INDEX, dtype=torch.long)
     for i, (ids, target_start) in enumerate(rows):
@@ -148,6 +245,12 @@ def _release_cached_memory(device: torch.device) -> None:
         torch.mps.empty_cache()
     elif device.type == "cuda":
         torch.cuda.empty_cache()
+
+
+def _peak_memory_gb() -> float:
+    """Peak resident memory of this process so far, in GB (ru_maxrss is bytes on macOS)."""
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return round(peak * (1 if sys.platform == "darwin" else 1024) / 1e9, 1)
 
 
 PRECISIONS = ("auto", "bf16", "fp32")
@@ -316,8 +419,14 @@ def train(
     train_set = tokenize_examples(
         read_examples(data_dir / "train"), tokenizer, config.context_length
     )
-    val_set = tokenize_examples(read_examples(data_dir / "val"), tokenizer, config.context_length)
-    val_samples = val_sample(val_set, cfg.eval_batches * cfg.batch_size, cfg.seed)
+    # Only the validation rows that evaluation reads are tokenized: a fixed sample per task.
+    per_task = cfg.eval_batches * cfg.batch_size
+    val_set = tokenize_examples(
+        sample_examples_by_task(read_examples(data_dir / "val"), per_task, cfg.seed),
+        tokenizer,
+        config.context_length,
+    )
+    val_samples = val_sample(val_set, per_task, cfg.seed)
     if not train_set.rows:
         raise ValueError(f"no training examples fit the context in {data_dir / 'train'}")
     prose_train, prose_val = TokenizedSet(), TokenizedSet()
@@ -359,7 +468,10 @@ def train(
     out_dir.mkdir(parents=True, exist_ok=True)
     if start == 0:
         (out_dir / METRICS_FILE).unlink(missing_ok=True)  # a fresh run starts a fresh log
-    tokens_seen, t0 = 0, time.perf_counter()
+    # Target tokens are counted on the device and read back only when logging, so the loop
+    # never waits for the accelerator. The rate is over the window since the last reset.
+    tokens_seen = torch.zeros((), dtype=torch.long, device=device)
+    window_tokens, window_t0 = 0, time.perf_counter()
 
     def log(entry: dict[str, Any]) -> None:
         metrics.append(entry)
@@ -397,14 +509,17 @@ def train(
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         opt.step()
-        tokens_seen += int((labels != IGNORE_INDEX).sum())
+        tokens_seen += (labels != IGNORE_INDEX).sum()
 
         done = step + 1
         if done % cfg.log_every == 0 or done == cfg.steps:
-            elapsed = time.perf_counter() - t0
+            now, total = time.perf_counter(), int(tokens_seen)
+            rate = (total - window_tokens) / max(now - window_t0, 1e-9)
+            window_tokens, window_t0 = total, now
             log({"step": done, "loss": round(float(loss.detach()), 4),
                  "lr": lr_at(step, cfg, resumed),
-                 "target_tokens_per_s": round(tokens_seen / elapsed, 1)})  # fmt: skip
+                 "target_tokens_per_s": round(rate, 1),
+                 "mem_gb": _peak_memory_gb()})  # fmt: skip
         if val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
             scores = evaluate_by_task(model, val_samples, cfg, tokenizer.pad_id, device)
             if prose_val.rows:
@@ -412,8 +527,12 @@ def train(
                 scores["val_loss_prose"] = round(prose_loss, 4)
             log({"step": done, **scores})
             _release_cached_memory(device)
+            window_tokens, window_t0 = int(tokens_seen), time.perf_counter()  # not training time
         if done % cfg.checkpoint_every == 0 and done != cfg.steps:
             checkpoint(done)
+            _release_cached_memory(device)
+            window_tokens, window_t0 = int(tokens_seen), time.perf_counter()
+        if cfg.flush_every and done % cfg.flush_every == 0:
             _release_cached_memory(device)
 
     checkpoint(cfg.steps)

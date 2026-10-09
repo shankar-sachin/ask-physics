@@ -28,7 +28,7 @@ for f in $lm_shipped; do
 done
 gzip -9 "$out/py/askphysics.tar"
 
-# The docs, rendered from docs/wiki/ and the equation database (scripts/docs_site.py).
+# The docs, rendered from docs/pages/ and the equation database (scripts/docs_site.py).
 # It needs Python 3.9+; without it the site still builds, just without /docs/.
 if command -v python3 >/dev/null 2>&1 \
   && python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then

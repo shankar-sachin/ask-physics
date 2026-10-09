@@ -3,7 +3,13 @@ import torch
 from typer.testing import CliRunner
 
 from askphysics import cli
-from askphysics.lm.bench import available_settings, bench, format_hours, projected_hours
+from askphysics.lm.bench import (
+    available_settings,
+    bench,
+    bench_widths,
+    format_hours,
+    projected_hours,
+)
 from askphysics.lm.config import LUNA
 from askphysics.lm.train import autocast_dtype
 
@@ -19,16 +25,24 @@ def test_autocast_dtype_mapping() -> None:
         autocast_dtype(cpu, "fp16")
 
 
+def test_bench_widths_are_powers_of_two_up_to_the_largest() -> None:
+    assert bench_widths(128) == [64, 128]
+    assert bench_widths(512) == [64, 128, 256, 512]
+    assert bench_widths(16) == [16]
+
+
 def test_bench_times_a_cpu_step_and_survives_a_bad_device() -> None:
     good, bad = bench(
         LUNA,
         batch_size=2,
-        width=16,
+        width=128,
         steps=1,
         warmup=0,
         settings=[("cpu", "fp32"), ("nosuchdevice", "fp32")],
     )
     assert good.error is None and good.tokens_per_s > 0 and good.seconds_per_step > 0
+    assert good.rss_gb > 0
+    assert good.gpu_mem_gb is None
     assert bad.error and bad.tokens_per_s == 0
 
 
@@ -42,10 +56,11 @@ def test_projected_hours() -> None:
 
 
 def test_cli_bench_names_the_fastest() -> None:
-    args = ["model", "bench", "--model", "fermi-luna-1", "--batch-size", "2", "--width", "16"]
+    args = ["model", "bench", "--model", "fermi-luna-1", "--batch-size", "2", "--width", "128"]
     r = CliRunner().invoke(cli.app, [*args, "--steps", "1", "--warmup", "0", "--device", "cpu"])
     assert r.exit_code == 0, r.output
     assert "fastest: cpu fp32" in r.output
     assert "--device cpu --precision fp32" in r.output
+    assert "GPU memory" in r.output
     bad = CliRunner().invoke(cli.app, [*args[:-1], "4", "--steps", "1"])
     assert bad.exit_code != 0

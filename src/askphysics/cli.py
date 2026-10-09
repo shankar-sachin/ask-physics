@@ -354,16 +354,28 @@ def train_cmd(
 def bench_cmd(
     model: Annotated[str, typer.Option(help="Model preset, e.g. fermi-solem-1.")] = "fermi-solem-1",
     batch_size: Annotated[int, typer.Option(min=1)] = 32,
-    width: Annotated[int, typer.Option(help="Tokens per row (8 to the model's context).")] = 512,
-    steps: Annotated[int, typer.Option(min=1, help="Timed steps per setting.")] = 5,
-    warmup: Annotated[int, typer.Option(min=0, help="Untimed steps per setting.")] = 2,
+    width: Annotated[
+        int,
+        typer.Option(
+            help="Largest tokens per row (8 to the model's context). Times each power of two "
+            "from 64 up to it."
+        ),
+    ] = 512,
+    steps: Annotated[int, typer.Option(min=1, help="Timed steps per width per setting.")] = 3,
+    warmup: Annotated[int, typer.Option(min=0, help="Untimed steps per width per setting.")] = 2,
     device: Annotated[str | None, typer.Option(help="Only bench this device.")] = None,
     plan_steps: Annotated[
         int, typer.Option(min=1, help="Training length to project hours for.")
     ] = 5000,
 ) -> None:
     """Time training steps on each device and precision and name the fastest."""
-    from askphysics.lm.bench import available_settings, bench, format_hours, projected_hours
+    from askphysics.lm.bench import (
+        available_settings,
+        bench,
+        bench_widths,
+        format_hours,
+        projected_hours,
+    )
     from askphysics.lm.config import get_config
 
     try:
@@ -375,9 +387,12 @@ def bench_cmd(
     settings = [s for s in available_settings() if device in (None, s[0])]
     if not settings:
         raise _fail(f"no benchmarkable setting for device {device!r}")
+    widths = bench_widths(width)
+    avg_width = sum(widths) / len(widths)
+    width_list = ", ".join(str(w) for w in widths)
     console.print(
-        f"  [muted]benchmarking {model}: batch {batch_size} x {width} tokens, "
-        f"{warmup} warmup + {steps} timed steps each[/]"
+        f"  [muted]benchmarking {model}: batch {batch_size} x widths {width_list}, "
+        f"{warmup} warmup + {steps} timed steps per width[/]"
     )
     results = bench(
         config, batch_size=batch_size, width=width, steps=steps, warmup=warmup, settings=settings
@@ -392,17 +407,20 @@ def bench_cmd(
     table.add_column("precision")
     table.add_column("s/step", justify="right")
     table.add_column("tokens/s", justify="right")
+    table.add_column("GPU memory", justify="right")
     table.add_column(f"{plan_steps:,} steps", justify="right")
     for r in results:
         if r.error is not None:
-            table.add_row(r.device, r.precision, "[bad]failed[/]", "", "")
+            table.add_row(r.device, r.precision, "[bad]failed[/]", "", "", "")
             continue
-        hours = projected_hours(r.tokens_per_s, plan_steps, batch_size, width)
+        hours = projected_hours(r.tokens_per_s, plan_steps, batch_size, avg_width)
+        gpu = "-" if r.gpu_mem_gb is None else f"{r.gpu_mem_gb:.1f} GB"
         table.add_row(
             r.device,
             r.precision,
             f"{r.seconds_per_step:.3f}",
             f"{r.tokens_per_s:,.0f}",
+            gpu,
             format_hours(hours),
         )
     console.print(table)

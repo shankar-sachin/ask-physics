@@ -67,7 +67,7 @@ def test_read_and_split(tmp_path: Path) -> None:
 
 def test_prose_rows_learn_every_token_after_the_first(tokenizer: Tokenizer) -> None:
     rows = tokenize_prose(PARAGRAPHS[:1], tokenizer, LUNA.context_length)
-    assert rows.tasks == [PROSE_TASK]
+    assert rows.tasks == [PROSE_TASK] and rows.tokens.itemsize == 4
     ids, start = rows.rows[0]
     assert start == 1 and ids[-1] == tokenizer.end_id
     _, labels = make_batch(rows.rows, tokenizer.pad_id, "cpu")  # type: ignore[arg-type]

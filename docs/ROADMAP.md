@@ -80,10 +80,10 @@ and the exit criteria that need them.
 
 ---
 
-## v0.4.0 solem, weights, solver, and the wiki (L)
+## v0.4.0 solem, weights, solver, and the docs (L)
 
 **Goal:** a fresh install answers real intro problems with solem, and
-explains itself in a wiki.
+explains itself in its docs.
 
 **Deliverables**
 - Train `fermi-solem-1` with the prose stage, and `fermi-celeste-1` (~120M)
@@ -101,14 +101,12 @@ explains itself in a wiki.
 - Offset units (Celsius, Fahrenheit) converted before substitution.
 - 15+ worked examples.
 - Factory regenerated from the bigger database; models retrained.
-- **The Ask Physics Wiki**, one source with two homes:
-  - Pages live in this repo under `docs/wiki/`: guides, FAQ, glossary, the
+- **Ask Physics Docs** at askphysics.vercel.app/docs/, built from one source:
+  - Pages live in this repo under `docs/pages/`: guides, FAQ, glossary, the
     model cards, and a page per equation generated from the database
     (formula, variables with units, validity conditions, source, license).
-  - A CI workflow publishes them to the repo's GitHub Wiki.
-  - The website (Ask Physics Docs) renders the same pages at askphysics.vercel.app/docs/, with
-    rendered math, linked from answer cards (each equation id links to its
-    page).
+  - Rendered math, search, and a link from each equation id on an answer card
+    to its page.
 
 **Exit criteria**
 - On a held-out set of factory-style questions (unseen templates), solem
@@ -124,6 +122,26 @@ explains itself in a wiki.
   and no manual download step.
 - 80% or more of standard eval questions within 2% with the correct unit.
 - Every worked example re-solves within 0.1%.
+
+---
+
+## After fermi-celeste-1: Noether and Fermi as their own packages (M)
+
+**Goal:** three repositories, each MIT (ADR-018): `noether` (the math engine
+and the equation database), `fermi` (the models, training, and weights), and
+`ask-physics` (the pipeline, CLI, website, and docs, built on the other two).
+
+**Deliverables**
+- Untangle the imports first: compute and sanity checks, normalization, and
+  the shared models move so that fermi depends only on noether.
+- Split with history (`git filter-repo`), one package and CI per repository,
+  PyPI releases, ask-physics pinning both.
+- Installers, Homebrew, and the website keep working unchanged for users.
+
+**Exit criteria**
+- `pip install noether` solves an equation by id with units, with no torch.
+- `pip install fermi` trains and evaluates luna on CPU.
+- ask-physics installs both and passes its full test suite and smoke test.
 
 ---
 
