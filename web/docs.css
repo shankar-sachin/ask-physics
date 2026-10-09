@@ -148,7 +148,8 @@
   .docs-tabs { padding: 0 16px; gap: 22px; }
   .docs { display: block; padding: 0 16px; }
   .docs-links > a:first-child { display: none; } /* room for the search box */
-  .docs-links .install-btn { padding: 8px 13px; }
+  .docs-links .install-btn { height: 40px; padding: 0 14px; }
+  .docs-links .gh { width: 40px; height: 40px; }
   .docs-menu {
     display: block; width: 100%; margin: 16px 0 0; padding: 11px 14px; text-align: left; cursor: pointer;
     border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: 600 14px var(--body);

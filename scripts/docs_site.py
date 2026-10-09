@@ -351,7 +351,8 @@ def render_page(name: str, body_md: str, all_sections: list[Section], title: str
       </div>
       <nav class="docs-links">
         <a href="/#ask">Ask a question</a>
-        <a href="/#install" class="install-btn">{DOWNLOAD_ICON}Install</a>
+        <a href="/#install" class="install-btn"
+          >{DOWNLOAD_ICON}<span class="label">Install</span></a>
         <a href="{build_wiki.REPO}" class="gh" aria-label="Ask Physics on GitHub"
           title="GitHub">{GITHUB_ICON}</a>
       </nav>
