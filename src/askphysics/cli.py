@@ -15,7 +15,7 @@ from rich.text import Text
 from askphysics import __version__
 from askphysics.config import Provider, Settings
 from askphysics.data.loader import load_all
-from askphysics.errors import AskPhysicsError, DataValidationError
+from askphysics.errors import AskPhysicsError, ConfigError, DataValidationError
 from askphysics.pipeline import Pipeline
 from askphysics.ui import (
     answer_card,
@@ -263,6 +263,30 @@ def train_cmd(
     precision: Annotated[
         str, typer.Option(help="auto (bf16 on mps/cuda, fp32 on cpu), bf16, or fp32.")
     ] = "auto",
+    backend: Annotated[
+        str,
+        typer.Option(
+            help="auto (MLX on an Apple Silicon Mac, torch elsewhere), mlx, or torch. See ADR-019."
+        ),
+    ] = "auto",
+    mlx_cache_gb: Annotated[
+        float,
+        typer.Option(min=0.5, help="MLX only: most memory kept for reuse, in GB."),
+    ] = 4.0,
+    mlx_memory_gb: Annotated[
+        float | None,
+        typer.Option(
+            min=1.0,
+            help="MLX only: memory limit in GB (default: 70% of system RAM).",
+        ),
+    ] = None,
+    checkpoint_blocks: Annotated[
+        bool,
+        typer.Option(
+            help="MLX only: recompute each block's activations in the backward pass, "
+            "instead of storing them. Less memory, more compute."
+        ),
+    ] = False,
     seed: Annotated[int, typer.Option()] = 0,
     resume: Annotated[bool, typer.Option(help="Continue from a checkpoint in --out.")] = False,
     prose: Annotated[
@@ -277,6 +301,7 @@ def train_cmd(
     ] = 0.0,
 ) -> None:
     """Train a Fermi model from scratch on factory data, optionally after real prose."""
+    from askphysics.lm.backend import on_apple_silicon, resolve_backend
     from askphysics.lm.checkpoints import default_model_dir
     from askphysics.lm.config import get_config
     from askphysics.lm.tokenizer import Tokenizer
@@ -289,6 +314,12 @@ def train_cmd(
     out_dir = out or default_model_dir() / config.name
     if precision not in PRECISIONS:
         raise _fail(f"unknown --precision {precision!r}; choose from {', '.join(PRECISIONS)}")
+    try:
+        chosen = resolve_backend(backend, device)
+    except ConfigError as exc:
+        raise _fail(str(exc)) from exc
+    if chosen != "mlx" and (checkpoint_blocks or mlx_memory_gb is not None):
+        raise _fail("--checkpoint-blocks and --mlx-memory-gb apply to the mlx backend only")
     cfg = TrainConfig(
         steps=steps,
         batch_size=batch_size,
@@ -303,6 +334,7 @@ def train_cmd(
         precision=precision,
         prose_steps=prose_steps,
         prose_share=prose_share,
+        checkpoint_blocks=checkpoint_blocks,
     )
     if (prose_steps or prose_share) and prose is None:
         raise _fail("--prose-steps and --prose-share need --prose")
@@ -318,9 +350,16 @@ def train_cmd(
     head = banner()
     head.append(f"\n  training {config.name}", style="value")
     head.append(
-        f"  {config.num_parameters():,} params · {steps:,} steps · → {out_dir}", style="muted"
+        f"  {config.num_parameters():,} params · {steps:,} steps · {chosen} · → {out_dir}",
+        style="muted",
     )
     console.print(head)
+    if backend == "auto" and chosen == "torch" and on_apple_silicon():
+        console.print(
+            "  mlx is not installed, so this runs on torch, which is slower on a Mac and can "
+            "use much more memory. Install it with: pip install -e '.[mlx]'",
+            style="muted",
+        )
 
     last_val: dict[str, Any] = {}
     with training_progress(console) as progress:
@@ -338,16 +377,32 @@ def train_cmd(
                     speed=f"{entry['target_tokens_per_s']:,.0f} tok/s",
                 )
 
-        train(
-            config,
-            Tokenizer.load(tokenizer),
-            data,
-            out_dir,
-            cfg,
-            resume=resume,
-            on_log=show,
-            prose=texts,
-        )
+        if chosen == "mlx":
+            from askphysics.lm.mlx_train import train_mlx
+
+            train_mlx(
+                config,
+                Tokenizer.load(tokenizer),
+                data,
+                out_dir,
+                cfg,
+                resume=resume,
+                on_log=show,
+                prose=texts,
+                cache_limit_gb=mlx_cache_gb,
+                memory_limit_gb=mlx_memory_gb,
+            )
+        else:
+            train(
+                config,
+                Tokenizer.load(tokenizer),
+                data,
+                out_dir,
+                cfg,
+                resume=resume,
+                on_log=show,
+                prose=texts,
+            )
         progress.update(task, completed=steps)
     by_task = [
         f"{key.removeprefix('val_loss_')} {value:.3f}"
@@ -357,6 +412,23 @@ def train_cmd(
     if by_task:
         console.print("  val loss by task: " + " · ".join(by_task), style="muted")
     console.print(f"[ok]✓[/] {config.name} saved to {safe(str(out_dir))}")
+
+
+@model_app.command("backend")
+def backend_cmd(
+    backend: Annotated[
+        str, typer.Option(help="auto, mlx, or torch (as for model train).")
+    ] = "auto",
+    device: Annotated[str | None, typer.Option(help="mps, cuda, or cpu, if chosen.")] = None,
+) -> None:
+    """Print the training backend that model train would use here (for scripts)."""
+    from askphysics.lm.backend import resolve_backend
+
+    try:
+        typer.echo(resolve_backend(backend, device))
+    except ConfigError as exc:
+        typer.echo(f"error: {exc}", err=True)  # stderr, so a script's $(...) still shows it
+        raise typer.Exit(code=1) from exc
 
 
 @model_app.command("bench")

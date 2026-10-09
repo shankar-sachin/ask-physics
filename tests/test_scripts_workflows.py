@@ -90,7 +90,8 @@ def test_train_resume_skips_backup_and_rebuilds(tmp_path: Path) -> None:
     assert _commands(result) == [
         "askphysics model bench --model fermi-tellus-1 --batch-size 32 --plan-steps 1500",
         "askphysics model train --model fermi-tellus-1 --data build/data --tokenizer "
-        "build/tokenizer.json --steps 1500 --batch-size 32 --precision auto --resume",
+        "build/tokenizer.json --steps 1500 --batch-size 32 --backend torch "
+        "--precision auto --resume",
     ]
     refused = _run("train.sh", "fermi-tellus-1", "--resume", "--fresh-data", tmp_path=tmp_path)
     assert refused.returncode != 0 and "--resume can't rebuild" in refused.stderr
@@ -103,7 +104,7 @@ def test_train_precision_and_no_bench(tmp_path: Path) -> None:
     commands = _commands(result)
     assert not any(c.startswith("askphysics model bench") for c in commands)
     train = next(c for c in commands if c.startswith("askphysics model train "))
-    assert train.endswith("--batch-size 32 --precision fp32")
+    assert train.endswith("--batch-size 32 --backend torch --precision fp32")
 
 
 def test_train_grad_accum_is_passed_only_when_set(tmp_path: Path) -> None:
@@ -214,3 +215,26 @@ def test_compare_evals_needs_both_reports(tmp_path: Path) -> None:
     report.write_text(json.dumps({}))
     assert compare_evals.main([str(report), str(tmp_path / "missing.json")]) == 1
     assert compare_evals.main([str(report)]) == 2
+
+
+def test_train_backend_mlx_skips_the_torch_bench(tmp_path: Path) -> None:
+    pytest.importorskip("mlx.core")
+    result = _run("train.sh", "fermi-solem-1", "--backend", "mlx", "--device", "cpu",
+                  "--checkpoint-blocks", "--no-eval", "--no-prose", tmp_path=tmp_path)  # fmt: skip
+    assert result.returncode == 0, result.stderr
+    commands = _commands(result)
+    assert not any(c.startswith("askphysics model bench") for c in commands)
+    train = next(c for c in commands if c.startswith("askphysics model train "))
+    assert "--backend mlx" in train and "--checkpoint-blocks" in train
+    assert "--device cpu" in train and train.index("--checkpoint-blocks") < train.index(
+        "--precision"
+    )
+    assert "Skipping the torch speed check" in result.stdout
+
+
+def test_train_checkpoint_blocks_needs_mlx(tmp_path: Path) -> None:
+    refused = _run("train.sh", "fermi-tellus-1", "--backend", "torch", "--checkpoint-blocks",
+                   "--no-bench", "--no-eval", tmp_path=tmp_path)  # fmt: skip
+    assert refused.returncode != 0 and "needs the mlx backend" in refused.stderr
+    unknown = _run("train.sh", "fermi-tellus-1", "--backend", "jax", tmp_path=tmp_path)
+    assert unknown.returncode != 0 and "unknown --backend jax" in unknown.stderr

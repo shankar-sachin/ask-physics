@@ -10,7 +10,7 @@
 #   2. build the training data, if missing (or --fresh-data)
 #   3. train the tokenizer, if missing (or --fresh-tokenizer), on the corpus when built
 #   4. score the backed-up model, so there is a baseline on the same data
-#   5. check the training speed (about a minute), unless --no-bench
+#   5. check the torch training speed (about a minute), unless --no-bench or MLX
 #   6. train (solem and celeste read the prose corpus first, when it is built)
 #   7. score the new model and compare it with the baseline
 #
@@ -36,7 +36,12 @@
 #   --no-eval            skip both evals
 #   --device D           mps, cuda, or cpu, passed to model train (default: the best here)
 #   --precision P        auto, bf16, or fp32 (default auto), passed to model train
-#   --no-bench           skip the one-minute speed check before training
+#   --backend B          auto, mlx, or torch (default auto: MLX on an Apple Silicon Mac,
+#                        torch elsewhere; ADR-019), passed to model train
+#   --checkpoint-blocks  MLX only: recompute each block's activations in the backward pass,
+#                        for when a model's activations don't fit (less memory, more compute)
+#   --no-bench           skip the one-minute torch speed check before training (MLX runs
+#                        skip it: the check times torch only)
 #
 # DRY_RUN=1 prints every command instead of running it.
 set -eu
@@ -58,6 +63,7 @@ esac
 batch=32 grad_accum=1 data=build/data examples=1000000 workers=10 tokenizer=build/tokenizer.json
 prose="" prose_steps="" prose_share="" fresh_data=0 fresh_tokenizer=0 resume=0
 eval_examples=3000 evaluate=1 device="" precision=auto bench=1
+backend=auto ckpt=0
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -79,6 +85,8 @@ while [ $# -gt 0 ]; do
     --no-eval) evaluate=0 ;;
     --device) device=$2 && shift ;;
     --precision) precision=$2 && shift ;;
+    --backend) backend=$2 && shift ;;
+    --checkpoint-blocks) ckpt=1 ;;
     --no-bench) bench=0 ;;
     -h | --help) usage 0 ;;
     *) fail "unknown option $1 (see --help)" ;;
@@ -94,8 +102,25 @@ case $grad_accum in
   ''|*[!0-9]*|0) fail "--grad-accum must be a positive integer, not $grad_accum" ;;
 esac
 
+case $backend in
+  auto | mlx | torch) ;;
+  *) fail "unknown --backend $backend (choose auto, mlx, or torch)" ;;
+esac
+
 to_repo_root
 need_askphysics
+
+# Which framework trains: the CLI decides, so this script and model train always agree.
+# The CLI's own error message goes to stderr, so it still shows if the choice is refused.
+if [ -n "$device" ]; then
+  resolved=$(askphysics model backend --backend "$backend" --device "$device")
+else
+  resolved=$(askphysics model backend --backend "$backend")
+fi
+info "Training backend: $resolved"
+if [ "$ckpt" = 1 ] && [ "$resolved" != mlx ]; then
+  fail "--checkpoint-blocks needs the mlx backend (this run uses $resolved)"
+fi
 
 corpus=build/corpus/prose.jsonl
 if [ "$wants_prose" = 1 ] && [ -z "$prose" ]; then
@@ -149,19 +174,22 @@ else
   fi
 fi
 
-if [ "$bench" = 1 ]; then
+if [ "$bench" = 1 ] && [ "$resolved" = torch ]; then
   info "Checking training speed (about a minute)"
   awake askphysics model bench --model "$model" --batch-size "$batch" --plan-steps "$steps"
+elif [ "$bench" = 1 ]; then
+  info "Skipping the torch speed check: this run trains with $resolved"
 fi
 
-info "Training $model ($steps steps)"
+info "Training $model ($steps steps) with $resolved"
 set -- askphysics model train --model "$model" --data "$data" --tokenizer "$tokenizer" \
-  --steps "$steps" --batch-size "$batch"
+  --steps "$steps" --batch-size "$batch" --backend "$resolved"
 if [ "$wants_prose" = 1 ]; then
   set -- "$@" --prose "$prose" --prose-steps "$prose_steps" --prose-share "$prose_share"
 fi
 [ -n "$device" ] && set -- "$@" --device "$device"
 [ "$grad_accum" = 1 ] || set -- "$@" --grad-accum "$grad_accum"
+[ "$ckpt" = 1 ] && set -- "$@" --checkpoint-blocks
 set -- "$@" --precision "$precision"
 [ "$resume" = 1 ] && set -- "$@" --resume
 awake "$@"
