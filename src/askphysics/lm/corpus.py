@@ -49,6 +49,5 @@ def tokenize_prose(texts: Sequence[str], tokenizer: Tokenizer, context_length: i
         for start in range(0, len(ids), context_length):
             chunk = ids[start : start + context_length + 1]
             if len(chunk) >= 2:
-                out.rows.append((chunk, 1))  # no prompt: learn every token after the first
-                out.tasks.append(PROSE_TASK)
+                out.add(chunk, 1, PROSE_TASK)  # no prompt: learn every token after the first
     return out

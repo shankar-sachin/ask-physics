@@ -1,4 +1,6 @@
 import json
+import random
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -14,12 +16,16 @@ from askphysics.lm.model import IGNORE_INDEX, FermiLM
 from askphysics.lm.tokenizer import Tokenizer
 from askphysics.lm.train import (
     STATE_FILE,
+    TokenizedSet,
     TrainConfig,
     _load_optimizer,
     _optimizer,
+    _peak_memory_gb,
     _save_optimizer,
+    bucket_width,
     lr_at,
     make_batch,
+    sample_examples_by_task,
     tokenize_examples,
     train,
     train_tokenizer,
@@ -62,7 +68,7 @@ def test_make_batch_only_learns_targets(tokenizer: Tokenizer) -> None:
     data = tokenize_examples([e], tokenizer, 1024)
     ids, target_start = data.rows[0]
     inputs, labels = make_batch(data.rows, tokenizer.pad_id, torch.device("cpu"))
-    assert inputs.shape == labels.shape == (1, len(ids) - 1)
+    assert inputs.shape == labels.shape and inputs.shape[1] >= len(ids) - 1
     learned = [int(t) for t in labels[0] if t != IGNORE_INDEX]
     assert learned == ids[target_start:]
     assert learned[-1] == tokenizer.end_id
@@ -78,13 +84,60 @@ def test_padding_is_ignored(tokenizer: Tokenizer) -> None:
 def test_batch_widths_are_bucketed(tokenizer: Tokenizer) -> None:
     rows = [([1] * 70, 2), ([1] * 10, 1)]
     inputs, labels = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64)
-    assert inputs.shape == labels.shape == (2, 128)
+    assert inputs.shape == labels.shape == (2, 96)
     assert (labels[:, 69:] == IGNORE_INDEX).all()
     # Rounding never pushes past the model's context, and never cuts a row short.
-    inputs, _ = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64, max_width=100)
-    assert inputs.shape == (2, 100)
+    inputs, _ = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64, max_width=80)
+    assert inputs.shape == (2, 80)
     inputs, _ = make_batch(rows, tokenizer.pad_id, torch.device("cpu"), multiple=64, max_width=50)
     assert inputs.shape == (2, 69)
+
+
+def test_batch_widths_come_in_a_few_buckets() -> None:
+    assert [bucket_width(n, 64) for n in (1, 64, 65, 97, 129, 300, 513, 1024)] == [
+        64, 64, 96, 128, 192, 384, 768, 1024,
+    ]  # fmt: skip
+    widths = {bucket_width(n, 64) for n in range(1, 1025)}
+    assert len(widths) == 9 and all(n <= bucket_width(n, 64) < n * 1.5 + 64 for n in (65, 700))
+    cpu = torch.device("cpu")
+    # Widths are the row length minus one (the inputs), so 65 -> 96 needs 66 ids.
+    for ids_len, width in [(2, 64), (66, 96), (130, 192), (1025, 1024)]:
+        inputs, _ = make_batch([([1] * ids_len, 1)], 0, cpu, multiple=64)
+        assert inputs.shape[1] == width
+    # A cap is honored, but never cuts below the longest row (129 here).
+    rows = [([1] * 130, 1)]
+    inputs, _ = make_batch(rows, 0, cpu, multiple=64, max_width=100)
+    assert inputs.shape[1] == 129
+
+
+def test_tokenized_set_stores_compact_rows() -> None:
+    data = TokenizedSet()
+    data.add([1, 2, 3], 1, "a")
+    data.add([4, 5], 1, "b")
+    data.add([6, 7, 8, 9], 2, "a")
+    assert len(data) == 3 and len(data.rows) == 3
+    assert data.tasks == ["a", "b", "a"] and data.tokens.itemsize == 4
+    assert data.tokens.tolist() == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    rows = [([1, 2, 3], 1), ([4, 5], 1), ([6, 7, 8, 9], 2)]
+    assert data.rows[0] == rows[0] and data.rows[-1] == rows[2]
+    assert data.rows[0:2] == rows[0:2] and list(data.rows) == rows
+    assert data.rows == rows and data.rows != rows[:2]
+    assert {"x": data.rows} == {"x": rows}
+    assert all(p in rows for p in random.Random(0).sample(data.rows, 2))
+    with pytest.raises(IndexError):
+        data.rows[3]
+
+
+def test_sample_examples_by_task_is_bounded_deterministic_and_complete(
+    dataset: Path,
+) -> None:
+    examples = list(read_examples(dataset / "val"))
+    a = sample_examples_by_task(examples, per_task=3, seed=5)
+    assert a == sample_examples_by_task(examples, per_task=3, seed=5)
+    totals = Counter(e.task for e in examples)
+    counts = Counter(e.task for e in a)
+    assert counts == {task: min(3, n) for task, n in totals.items()}
+    assert [e.task for e in a] == sorted(e.task for e in a)
 
 
 def test_too_long_examples_skipped(tokenizer: Tokenizer) -> None:
@@ -137,6 +190,21 @@ def test_fp32_precision_trains_and_is_recorded(
     train(LUNA, tokenizer, dataset, tmp_path / "fp32", cfg)
     summary = json.loads((tmp_path / "fp32" / "training_summary.json").read_text())
     assert summary["train"]["precision"] == "fp32"
+
+
+def test_log_reports_memory_and_a_windowed_rate(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    cfg = TrainConfig(**{**FAST.__dict__, "steps": 10, "log_every": 5})
+    metrics = train(LUNA, tokenizer, dataset, tmp_path / "luna", cfg)
+    logged = [m for m in metrics if "loss" in m]
+    assert [m["step"] for m in logged] == [5, 10]
+    for m in logged:
+        assert m["mem_gb"] > 0 and m["target_tokens_per_s"] > 0
+    assert _peak_memory_gb() > 0
+    # Validation is a fixed sample per task, not the whole split.
+    summary = json.loads((tmp_path / "luna" / "training_summary.json").read_text())
+    assert 0 < summary["val_examples"] <= 3 * cfg.eval_batches * cfg.batch_size
 
 
 def test_val_sample_is_fixed_and_per_task(dataset: Path, tokenizer: Tokenizer) -> None:

@@ -78,6 +78,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Training no longer eats all the memory. solem's run on a 48 GB Mac grew to 58 GB,
+  swapped 16 GB, and slowed from 4,800 to 250 tokens/s within 150 steps. Training data
+  is now stored compactly (4 bytes a token instead of about 36), only the validation
+  rows that get scored are tokenized, batches come in nine widths instead of sixteen,
+  and the GPU cache is released every 100 steps. The log's tokens/s is now the current
+  speed rather than the average since the start, and it records the process's peak
+  memory (`mem_gb`), so a run going wrong shows within minutes.
+
 - Training: `askphysics model bench` times a few training steps for each device and
   precision your machine has and says how long a run will take, and `train.sh` runs it
   before every training run; `model train --precision auto|bf16|fp32` picks the fastest.
