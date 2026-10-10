@@ -53,6 +53,7 @@ and celeste gets one escalation shot (ADR-010).
 | `llm/routing.py` | Which installed model handles each stage (ADR-010), without loading weights | stdlib |
 | `llm/fermi_client.py` | `FermiClient`: one Fermi model behind `LLMClient`, using the constrained decoders; `build_roster` makes the per-stage clients | `lm`, torch |
 | `lm/` (v0.2) | The Fermi models: config, tokenizer, transformer, constrained decoding, data factory, training | torch, safetensors |
+| `lm/engine.py`, `lm/torch_engine.py`, `lm/numpy_model.py` (ADR-021) | The seam under the constrained decoder (`Engine`: next-token logits as numpy arrays), its torch implementation, and a numpy forward pass that reads the same safetensors for the browser | numpy (`torch_engine` needs torch) |
 | `prose.py` | Checks model-written text before it is shown: loops, unreadable text, refusal reasons that aren't about the question, redirects that aren't questions | stdlib |
 | `normalize.py` (v0.3) | Rewrites real-world quantity spellings (commas, powers of ten, superscripts, middle dots, "per", µ, Ω) into canonical forms when a question enters the pipeline | Pint (unit check) |
 | `retrieval/base.py` | `Retriever` and `VectorStore` protocols | `models` |

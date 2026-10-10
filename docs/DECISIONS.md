@@ -947,3 +947,139 @@ compares their plain output and the width of the ready panel. Rich and the modul
 the scripts and the CLI; the website bundle leaves them out. Rich is already a dependency, so
 nothing new is installed.
 
+
+## ADR-021: Run the Fermi models in the browser with a numpy forward pass
+
+**Status:** Proposed. Phase 1 (the backend, the decoder seam, and parity tests) is implemented on
+`feat/browser-inference`; the speed and memory below are estimates until phase 2 measures them in
+real Pyodide (issue #66).
+
+**Context.** The website runs the real `askphysics` package in Pyodide in a Web Worker (ADR-013).
+Pyodide has numpy, SymPy, and pydantic, but no torch, so the Fermi models cannot run there as
+written. ADR-013 said this choice "gets its own ADR": a browser-capable inference path that reads
+the same weights. Issue #66 needs it before tellus, solem, and celeste can answer on the site.
+ADR-012 chose to keep torch for inference rather than add a numpy engine; that holds for the CLI,
+but the browser has no torch.
+
+**Decision.**
+
+- **A numpy forward pass** (`lm/numpy_model.py`, `NumpyFermiLM`) for the Fermi transformer: the same
+  RMSNorm, rotary embeddings, causal attention with a KV cache, SwiGLU, and tied head as
+  `lm/model.py`. It reads the same `model.safetensors` that `askphysics model pull` installs: bf16
+  weights become float32 by placing the 16 bits in the top half of a float32, which is exact.
+  Weights stay in torch's `(out, in)` layout. It imports no torch.
+- **A small safetensors reader of our own** (`read_safetensors`, about 40 lines: an 8-byte length,
+  a JSON header, raw bytes). Pyodide's package set does include `safetensors` 0.7.0 (a recipe in
+  `pyodide/pyodide-recipes`, depending on numpy), but I could not confirm that the Pyodide version
+  pinned in `web/worker.js` ships it, and its numpy path cannot return bf16 without `ml_dtypes`.
+  Reading the file ourselves removes both questions. The reader accepts F32, F16, and BF16,
+  validates every offset against its shape, and refuses anything else with `ConfigError`.
+- **Constrained decoding is unchanged and written once.** `Decoder` (`lm/generate.py`) now sits on a
+  seam, `Engine` (`lm/engine.py`): an engine turns tokens and a cache into the next-token logits,
+  and the logits cross the seam as one-dimensional float32 numpy arrays. The masks, the number
+  guard, the slot rules, the no-repeat rule, and the greedy choice all run over numpy, whichever
+  framework produced the logits. `TorchEngine` (`lm/torch_engine.py`) wraps `FermiLM`;
+  `NumpyFermiLM` is itself an `Engine`. `Decoder(model, tokenizer)` takes either a `FermiLM` or an
+  `Engine`, and `generate.py` no longer imports torch at module level. The seam is five small
+  methods: `next_logits`, `generator`, `sample`, `cache_length`, and `truncate`. `FORMAT_VERSION`,
+  the formats, and the training code are untouched.
+- **Both loaders refuse the same files.** The checks on a saved model (files present, `config.json`
+  against the weights' metadata, task format version) moved from `checkpoints.py` into
+  `lm/config.py`, torch-free, and both loaders call them.
+- **Not decided here:** where the weights are hosted for the site (Q20 in `OPEN_QUESTIONS.md`, which
+  needs the maintainer), and which matrix-product kernel Pyodide should use (below).
+
+**Alternatives.**
+
+- *ONNX Runtime Web (wasm or WebGPU).* Faster, with SIMD and threads in wasm and far more on
+  WebGPU. But it needs an export step that has to track `model.py` (a graph with a KV cache,
+  dynamic shapes, and rotary tables), a second runtime of several MB, and a bridge: ONNX Runtime
+  is JavaScript and asynchronous, while `Decoder` is Python that calls the model synchronously
+  hundreds of times per question. Bridging means rewriting the decoder as async or blocking across
+  workers with `Atomics.wait`. That is a lot of machinery for models small enough to run in numpy.
+- *WebGPU kernels by hand.* The same bridge problem, narrower browser support, and the most code.
+- *A hosted API.* ADR-013 chose a site where nothing runs on our servers: no cost per question, no
+  rate limits, no accounts or keys. ADR-009 says no external model APIs. A hosted model would bring
+  back everything those ADRs avoid (Q17, Q18).
+- *numpy wins here because* there is one decoder, in Python, and one model definition per
+  framework in the same package, tested against each other in CI. There is no export step to drift,
+  no new runtime to download (numpy is already in the Pyodide load), and no server. Its cost is
+  speed, estimated below. The seam keeps the door open: if phase 2 shows numpy is too slow for
+  solem, an ONNX or WebGPU engine can be added behind `Engine` by a later ADR without touching a
+  decoding rule.
+
+**Parity (measured, CPU).** For random weights of `fermi-luna-1` and of tellus's shape, the largest
+absolute logit difference from torch is about 1e-5 at logits of size 5 to 6 (about 2e-6 relative),
+with and without the KV cache, and for bf16 weights written by `model package`. Classify, plan, and
+explain give identical text on both backends for five questions over three weight seeds
+(`tests/test_lm_numpy_model.py`). Greedy decoding is the default and is what the site uses. A
+sampled explanation (`temperature > 0`) draws from each engine's own random generator, so it differs
+between backends, as it differs between seeds; the number guard holds on both.
+
+**Speed and memory in Pyodide (estimates).** Measured on a 4-core box, one thread, native numpy 2.5
+with BLAS, on random weights and the real decoder:
+
+| | tellus-shaped (3.2M) | solem-shaped (29.9M) |
+|---|---|---|
+| Prefill, 300 tokens: numpy / torch | 42 ms / 34 ms | 219 ms / 175 ms |
+| One cached step: numpy / torch | 1.8 ms / 3.2 ms | 12.4 ms / 16.2 ms |
+| Whole question on one model, classify + plan + explain: numpy / torch | 0.55 s / 0.89 s | 3.7 s / 4.5 s |
+
+The work in a question, counted through the engine, is about 420 prompt tokens and about 290 cached
+single-token steps (a classify prompt is about 35 tokens, a plan prompt about 350, an explanation
+prompt about 100; counted with a 3,130-token tokenizer trained on factory text, so the shipped
+8,192-token one will be a little shorter). In floating point operations that is about 4 GFLOP for a
+whole question on tellus and about 43 GFLOP on solem. Of those, tellus's classify share is under
+0.5 GFLOP, and on solem the plan is about 29 and the explanation about 9.
+
+Pyodide's numpy is built without BLAS (`-Dallow-noblas=true` in its recipe), so every matrix
+product is numpy's plain triple loop, single-threaded. A C copy of that loop runs at about 2.9
+GFLOP/s on the box above, so I expect roughly 1 to 2 GFLOP/s in wasm on a recent laptop and about
+half that on a phone. That gives, per question:
+
+- **tellus doing every stage:** about 2 to 4 s on a laptop. Classify alone is well under a second.
+- **solem planning and explaining:** about 20 to 40 s for one plan attempt plus the explanation
+  (the plan is three quarters of that), and a failed plan retries up to five times (ADR-010), so a
+  hard question can take minutes. This is the number phase 2 must beat or hide.
+- **celeste (113M non-embedding parameters, about 4 times solem):** roughly 1.5 to 3 minutes per
+  attempt on this path. Not viable here.
+- A different kernel may change this a lot. Natively, `np.einsum` runs the same product at about
+  10 GFLOP/s against 2.9 for numpy's plain `matmul` loop, because einsum has SIMD inner loops.
+  Whether Pyodide's build keeps that edge is unknown until measured. Other levers, none built:
+  reuse the KV cache of the shared prompt prefix across plan retries, and avoid re-feeding tokens
+  the decoder already holds.
+
+Memory: tellus is 6 MB on the wire, 13 MB as float32, and about 25 MB at its peak while loading.
+solem is 60 MB on the wire and 120 MB as float32. Its peak while loading is about 240 MB (the
+downloaded buffer, the Python copy of it, and the float32 arrays, before the first two are freed;
+60 MB more if the file is first written to Pyodide's file system), and the KV cache adds up to 34
+MB at the full 1,024 tokens. Both models resident come to about 135 MB of weights on top of
+Pyodide's own footprint (I estimate 150 to 250 MB with SymPy loaded): comfortable on a laptop and
+tight on a low-end phone. celeste is 476 MB as float32 with a peak near 1 GB: not on this path.
+
+**What the visitor sees while a model loads.** The engine already shows four boot steps from the
+worker. A fifth, "Loading the language models", would show a determinate download bar in megabytes.
+tellus (6 MB) loads first so a question can be answered at once, because tellus alone can run every
+stage (ADR-010); solem keeps downloading in the background and takes over for later questions. The
+answer card's model line, which already records each stage's model, says which one answered. While
+a long answer runs, the page shows the stage it is on ("Planning, attempt 2 of 5"). Weights are
+fetched once and kept by the browser cache under content-hashed names, so a return visit does not
+download them again. A model that cannot be fetched or does not fit in memory degrades to the
+smaller one with a plain message instead of failing (issue #66, third item). All of this is phase
+2; none of it exists yet.
+
+**Consequences.**
+
+- Two forward passes (`model.py`, `numpy_model.py`) plus the MLX trainer's (ADR-019) must stay in
+  step. `tests/test_lm_numpy_model.py` compares numpy with torch on every run, so a change to
+  `model.py` that is not mirrored fails there.
+- The site bundle is unchanged: `scripts/build_site.sh` still leaves `lm/` out except the torch-free
+  modules, and `llm/fermi_client.py` imports torch at module level. Phase 2 ships `engine.py`,
+  `generate.py`, and `numpy_model.py`, and loads torch lazily in `FermiClient`.
+- The CLI, evaluation, packaging, and training keep using torch (and MLX) exactly as before; ADR-012
+  and ADR-019 stand for them.
+- Phase 2 (needs real Pyodide, so not done here): wire `FermiClient` to the numpy engine in the
+  worker; measure speed and memory in headless Chromium (`scripts/site_smoke.mjs`) and choose the
+  kernel; settle where the weights are hosted (Q20); add the loading and progress states; smoke-test
+  the eval questions through the built site. Tellus and solem ship only if those numbers are
+  acceptable; celeste waits for a faster engine.

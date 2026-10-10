@@ -8,6 +8,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A numpy inference path for the Fermi models (ADR-021, issue #66; not yet used by the website).
+  `lm/numpy_model.py` runs the same network from the same `model.safetensors` (bf16 or fp32) with
+  a KV cache and imports no torch and no `safetensors` package, so it can run in the browser under
+  Pyodide. The constrained decoder now sits on a small `Engine` seam (`lm/engine.py`) and produces
+  the same text over torch or numpy; the rules are written once, and decoding is unchanged.
+  Logits match torch to about 1e-5. The docs add Q20, where the website's weights should be hosted
+  (GitHub release assets send no CORS headers), which needs the maintainer's decision.
 - Plain questions with no numbers, and their look-alikes, are now trained and checked (issue
   #92; tellus needs retraining to learn them). The data gains one equation
   (`sound_speed_ideal_gas`, 111 in all) and four Fermi assumptions (`car_mass`,
