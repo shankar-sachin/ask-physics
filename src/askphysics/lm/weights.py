@@ -208,6 +208,23 @@ def pull(
     }
 
 
+def missing_published(
+    names: Iterable[str],
+    root: Path | None = None,
+    *,
+    manifest: dict[str, PinnedModel] | None = None,
+) -> list[str]:
+    """The ``names`` that are published but not installed under ``root``.
+
+    Reads the local manifest and the models directory only, never the network. A complete
+    model of the same name counts as installed, so a locally trained one is never a
+    candidate for replacement.
+    """
+    root = root or default_model_dir()
+    manifest = read_manifest() if manifest is None else manifest
+    return [n for n in names if n in manifest and not is_installed(root / n)]
+
+
 def pin(asset_dir: Path, name: str, release: str, files: dict[str, str]) -> dict[str, Any]:
     """A manifest entry for ``name``'s files in ``asset_dir``.
 
@@ -243,6 +260,7 @@ __all__ = [
     "install",
     "manifest_path",
     "matches",
+    "missing_published",
     "pin",
     "pull",
     "read_manifest",
