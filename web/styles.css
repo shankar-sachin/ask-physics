@@ -97,6 +97,12 @@ h2 { font-size: clamp(28px, 4vw, 40px); }
 /* hero */
 .hero { text-align: center; padding-top: 64px; }
 .hero-logo { filter: drop-shadow(0 12px 40px rgba(108, 198, 244, 0.25)); margin-bottom: 12px; }
+.demo { padding-top: 40px; }
+.demo-video {
+  display: block; width: 100%; height: auto; aspect-ratio: 16 / 9;
+  border-radius: 18px; border: 1px solid var(--line); background: var(--card);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+}
 .lede { max-width: 720px; margin: 20px auto 28px; color: #c8cbe0; font-size: 18px; }
 .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .fine { color: var(--muted); font-size: 14px; margin-top: 16px; }

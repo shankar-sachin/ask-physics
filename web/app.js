@@ -208,3 +208,12 @@ for (const copy of document.querySelectorAll(".copy")) {
     setTimeout(() => (copy.textContent = "Copy"), 1500);
   });
 }
+
+// The demo video autoplays muted on a loop; with reduced motion it stays on its poster
+// and shows controls instead.
+const demo = document.querySelector(".demo-video");
+if (demo && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  demo.removeAttribute("autoplay");
+  demo.pause();
+  demo.controls = true;
+}
