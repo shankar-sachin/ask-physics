@@ -110,3 +110,20 @@ def test_cli_trains_with_the_mlx_backend(tmp_path: Path) -> None:
     assert r.exit_code == 0, r.output
     assert "mlx" in _plain(r.output)
     assert (out / "model.safetensors").exists() and (out / "metrics.jsonl").exists()
+
+
+def test_cli_reports_a_refused_resume_without_a_traceback(tmp_path: Path) -> None:
+    pytest.importorskip("mlx.core")
+    data, tok = _small_data(tmp_path)
+    out = tmp_path / "models" / "fermi-luna-1"
+    out.mkdir(parents=True)
+    # A torch run's optimizer state: no "backend" field, so it counts as torch's.
+    (out / "train_state.json").write_text('{"step": 5, "lr": 0.001, "param_groups": []}')
+    r = CliRunner().invoke(
+        cli.app,
+        ["model", "train", "--model", "fermi-luna-1", "--data", str(data), "--tokenizer", str(tok),
+         "--out", str(out), "--steps", "2", "--batch-size", "4", "--device", "cpu",
+         "--backend", "mlx", "--resume"],
+    )  # fmt: skip
+    assert r.exit_code == 1 and isinstance(r.exception, SystemExit)
+    assert "was trained with the torch backend" in _plain(r.output)

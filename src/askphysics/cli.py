@@ -377,32 +377,35 @@ def train_cmd(
                     speed=f"{entry['target_tokens_per_s']:,.0f} tok/s",
                 )
 
-        if chosen == "mlx":
-            from askphysics.lm.mlx_train import train_mlx
+        try:
+            if chosen == "mlx":
+                from askphysics.lm.mlx_train import train_mlx
 
-            train_mlx(
-                config,
-                Tokenizer.load(tokenizer),
-                data,
-                out_dir,
-                cfg,
-                resume=resume,
-                on_log=show,
-                prose=texts,
-                cache_limit_gb=mlx_cache_gb,
-                memory_limit_gb=mlx_memory_gb,
-            )
-        else:
-            train(
-                config,
-                Tokenizer.load(tokenizer),
-                data,
-                out_dir,
-                cfg,
-                resume=resume,
-                on_log=show,
-                prose=texts,
-            )
+                train_mlx(
+                    config,
+                    Tokenizer.load(tokenizer),
+                    data,
+                    out_dir,
+                    cfg,
+                    resume=resume,
+                    on_log=show,
+                    prose=texts,
+                    cache_limit_gb=mlx_cache_gb,
+                    memory_limit_gb=mlx_memory_gb,
+                )
+            else:
+                train(
+                    config,
+                    Tokenizer.load(tokenizer),
+                    data,
+                    out_dir,
+                    cfg,
+                    resume=resume,
+                    on_log=show,
+                    prose=texts,
+                )
+        except ConfigError as exc:  # a refused resume, or a device the backend can't use
+            raise _fail(str(exc)) from exc
         progress.update(task, completed=steps)
     by_task = [
         f"{key.removeprefix('val_loss_')} {value:.3f}"
