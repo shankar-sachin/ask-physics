@@ -318,6 +318,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `mu0`; `compute` and `sanity_check` rename the table symbol to the equation variable when the
   dimensions match, so a Coulomb constant never stands in for a spring constant. The table and
   equations are unchanged, and `validate-data` checks each alias (#74).
+- The 404 page's electron now passes behind Pip on the top of its orbit instead of over him on
+  both flybys.
 
 ## [0.3.0] - 2026-10-06
 
