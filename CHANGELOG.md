@@ -174,6 +174,26 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An explanation is no longer cut off after 48 tokens. The Fermi model may use the whole context
   window left after its prompt, so the assumptions clause at the end survives. An explanation that
   still does not finish degrades to the template answer instead of showing a fragment (#83).
+- Numbers in a question are read whole (#97). "4.00 x 10^14 Hz", "1.0*10^6", "6.30x10^5",
+  and "3.56e-13 J" were split into pieces ("4" and "10") or read as the wrong number, and
+  "1,530 kHz" was read as 530, so the decoder never offered the right value and the plan could
+  not be written. `extract_numbers` and `stated_quantities` now read a times-ten power, an
+  e-notation number, a thousands comma (never across a space, so "3, 4 and 5" stays three
+  numbers), a leading minus (also set apart after "=" or "(", as in "Q = - 25 nC", but never a
+  range dash, as in "10-20 m"), and a unit joined by a hyphen ("a 90.0-MHz station"). The
+  mantissa is parsed from its digits as written, so "1.1 x 10^-5" is exactly `1.1e-05`; a power
+  of ten never offers its base or exponent as numbers of their own. `labelled_quantities`
+  reads the same spellings ("mu = 3 x 10^-3"). The gold plans of the 49 real OpenStax questions
+  that the decoder can write (every known value among its options) went from 23 to 45 on the
+  questions as printed, and a test pins that count; the factory's training examples are
+  unchanged byte for byte.
+- Free text can end a sentence on an allowed whole number and can spell scientific
+  notation (#84). The number guard refused a period right after a whole number ("The answer
+  is 10." with 10 allowed), and it could not write a number such as `5e-07`, which
+  `format_number` produces for 0.0000005 and the explanation numbers include: the "e", the
+  sign, and the exponent digits each closed a number that was not allowed. The guard now
+  reads `5e-07` and `7.5e+19` as one number and checks each piece against the allowed
+  spellings; a digit after a period is still checked on its own step.
 - A plan can no longer fill a speed with the speed of light or zero a variable that was
   stated or asked for (#91). A table constant filled any slot with matching units, so
   `v = 299792458 m/s` showed up in "an average speed of 23.2 m/s" and "an angular velocity

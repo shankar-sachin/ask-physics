@@ -1,5 +1,6 @@
 import json
 from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 import torch
@@ -50,6 +51,7 @@ from askphysics.lm.generate import (
 from askphysics.lm.model import FermiLM
 from askphysics.lm.tokenizer import CLASSIFY, END, PLAN, Tokenizer
 from askphysics.models import Classification, Plan, Variable
+from askphysics.normalize import normalize_question
 from askphysics.solver.units import check_dimensions, quantity
 
 QUESTION = "How fast does a ball dropped from 20 m hit the ground?"
@@ -90,6 +92,59 @@ def _decoder(tokenizer: Tokenizer, seed: int) -> Decoder:
 )
 def test_number_guard(prefix: str, piece: str, ok: bool) -> None:
     assert number_guard_ok(prefix, piece, ["20", "9.8"]) is ok
+
+
+@pytest.mark.parametrize(
+    ("prefix", "piece", "allowed", "ok"),
+    [
+        # A sentence can end on a whole allowed number (#84).
+        ("The answer is 10", ".", ["10"], True),
+        ("Set v0 = 0", ".", ["0"], True),
+        ("The answer is 10", ".", ["20"], False),  # 10 is not allowed
+        ("The answer is 10.", " m", ["10"], True),  # the period closed the sentence
+        ("The answer is 10.", "7", ["10"], False),  # a decimal still has to be allowed
+        ("The answer is 10.", "5", ["10", "10.5"], True),
+        ("The answer is 1", ".", ["10"], False),  # 1 is not 10
+        # Scientific notation is spelled the way format_number spells it (#84).
+        ("The wavelength is 5", "e", ["5e-07"], True),
+        ("The wavelength is 5e", "-", ["5e-07"], True),
+        ("The wavelength is 5e-", "0", ["5e-07"], True),
+        ("The wavelength is 5e-0", "7", ["5e-07"], True),
+        ("The wavelength is 5e-0", "8", ["5e-07"], False),  # 5e-08 is not allowed
+        ("wavelength 5e-07", " ", ["5e-07"], True),
+        ("wavelength 5e-07", ".", ["5e-07"], True),
+        ("wavelength 5e-", " ", ["5e-07"], False),  # a dangling exponent never closes
+        ("wavelength 5e-0", " m", ["5e-07"], False),
+        ("The wavelength is 5", "e", ["50"], False),  # 5e is no prefix of 50
+        ("the rate is 7.5", "e", ["7.5e+19"], True),
+        ("the rate is 7.5e", "+", ["7.5e+19"], True),
+        ("the rate is 7.5e+1", "9", ["7.5e+19"], True),
+        ("the rate is 7.5e+1", "8", ["7.5e+19"], False),
+        ("the rate is 7.5e+19", " ", ["7.5e+19"], True),
+        ("the rate is 7", "e", ["7.5e+19"], False),  # 7 is not allowed on its own
+        ("energy 3", "e", ["3"], True),  # "3eV": the e starts a unit, which is no number
+        ("energy 3e", "V", ["3"], True),
+        ("energy 3e", "V", ["30"], False),
+        ("a negative -5e-07", " ", ["5e-07"], True),  # signs are ignored
+        ("a gap of 5", "-", ["5"], True),  # "5-6": the dash closes 5
+    ],
+)
+def test_number_guard_spells_whole_numbers_and_exponents(
+    prefix: str, piece: str, allowed: list[str], ok: bool
+) -> None:
+    assert number_guard_ok(prefix, piece, allowed) is ok
+
+
+def test_number_guard_spells_every_number_format_number_writes() -> None:
+    """Any number the decoder may offer can be typed in free text, piece by piece."""
+    for value in (10.0, 0.0, 9.80665, 5e-7, 7.5e19, 6.3e20, 1.0e-11, 3.56e-13, 400e12, 1e15):
+        number = format_number(value)
+        written = ""
+        for char in number:
+            assert number_guard_ok("The result is " + written, char, [number]), (number, written)
+            written += char
+        assert number_guard_ok("The result is " + written, " ", [number]), number
+        assert number_guard_ok("The result is " + written, ".", [number]), number
 
 
 def test_encode_task_blocks_injected_task_tokens(tokenizer: Tokenizer) -> None:
@@ -394,8 +449,12 @@ def test_target_is_what_the_question_leaves_open(store: DataStore) -> None:
     assert "R" not in target_options(gas, "Some gas.", consts)
 
 
-def _assert_decodable(store: DataStore, e: Example) -> None:
-    """The decoder's constraints allow every choice the gold plan makes, in its order."""
+def _assert_decodable(store: DataStore, e: Example, *, values_only: bool = False) -> None:
+    """The decoder's constraints allow every choice the gold plan makes, in its order.
+
+    With ``values_only``, only the known values are checked: each must be among the options
+    the decoder offers for its variable, which is what reading the question's numbers decides.
+    """
     payload = json.loads(e.prompt[len(PLAN) :])
     gold = Plan.model_validate_json(e.target[: -len(END)])
     eqs = [store.equations[x["id"]] for x in payload["equations"]]
@@ -406,9 +465,10 @@ def _assert_decodable(store: DataStore, e: Example) -> None:
         for v in eq.variables:
             variables.setdefault(v.symbol, v)
     q = payload["question"]
-    assert gold.equation_ids[0] in equation_options(eqs, q), q
-    assert gold.target in target_options(list(variables.values()), q, consts), q
-    assert set(gold.assumptions) <= set(assumption_options(cited)), q
+    if not values_only:
+        assert gold.equation_ids[0] in equation_options(eqs, q), q
+        assert gold.target in target_options(list(variables.values()), q, consts), q
+        assert set(gold.assumptions) <= set(assumption_options(cited)), q
     gold_by_symbol = {k.symbol: k for k in gold.known_values}
     order = [s for s in variables if s not in gold.unknowns]
     unused = stated_quantities(q)
@@ -447,6 +507,59 @@ def test_gold_plans_always_fit_the_constraints(store: DataStore) -> None:
             _assert_decodable(store, e)
             checked += 1
     assert checked > 400
+
+
+OPENSTAX = Path(__file__).resolve().parents[1] / "third_party" / "openstax-physics"
+# How many of the 49 real OpenStax gold plans have every known value among the options the
+# decoder offers (#97). Each is a floor: raise it when a change decodes more, and a number
+# that is misread again shows up here as a plan that can no longer be written.
+# The question as the book prints it ("4.00 x 10^14 Hz", "1,530 kHz", "Q = - 25 nC"): 23
+# before the extractors read scientific notation, digit groups, signs, and hyphenated units.
+DECODABLE_REAL_PLANS = 45
+# The question as the pipeline hands it over, after `normalize_question` (46 before as well:
+# the normalizer already spelled these numbers, so what is left is not number reading).
+DECODABLE_NORMALIZED_REAL_PLANS = 46
+
+
+def _decodable_real_plans(store: DataStore, *, normalize: bool) -> tuple[int, list[str]]:
+    """(count, ids of the plans that don't decode) over the real questions' gold plans."""
+    rows = [
+        json.loads(line)
+        for line in (OPENSTAX / "real_eval.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    consts = list(store.constants.values())
+    missed: list[str] = []
+    for row in rows:
+        gold = Plan.model_validate(row["plan"])
+        question = normalize_question(row["question"]) if normalize else row["question"]
+        eqs = [store.equations[i] for i in gold.equation_ids]
+        prompt = plan_prompt(question, "standard", eqs, relevant_constants(eqs, consts))
+        example = Example("plan", "eval", "real", prompt, serialize_plan(gold))
+        try:
+            _assert_decodable(store, example, values_only=True)
+        except AssertionError:
+            missed.append(row["id"])
+    return len(rows) - len(missed), missed
+
+
+@pytest.mark.parametrize(
+    ("normalize", "floor"),
+    [(False, DECODABLE_REAL_PLANS), (True, DECODABLE_NORMALIZED_REAL_PLANS)],
+)
+def test_real_question_numbers_reach_the_decoder(
+    store: DataStore, normalize: bool, floor: int
+) -> None:
+    """Every number a gold plan writes is one the decoder offers, for most real questions.
+
+    The decoder offers only what the question and the tables state (golden rule 1), so a
+    misread number is a plan nobody can write. Remaining misses are not number reading: an
+    assumed 0 start without a rest cue, and one quantity ("two 80 ohm resistors") for two
+    variables.
+    """
+    decodable, missed = _decodable_real_plans(store, normalize=normalize)
+    assert decodable + len(missed) >= 49
+    assert decodable >= floor, f"{decodable} of 49 decode, down from {floor}: {missed}"
 
 
 def test_chained_gold_plans_fit_the_constraints(store: DataStore) -> None:
