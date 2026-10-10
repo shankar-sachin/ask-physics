@@ -1,7 +1,19 @@
+import json
+from pathlib import Path
+
 import pytest
 
+from askphysics.normalize import normalize_question
+from askphysics.retrieval.aliases import alias_words
 from askphysics.retrieval.base import Retriever
 from askphysics.retrieval.keyword import KeywordRetriever, stem, tokenize
+
+REAL_EVAL = (
+    Path(__file__).resolve().parents[1] / "third_party" / "openstax-physics" / "real_eval.jsonl"
+)
+# Recall at top_k 5 with no classifier hint, after the units and vocabulary aliases.
+# Lower it only with a reason in the PR; it was 42 of 49 (85.7%) before the aliases.
+REAL_RECALL_FLOOR = 49
 
 
 def test_falling_object_retrieves_kinematics(retriever: KeywordRetriever) -> None:
@@ -92,3 +104,64 @@ def test_stem(word: str, expected: str) -> None:
 def test_tokenize_drops_stopwords_and_short_tokens() -> None:
     # Numbers are deliberately not tokens: they carry values, not topics.
     assert tokenize("How fast does a ball fall 20 m?") == {"fast", "ball", "fall"}
+
+
+@pytest.mark.parametrize(
+    ("query", "concept"),
+    [
+        ("a 5-kg object", "mass"),
+        ("a 1200 kg car", "mass"),
+        ("100000 W of power", "power"),
+        ("it exerts 10000 N", "force"),
+        ("6 C of charge", "charge"),
+        ("for 1 min", "time"),
+        ("in 5 s", "time"),
+        ("a 500 nm photon", "wavelength"),
+        ("at 20 m/s^2", "acceleration"),
+        ("at 3 m/s", "speed"),
+        ("how long does it take", "time"),
+        ("the velocity of the wave", "speed"),
+        ("the child weighs 300 N", "weight"),
+    ],
+)
+def test_aliases_name_the_quantity(query: str, concept: str) -> None:
+    assert concept in alias_words(query)
+
+
+@pytest.mark.parametrize("query", ["a car has 3 wheels", "an arm A of the object", "every car"])
+def test_aliases_stay_quiet_on_ordinary_words(query: str) -> None:
+    # Units need a number before them, and "A" or "s" alone is not a unit.
+    words = alias_words(query)
+    assert "current" not in words
+    assert "time" not in words
+
+
+def test_real_question_recall_at_top_5(retriever: KeywordRetriever) -> None:
+    rows = [json.loads(line) for line in REAL_EVAL.read_text().splitlines() if line.strip()]
+    hits = 0
+    for row in rows:
+        gold = set(row["plan"]["equation_ids"])
+        shown = {
+            h.equation.id
+            for h in retriever.search(normalize_question(row["question"]), 5).equations
+        }
+        hits += gold <= shown
+    assert len(rows) == 49
+    assert hits >= REAL_RECALL_FLOOR, (
+        f"{hits}/{len(rows)} real questions retrieved every gold equation"
+    )
+
+
+def test_newton_second_law_from_units_and_acceleration(retriever: KeywordRetriever) -> None:
+    query = "How much force needs to be applied to a 5 kg object to accelerate at 20 m/s^2?"
+    ids = [h.equation.id for h in retriever.search(query, k=5).equations]
+    assert "newton_second_law" in ids
+
+
+def test_engine_power_question_retrieves_both_chain_equations(retriever: KeywordRetriever) -> None:
+    query = (
+        "A cars engine generates 100000 W of power as it exerts a force of 10000 N. "
+        "How long does it take the car to travel 100 m?"
+    )
+    ids = [h.equation.id for h in retriever.search(normalize_question(query), k=5).equations]
+    assert {"power_force_velocity", "avg_speed"} <= set(ids)

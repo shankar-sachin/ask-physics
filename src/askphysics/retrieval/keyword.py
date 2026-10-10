@@ -20,6 +20,7 @@ from askphysics.models import (
     ScoredExample,
     WorkedExample,
 )
+from askphysics.retrieval.aliases import alias_words
 
 TAG_WEIGHT = 3.0
 NAME_WEIGHT = 2.0
@@ -99,7 +100,7 @@ class KeywordRetriever:
     def search(
         self, query: str, k: int, *, domains: Sequence[str] | None = None
     ) -> RetrievalResult:
-        q = tokenize(query)
+        q = tokenize(f"{query} {' '.join(alias_words(query))}")
         boosted = set(domains or ())
 
         eq_hits: list[ScoredEquation] = []
