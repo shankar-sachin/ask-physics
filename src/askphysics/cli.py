@@ -439,12 +439,12 @@ def bench_cmd(
     model: Annotated[str, typer.Option(help="Model preset, e.g. fermi-solem-1.")] = "fermi-solem-1",
     batch_size: Annotated[int, typer.Option(min=1)] = 32,
     width: Annotated[
-        int,
+        int | None,
         typer.Option(
-            help="Largest tokens per row (8 to the model's context). Times each power of two "
-            "from 64 up to it."
+            help="Largest tokens per row, 8 to the model's context (default: the context). "
+            "Times each training bucket width up to it: 64, 96, 128, and so on."
         ),
-    ] = 512,
+    ] = None,
     steps: Annotated[int, typer.Option(min=1, help="Timed steps per width per setting.")] = 3,
     warmup: Annotated[int, typer.Option(min=0, help="Untimed steps per width per setting.")] = 2,
     device: Annotated[str | None, typer.Option(help="Only bench this device.")] = None,
@@ -466,6 +466,8 @@ def bench_cmd(
         config = get_config(model)
     except KeyError as exc:
         raise _fail(str(exc.args[0])) from exc
+    if width is None:
+        width = config.context_length
     if not 8 <= width <= config.context_length:
         raise _fail(f"--width must be between 8 and {config.context_length} for {model}")
     settings = [s for s in available_settings() if device in (None, s[0])]

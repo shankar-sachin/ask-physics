@@ -25,8 +25,10 @@ a step when the one before it worked. Each prints its options with `--help`, and
 `python3 scripts/compare_evals.py OLD/eval.json NEW/eval.json` compares any two reports.
 
 `train.sh` starts with a one-minute speed check (`askphysics model bench`). It times a few
-training steps on each device and precision this machine has, and prints the tokens per
-second for each and how many hours the run will take. If the projection is far longer than
+training steps on each device and precision this machine has, at every batch width the
+training buckets produce up to the model's context (64, 96, ... 1024), then runs an evaluation
+pass at each width so the memory it reports covers both. It prints the tokens per second for
+each and how many hours the run will take. If the projection is far longer than
 a night, stop and find out why rather than leaving it running. On a Mac, train plugged in
 with the lid open: on battery macOS throttles the GPU and sleeps even under `caffeinate`.
 `--precision fp32` (or `bf16`) trains in the format the check found fastest, and

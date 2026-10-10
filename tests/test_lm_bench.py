@@ -11,7 +11,8 @@ from askphysics.lm.bench import (
     projected_hours,
 )
 from askphysics.lm.config import LUNA
-from askphysics.lm.train import autocast_dtype
+from askphysics.lm.model import FermiLM
+from askphysics.lm.train import autocast_dtype, numpy_batch
 
 
 def test_autocast_dtype_mapping() -> None:
@@ -25,10 +26,41 @@ def test_autocast_dtype_mapping() -> None:
         autocast_dtype(cpu, "fp16")
 
 
-def test_bench_widths_are_powers_of_two_up_to_the_largest() -> None:
-    assert bench_widths(128) == [64, 128]
-    assert bench_widths(512) == [64, 128, 256, 512]
+def test_bench_widths_are_the_training_buckets_up_to_the_largest() -> None:
+    assert bench_widths(1024) == [64, 96, 128, 192, 256, 384, 512, 768, 1024]
+    assert bench_widths(512) == [64, 96, 128, 192, 256, 384, 512]
+    assert bench_widths(1000) == [64, 96, 128, 192, 256, 384, 512, 768, 1000]
+    assert bench_widths(64) == [64]
     assert bench_widths(16) == [16]
+
+
+@pytest.mark.parametrize("largest", [1024, 1000, 512])
+def test_bench_widths_are_exactly_the_widths_training_produces(largest: int) -> None:
+    # Every batch length up to the context gets a width from numpy_batch; the bench must
+    # time each of them and nothing else.
+    produced = set()
+    for n in range(1, largest + 1):
+        inputs, _ = numpy_batch([([0] * (n + 1), 1)], 0, multiple=64, max_width=largest)
+        produced.add(inputs.shape[1])
+    assert produced == set(bench_widths(largest))
+
+
+def test_bench_runs_an_evaluation_pass_without_gradients(monkeypatch: pytest.MonkeyPatch) -> None:
+    from askphysics.lm import bench as bench_module
+
+    seen: list[tuple[bool, bool]] = []
+
+    class Recording(FermiLM):
+        def forward(
+            self, ids: torch.Tensor, targets: torch.Tensor | None = None
+        ) -> tuple[torch.Tensor, torch.Tensor | None]:
+            seen.append((self.training, torch.is_grad_enabled()))
+            return super().forward(ids, targets)
+
+    monkeypatch.setattr(bench_module, "FermiLM", Recording)
+    bench(LUNA, batch_size=2, width=64, steps=1, warmup=0, settings=[("cpu", "fp32")])
+    # One timed training step with gradients, then the evaluation pass without them.
+    assert seen == [(True, True), (False, False)]
 
 
 def test_bench_times_a_cpu_step_and_survives_a_bad_device() -> None:
@@ -62,5 +94,12 @@ def test_cli_bench_names_the_fastest() -> None:
     assert "fastest: cpu fp32" in r.output
     assert "--device cpu --precision fp32" in r.output
     assert "GPU memory" in r.output
+
+
+def test_cli_bench_defaults_to_the_model_context_and_its_buckets() -> None:
+    args = ["model", "bench", "--model", "fermi-luna-1", "--batch-size", "1", "--device", "cpu"]
+    r = CliRunner().invoke(cli.app, [*args, "--steps", "1", "--warmup", "0"])
+    assert r.exit_code == 0, r.output
+    assert "64, 96, 128, 192, 256, 384, 512, 768, 1024" in " ".join(r.output.split())
     bad = CliRunner().invoke(cli.app, [*args[:-1], "4", "--steps", "1"])
     assert bad.exit_code != 0

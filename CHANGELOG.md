@@ -102,6 +102,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   This stops training runs at many batch widths from filling memory until an allocation
   fails.
 
+- `askphysics model bench` times the batch widths training really uses (64, 96, 128, ...
+  up to the model's context, which is now its default `--width`, not 512) and runs an
+  evaluation pass, so its memory reading covers training and evaluation.
+
 - Torch training releases the GPU's cached buffers whenever an optimizer step's batch width
   differs from the previous step's, so widths that come and go don't pile up in the cache.
   The training math is unchanged: the same seed gives the same weights and metrics.
