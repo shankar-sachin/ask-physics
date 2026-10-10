@@ -123,7 +123,7 @@ function row(release, isLatest) {
   const install = el("td", "");
   install.dataset.label = "Install";
   if (models) {
-    install.append(el("span", "kind", "Model weights: askphysics model pull"));
+    install.append(el("span", "kind", "Model weights, downloaded for you"));
   } else {
     const details = el("details");
     details.append(el("summary", "", `Install ${tag}`));
@@ -162,7 +162,7 @@ function renderReleases(releases, mount) {
   if (models.length) {
     mount.append(el("h3", "", "Model releases"), el("p", "note",
       "Weights for the Fermi models, published as release assets. The installers and " +
-      "askphysics model pull fetch them for you."), table(models));
+      "the first question fetch them for you."), table(models));
   }
   wireCopy(mount);
 }
