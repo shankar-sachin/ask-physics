@@ -630,6 +630,28 @@ SCENARIOS: tuple[Scenario, ...] = (
         (_REST, _GRAVITY),
         _DROP,
     ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "rest_release_v_sq_01",
+            "A {object} is released from rest {d} above the ground. How fast is it moving on "
+            "impact?",
+        ),
+        "v",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_v_squared",
+        Template(
+            "rest_ramp_v_sq_01_h",
+            "A {vehicle} starts at rest, speeds up at {a}, and covers {d}. What is its final "
+            "speed?",
+        ),
+        "v",
+        (_REST,),
+        _FROM_REST,
+    ),
     # kin_v_at
     Scenario(
         "kin_v_at",
@@ -738,7 +760,124 @@ SCENARIOS: tuple[Scenario, ...] = (
         (),
         ("Acceleration stays constant",),
     ),
+    # Velocity changes stated "from A to B", with the average acceleration asked for.
+    Scenario(
+        "kin_v_at",
+        Template(
+            "change_speed_accel_01",
+            "A {vehicle} changes its speed from {v0} to {v} in {t}. What is its acceleration?",
+        ),
+        "a",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "speed_up_accel_01_h",
+            "The {vehicle} speeds up from {v0} to {v} in {t}. Find its acceleration.",
+        ),
+        "a",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "avg_accel_01",
+            "Over {t}, the velocity of a {vehicle} climbs from {v0} to {v}. What is its average "
+            "acceleration?",
+        ),
+        "a",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "avg_accel_02_h",
+            "What average acceleration does a {vehicle} have if its velocity increases from {v0} "
+            "to {v} during {t}?",
+        ),
+        "a",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "change_time_01",
+            "How long must a {vehicle} accelerate at {a} to change its speed from {v0} to {v}?",
+        ),
+        "t",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "speed_up_time_01_h",
+            "A {vehicle} speeds up from {v0} to {v} at a steady {a}. How many seconds does that "
+            "take?",
+        ),
+        "t",
+        (),
+        ("Acceleration stays constant",),
+    ),
+    # Rest cues the database assumes as v0 = 0: "starts at rest", "released from rest".
+    Scenario(
+        "kin_v_at",
+        Template(
+            "rest_release_v_01",
+            "A {object} is released from rest and falls for {t}. What is its speed at that moment?",
+        ),
+        "v",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "rest_start_v_01_h",
+            "A {vehicle} starts at rest and builds speed at {a} for {t}. What speed does it have "
+            "then?",
+        ),
+        "v",
+        (_REST,),
+        _FROM_REST,
+    ),
+    Scenario(
+        "kin_v_at",
+        Template(
+            "rest_avg_accel_01",
+            "A {vehicle} starts at rest and its velocity is {v} after {t}. What is its average "
+            "acceleration?",
+        ),
+        "a",
+        (_REST,),
+        _FROM_REST,
+    ),
     # kin_x_at
+    Scenario(
+        "kin_x_at",
+        Template(
+            "rest_drop_dist_01",
+            "A {object} is dropped and falls for {t}. How far does it drop?",
+        ),
+        "x",
+        (_REST, _GRAVITY),
+        _DROP,
+    ),
+    Scenario(
+        "kin_x_at",
+        Template(
+            "rest_start_dist_01_h",
+            "A {vehicle} that starts at rest accelerates at {a} for {t}. How far does it go?",
+        ),
+        "x",
+        (_REST,),
+        _FROM_REST,
+    ),
     Scenario(
         "kin_x_at",
         Template("drop_dist_01", "How far does a {object} fall in {t} after being released?"),
@@ -1049,6 +1188,62 @@ SCENARIOS: tuple[Scenario, ...] = (
         "vf",
         (),
         ("Both move in the same direction before the collision",),
+    ),
+    # impulse_momentum: a speed change "from A to B" asks for the force or the contact time.
+    Scenario(
+        "impulse_momentum",
+        Template(
+            "impulse_force_01",
+            "A {m_a} {object} changes its speed from {v0} to {v} during a {t} impact. What average "
+            "force acted on it?",
+        ),
+        "F",
+        (),
+        ("The force is constant during the impact",),
+    ),
+    Scenario(
+        "impulse_momentum",
+        Template(
+            "impulse_force_02_h",
+            "A {vehicle} with a mass of {m} speeds up from {v0} to {v} in {t}. What average net "
+            "force was needed?",
+        ),
+        "F",
+        (),
+        ("The force is constant during the impact",),
+    ),
+    Scenario(
+        "impulse_momentum",
+        Template(
+            "impulse_time_01",
+            "A net force of {F} acts on a {m_a} {object} that changes its speed from {v0} to {v}. "
+            "How long does the force act?",
+        ),
+        "t",
+        (),
+        ("The force is constant during the impact",),
+    ),
+    Scenario(
+        "impulse_momentum",
+        Template(
+            "impulse_time_02_h",
+            "Pushing a {m_a} {vehicle} with {F} takes it from {v0} up to {v}. How long was the "
+            "push?",
+        ),
+        "t",
+        (),
+        ("The force is constant during the impact",),
+    ),
+    Scenario(
+        "impulse_momentum",
+        Template(
+            "impulse_rest_force_01",
+            "A {m_a} {object} starts at rest, and a steady push brings it to {v} in {t}. What "
+            "average force was applied?",
+        ),
+        "F",
+        (_REST,),
+        ("Starts at rest", "The force is constant during the impact"),
     ),
     # newton_gravitation
     Scenario(
@@ -1521,6 +1716,42 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
         "Not a physics question; it is arithmetic.",
         "How long does a dropped ball take to fall from a table?",
     ),
+    # Arithmetic as a textbook or homework line would phrase it, with no physical quantity.
+    (
+        Template("oos_math_10", "This came up in class: what is {int_a} times {int_b}?"),
+        "Not a physics question; it is arithmetic.",
+        "How long does a dropped ball take to fall from a table?",
+    ),
+    (
+        Template("oos_math_11", "what's {int_a} divided by {int_b}"),
+        "Not a physics question; it is arithmetic.",
+        "How fast does a dropped ball hit the floor?",
+    ),
+    (
+        Template("oos_math_12", "compute {dec_a} squared"),
+        "Not a physics question; it is arithmetic.",
+        "How far does a car travel while it speeds up?",
+    ),
+    (
+        Template("oos_math_13_h", "What is the square root of {int_a}?"),
+        "Not a physics question; it is arithmetic.",
+        "How long does a dropped ball take to fall from a table?",
+    ),
+    (
+        Template("oos_math_14", "Quick check for my homework: what is {dec_a} plus {int_b}?"),
+        "Not a physics question; it is arithmetic.",
+        "How fast does a dropped ball hit the floor?",
+    ),
+    (
+        Template("oos_math_15", "Evaluate {int_a} minus {int_b}."),
+        "Not a physics question; it is arithmetic.",
+        "How far does a car travel while it speeds up?",
+    ),
+    (
+        Template("oos_math_16_h", "What's {int_b} times {dec_a}?"),
+        "Not a physics question; it is arithmetic.",
+        "How long does a dropped ball take to fall from a table?",
+    ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "abstract": (
@@ -1543,7 +1774,8 @@ OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "equation": ("2x + 3 = 11", "x squared = 49", "5x - 4 = 21", "3x = 12"),
     "integer": ("91", "1001", "221", "97"),
     "int_a": ("10", "48", "7", "144"),
-    "int_b": ("3", "6", "12"),
+    "int_b": ("3", "4", "6", "8", "12"),
+    "dec_a": ("3.5", "2.5", "7.2", "0.8", "4.5", "1.25"),
 }  # fmt: skip
 
 # --------------------------------------------------------------------------- explanations
