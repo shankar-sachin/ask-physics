@@ -298,6 +298,56 @@ def test_grad_accum_trains_and_is_recorded(
     assert summary["train"]["batch_size"] == cfg.batch_size
 
 
+def test_torch_trainer_recomputes_blocks_only_when_asked(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from askphysics.lm import model as model_module
+
+    calls: list[int] = []
+    real = model_module.checkpoint
+
+    def counting(*args: object, **kwargs: object) -> object:
+        calls.append(1)
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(model_module, "checkpoint", counting)
+    # Only the final evaluation runs (in eval mode), so every recomputation is a training one.
+    base = {**FAST.__dict__, "steps": 4, "eval_every": 1000, "checkpoint_every": 1000}
+    train(LUNA, tokenizer, dataset, tmp_path / "plain", TrainConfig(**base))
+    assert calls == []
+    checkpointed = TrainConfig(**{**base, "checkpoint_blocks": True})
+    train(LUNA, tokenizer, dataset, tmp_path / "checkpointed", checkpointed)
+    assert len(calls) == base["steps"] * LUNA.n_layers
+    plain_model, _ = load_model(tmp_path / "plain")
+    ckpt_model, _ = load_model(tmp_path / "checkpointed")
+    for p, q in zip(plain_model.parameters(), ckpt_model.parameters(), strict=True):
+        assert torch.allclose(p, q, atol=1e-6)
+
+
+def test_cli_accepts_checkpoint_blocks_on_torch(
+    tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, TrainConfig] = {}
+
+    def fake_train(*args: object, **kwargs: object) -> list[dict[str, object]]:
+        seen["cfg"] = args[4]  # type: ignore[assignment]
+        return []
+
+    monkeypatch.setattr(train_module, "train", fake_train)
+    tok_path = tmp_path / "tok.json"
+    tokenizer.save(tok_path)
+    r = CliRunner().invoke(
+        cli.app,
+        [
+            "model", "train", "--model", "fermi-luna-1", "--backend", "torch", "--device", "cpu",
+            "--checkpoint-blocks", "--steps", "5", "--tokenizer", str(tok_path),
+            "--data", str(tmp_path), "--out", str(tmp_path / "out"),
+        ],
+    )  # fmt: skip
+    assert r.exit_code == 0, r.output
+    assert seen["cfg"].checkpoint_blocks is True
+
+
 def test_cli_rejects_zero_grad_accum() -> None:
     r = CliRunner().invoke(cli.app, ["model", "train", "--grad-accum", "0"])
     # CI forces color, and rich styles each hyphen of the option name on its own.

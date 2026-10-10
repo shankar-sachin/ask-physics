@@ -38,8 +38,9 @@
 #   --precision P        auto, bf16, or fp32 (default auto), passed to model train
 #   --backend B          auto, mlx, or torch (default auto: MLX on an Apple Silicon Mac,
 #                        torch elsewhere; ADR-019), passed to model train
-#   --checkpoint-blocks  MLX only: recompute each block's activations in the backward pass,
-#                        for when a model's activations don't fit (less memory, more compute)
+#   --checkpoint-blocks  recompute each block's activations in the backward pass, for when a
+#                        model's activations don't fit (less memory, more compute), on either
+#                        backend
 #   --no-bench           skip the one-minute torch speed check before training (MLX runs
 #                        skip it: the check times torch only)
 #
@@ -118,9 +119,6 @@ else
   resolved=$(askphysics model backend --backend "$backend")
 fi
 info "Training backend: $resolved"
-if [ "$ckpt" = 1 ] && [ "$resolved" != mlx ]; then
-  fail "--checkpoint-blocks needs the mlx backend (this run uses $resolved)"
-fi
 
 corpus=build/corpus/prose.jsonl
 if [ "$wants_prose" = 1 ] && [ -z "$prose" ]; then

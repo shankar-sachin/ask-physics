@@ -8,6 +8,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `model train --checkpoint-blocks` (and `scripts/train.sh --checkpoint-blocks`) works on
+  the torch backend too. Each block's activations are recomputed in the backward pass instead of
+  stored, for a model whose activations don't fit on the GPU; evaluation never recomputes.
 - Training on Apple Silicon uses MLX (ADR-019). On an arm64 Mac, `askphysics model train`
   runs on MLX by default (`--backend auto`): it stays inside a memory limit (70% of RAM by
   default, `--mlx-memory-gb`) where torch's MPS backend grew past 40 GB and swapped. The

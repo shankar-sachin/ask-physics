@@ -74,8 +74,8 @@ class TrainConfig:
     # ``prose_share`` of later batches keep it from fading. Both need ``prose`` texts.
     prose_steps: int = 0
     prose_share: float = 0.0
-    # MLX only (ADR-019; the torch trainer ignores it): recompute each block's activations in
-    # the backward pass instead of storing them. Less memory, more compute.
+    # Recompute each block's activations in the backward pass instead of storing them: less
+    # memory, more compute. Both backends honour it (ADR-019).
     checkpoint_blocks: bool = False
 
 
@@ -646,6 +646,7 @@ def train(
     data = prepare_data(config, tokenizer, data_dir, cfg, prose)
 
     model = FermiLM(config).to(device)
+    model.checkpoint_blocks = cfg.checkpoint_blocks
     opt = _optimizer(model, cfg)
     start = 0
     resumed: tuple[int, float] | None = None

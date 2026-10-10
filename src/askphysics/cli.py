@@ -283,8 +283,8 @@ def train_cmd(
     checkpoint_blocks: Annotated[
         bool,
         typer.Option(
-            help="MLX only: recompute each block's activations in the backward pass, "
-            "instead of storing them. Less memory, more compute."
+            help="Recompute each block's activations in the backward pass, instead of "
+            "storing them. Less memory, more compute; works on both backends."
         ),
     ] = False,
     seed: Annotated[int, typer.Option()] = 0,
@@ -318,8 +318,8 @@ def train_cmd(
         chosen = resolve_backend(backend, device)
     except ConfigError as exc:
         raise _fail(str(exc)) from exc
-    if chosen != "mlx" and (checkpoint_blocks or mlx_memory_gb is not None):
-        raise _fail("--checkpoint-blocks and --mlx-memory-gb apply to the mlx backend only")
+    if chosen != "mlx" and mlx_memory_gb is not None:
+        raise _fail("--mlx-memory-gb applies to the mlx backend only")
     cfg = TrainConfig(
         steps=steps,
         batch_size=batch_size,

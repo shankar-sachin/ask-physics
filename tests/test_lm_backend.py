@@ -68,8 +68,9 @@ def test_cli_backend_command_prints_the_choice(monkeypatch: pytest.MonkeyPatch) 
     assert r.exit_code == 1
 
 
-def test_checkpoint_blocks_needs_mlx() -> None:
-    r = CliRunner().invoke(cli.app, ["model", "train", "--backend", "torch", "--checkpoint-blocks"])
+def test_mlx_memory_limit_needs_mlx() -> None:
+    args = ["model", "train", "--backend", "torch", "--mlx-memory-gb", "8"]
+    r = CliRunner().invoke(cli.app, args)
     assert r.exit_code == 1 and "mlx backend" in _plain(r.output)
 
 

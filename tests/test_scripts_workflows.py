@@ -233,9 +233,11 @@ def test_train_backend_mlx_skips_the_torch_bench(tmp_path: Path) -> None:
     assert "Skipping the torch speed check" in result.stdout
 
 
-def test_train_checkpoint_blocks_needs_mlx(tmp_path: Path) -> None:
-    refused = _run("train.sh", "fermi-tellus-1", "--backend", "torch", "--checkpoint-blocks",
-                   "--no-bench", "--no-eval", tmp_path=tmp_path)  # fmt: skip
-    assert refused.returncode != 0 and "needs the mlx backend" in refused.stderr
+def test_train_checkpoint_blocks_is_passed_on_torch(tmp_path: Path) -> None:
+    on_torch = _run("train.sh", "fermi-tellus-1", "--backend", "torch", "--checkpoint-blocks",
+                    "--no-bench", "--no-eval", tmp_path=tmp_path)  # fmt: skip
+    assert on_torch.returncode == 0, on_torch.stderr
+    train = next(c for c in _commands(on_torch) if c.startswith("askphysics model train "))
+    assert "--backend torch" in train and "--checkpoint-blocks" in train
     unknown = _run("train.sh", "fermi-tellus-1", "--backend", "jax", tmp_path=tmp_path)
     assert unknown.returncode != 0 and "unknown --backend jax" in unknown.stderr

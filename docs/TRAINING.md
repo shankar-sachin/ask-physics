@@ -144,7 +144,8 @@ website still run on torch.
 - `--checkpoint-blocks` recomputes each block's activations in the backward pass instead of
   storing them. Attention's (heads, T, T) matrix is the largest activation: at 1024 tokens a
   layer holds about 0.5 to 1 GB of it. Use the flag when a model's activations don't fit, for
-  example celeste at batch 16; it costs extra compute. It is refused on torch.
+  example celeste at batch 16; it costs extra compute. It works on torch too, where it only
+  applies to training (evaluation never recomputes).
 - `scripts/train.sh` takes the same choices as `--backend`, `--checkpoint-blocks`, and
   `--device`, and skips the torch speed check when the run is MLX.
 

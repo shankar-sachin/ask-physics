@@ -872,7 +872,9 @@ the backward pass.
 - Memory on MLX: a memory limit (`mx.set_memory_limit`, 70% of system RAM by default,
   `--mlx-memory-gb` to change it), a cap on the cache kept for reuse (`--mlx-cache-gb`, 4 GB by
   default), and `--checkpoint-blocks` to recompute each block's activations in the backward
-  pass (`mx.checkpoint`). The loss upcasts the logits to fp32 once and does not materialize a
+  pass (`mx.checkpoint`). The torch trainer takes the same `--checkpoint-blocks` flag
+  (`torch.utils.checkpoint`, non-reentrant), used only while training, so evaluation and
+  decoding never recompute. The loss upcasts the logits to fp32 once and does not materialize a
   log-softmax copy. The optimizer step runs under `mx.compile`, which is on by default.
 - Precision: parameters are always fp32. `bf16` runs the forward pass in bfloat16 with fp32
   master weights and an fp32 loss, as torch autocast does on MPS. `auto` does that on the GPU
