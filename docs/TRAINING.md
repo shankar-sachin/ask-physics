@@ -295,10 +295,10 @@ If a run stops with `MPS backend out of memory`, either halve `--batch-size` and
 `--grad-accum`, or pass `--checkpoint-blocks`.
 
 - Halving and doubling keeps the same number of sequences per optimizer step, and each step
-  now runs as twice as many micro-batches. `--resume` continues on the same task rows in the
-  same order, because the data position is step times batch size times grad-accum. With
-  `--prose` the prose micro-batches are drawn per micro-batch, so the prose mix of a resumed
-  run can differ a little.
+  now runs as twice as many micro-batches. `--resume` with the new sizes is fine: it picks up
+  partway through a shuffled pass over the task rows. The batches it sees won't match an
+  uninterrupted run exactly, since the sampler's random state isn't saved in the checkpoint,
+  but the data mix and the learning rate schedule are the same.
 - `--checkpoint-blocks` keeps the batch and recomputes activations in the backward pass. It
   costs extra compute.
 - Check `mem_gb` in `metrics.jsonl` to see whether the change helped.
