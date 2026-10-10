@@ -8,6 +8,16 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- celeste asks before it downloads (ADR-022). It used to download by itself the first time a
+  question reached its escalation try; now, when it is published but not installed, `askphysics
+  ask` on a terminal asks `This question needs celeste-1 (about 240.1 MB, a one-time download)
+  to try harder. Download it?` with `y`, `n`, `a` (always), and `never`. Yes downloads it with
+  the usual verified pull and progress display and continues with it; no skips it, as if it
+  weren't available, for the rest of that run. `a` and `never` are saved in `preferences.json` in
+  the models folder (delete the file to reset), and `ASKPHYSICS_CELESTE_DOWNLOAD=ask|always|never`
+  overrides it. With `--json`, no terminal, or on the website nothing is asked and celeste is
+  skipped unless it is installed or the choice is `always`. tellus and solem still download by
+  themselves. The pipeline takes the prompt as an optional callback and does no terminal I/O.
 - Homebrew installs download the models. The formula wraps `askphysics` so the models live in
   Homebrew's `var/askphysics/models` (a place a formula can write; `ASKPHYSICS_MODEL_DIR` already chose
   the folder, and a value the user sets still wins) and runs a new hidden `askphysics

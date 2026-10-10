@@ -51,6 +51,7 @@ Speed and real-question results get measured for the v0.4 model cards.
 
 The installers and Homebrew download them for you when they install, checked byte for byte
 against the manifest this version pins, and the first `askphysics ask` does the same if they
-are missing (`ASKPHYSICS_AUTO_PULL=0` turns that off). Each model comes with its model card
+are missing (`ASKPHYSICS_AUTO_PULL=0` turns that off). celeste is the exception: it asks
+before downloading (see [Getting started](Getting-Started#celeste-asks-first)). Each model comes with its model card
 (`MODEL_CARD.md`: training, results, speed, credit) in its folder under
 `~/.cache/askphysics/models/`. You can also [train your own](Training-the-Models).

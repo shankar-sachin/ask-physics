@@ -179,8 +179,9 @@ commands are in [`TRAINING.md`](TRAINING.md).
 - Users never train: the maintainer trains and ships the weights as GitHub
   release assets, pinned by a checksum manifest (ADR-012). The installers and the
   Homebrew formula download tellus and solem when they install (ADR-022), the first `ask`
-  downloads whichever of them is still missing, and celeste comes down on first escalation
-  (`ASKPHYSICS_AUTO_PULL=0` stops the last two). Maintainers can also run
+  downloads whichever of them is still missing (`ASKPHYSICS_AUTO_PULL=0` stops that), and
+  celeste, which is 240 MB and rarely needed, downloads only after the user says yes when a
+  question reaches its escalation try (ADR-022). Maintainers can also run
   `askphysics-dev model pull`.
 
 ## Known limits

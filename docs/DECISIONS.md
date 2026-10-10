@@ -251,7 +251,7 @@ Pro with 48 GB of unified memory.
 
 ## ADR-010: Model routing: split and escalate locally, usage tiers online
 
-**Status:** Accepted (v0.2.0), decided by the maintainer
+**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: celeste's escalation try runs only if celeste is installed or the user agrees to download it.
 
 **Context.** Three model sizes trade speed for quality. The maintainer
 specified a scheme: start on solem, get one celeste, drop to tellus after
@@ -346,7 +346,7 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 
 ## ADR-012: Ship trained weights; users never train
 
-**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: the installers run the hidden `install-models`, Homebrew downloads in `post_install`, and the maintainer commands this record names (`model pull`, `model package`) are `askphysics-dev` commands.
+**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: the installers run the hidden `install-models`, Homebrew downloads in `post_install`, and the maintainer commands this record names (`model pull`, `model package`) are `askphysics-dev` commands. celeste no longer downloads by itself on its first escalation: the CLI asks first.
 
 **Context.** The Fermi models are trained from scratch (ADR-009), which takes
 hours to a day on an M5 Pro. Asking every user to do that would make Ask
@@ -1166,6 +1166,24 @@ the user's home directory.
   they say the models will download on the first question instead, which is what happens. They
   fall back to the old pull when the installed release has no `install-models` (anything before
   v0.4), so an installer served from `main` still works with the latest release.
+- **celeste asks first.** tellus and solem download without asking (the maintainer's wish), but
+  celeste is 240 MB and rarely needed, so it never downloads by itself. When a question reaches
+  its escalation try and it is published but not installed, the CLI asks (`This question needs
+  celeste-1 (about 240.1 MB, a one-time download) to try harder`, with the size from the
+  manifest): `y` downloads it now with the usual verified pull and progress display and goes on
+  with it, `n` skips it, `a` (always) and `never` are saved. A no is remembered for the rest of
+  that `ask` (one question per run, however many escalation tries are configured), and the
+  skipped try is dropped as if celeste weren't there: it counts as neither an attempt nor the
+  failure the answer reports. The choice is `preferences.json` in the models directory
+  (`$ASKPHYSICS_MODEL_DIR`, default `~/.cache/askphysics/models`; delete the file to reset it),
+  and `ASKPHYSICS_CELESTE_DOWNLOAD=ask|always|never` overrides it. Nothing is ever asked without
+  an interactive terminal: with `--json`, a pipe, or no stdin, and on the website, celeste is
+  skipped unless it is installed or the saved choice is `always`. The prompt lives in the CLI
+  only. `Pipeline.from_settings` and `build_roster` take two optional callbacks,
+  `confirm_download(name, size) -> bool` and `download(name)`; without them (the default, and
+  the website) nothing is downloaded and celeste isn't routed unless installed. The same rule
+  covers `--model fermi-celeste-1`. `ASKPHYSICS_AUTO_PULL=0` turns every download that happens
+  while asking off, celeste's included.
 - **Every channel downloads at install time, with no user command.** curl and irm: the installer
   runs `install-models`. pip: the first `ask` downloads (ADR-012, #107); its messages never name a
   command. Homebrew: below.

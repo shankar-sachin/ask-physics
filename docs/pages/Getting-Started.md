@@ -49,11 +49,31 @@ missing on your first `askphysics ask`, with a progress display. They are kept i
 in its own `var` folder), so it happens once.
 
 Every file is checked against the sizes and hashes this version of Ask Physics pins, and
-anything that doesn't match is refused. celeste downloads by itself the first time a
-question needs it. Set `ASKPHYSICS_AUTO_PULL=0` to stop the downloads that happen while you ask.
-If a download fails, `ask` still answers (with a stand-in) and says why, and the next `ask`
+anything that doesn't match is refused. Set `ASKPHYSICS_AUTO_PULL=0` to stop the downloads
+that happen while you ask. If a download fails, `ask` still answers (with a stand-in) and says why, and the next `ask`
 tries again. Without models, `ask` uses a stand-in that only knows "dropped from a height"
 questions, and says so.
+
+## celeste asks first
+
+tellus and solem are small and every question needs them. celeste (about 240 MB) is the last
+resort when solem can't make a plan work, and most questions never get that far, so it never
+downloads by itself. When a question does reach it, `askphysics ask` on a terminal asks:
+
+```
+? This question needs celeste-1 (about 240.1 MB, a one-time download) to try harder.
+  [y] yes   [N] no   [a] always download   [never] don't ask again
+  Download it?
+```
+
+`y` downloads it now (with a progress display) and carries on with it; `n` or Enter skips
+celeste for this question and doesn't ask again during it. `a` and `never` are remembered in a
+small file, `preferences.json`, in the models folder (`~/.cache/askphysics/models/`, or
+`ASKPHYSICS_MODEL_DIR`); to reset the choice, delete that file. You can also set
+`ASKPHYSICS_CELESTE_DOWNLOAD=ask`, `always`, or `never`, which wins over the file.
+
+With `--json`, in a script (no terminal), and on the website, nothing is ever asked: celeste is
+skipped unless it is already installed or your saved choice is `always`.
 
 ## Other commands
 

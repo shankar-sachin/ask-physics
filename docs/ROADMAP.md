@@ -93,7 +93,7 @@ explains itself in its docs.
   the OpenStax attribution.
 - Ship the trained weights (ADR-012): GitHub release assets pinned by a
   checksum manifest, a download at install time (installers and Homebrew) and on
-  the first question, and celeste on first escalation.
+  the first question, and celeste on first escalation if the user agrees (ADR-022).
 - Real-phrasing data from OpenStax *Physics* (ADR-016), uses (1) and (2): an
   eval of real questions with project-written gold plans the maintainer
   reviews, and its other questions as classify examples.

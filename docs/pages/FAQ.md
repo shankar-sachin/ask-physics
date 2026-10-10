@@ -57,6 +57,13 @@ downloads them if they are still missing (a pip install, say, or a download that
 live in `~/.cache/askphysics/models/` (or `$ASKPHYSICS_MODEL_DIR`; Homebrew keeps them in its
 `var` folder). To build them yourself, see [Training the models](Training-the-Models).
 
+## Why did it ask me to download celeste?
+
+celeste is the biggest model (about 240 MB) and only tries a question solem couldn't plan,
+so it never downloads without your say-so. Answer `y` for this once, `a` to always allow it,
+or `never` to stop being asked; delete `preferences.json` in the models folder to reset that.
+Without a terminal (`--json`, scripts, the website) it is skipped instead of asked about.
+
 ## Something's wrong. Where do I report it?
 
 Open an issue at

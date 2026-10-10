@@ -94,7 +94,8 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 - [x] Installers run the hidden `askphysics install-models` (was `model pull`, #51), and the
       Homebrew formula runs it in `post_install` into `$(brew --prefix)/var/askphysics/models`
       (ADR-022, `docs/RELEASING.md`).
-- [x] Download celeste on first escalation; clear message when no weights
+- [x] Download celeste on first escalation (since ADR-022, only if the user says yes); clear
+      message when no weights
       are installed (#51).
 
 ### Evals
