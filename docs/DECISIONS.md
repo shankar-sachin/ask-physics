@@ -912,3 +912,38 @@ and packaged the same way. MLX is MIT licensed, so it adds no license obligation
 attribution in `THIRD_PARTY_LICENSES.md`. Linux and Windows users see no change at run time: the
 `[mlx]` extra is Mac-only, and `auto` resolves to torch there. The `dev` extra adds `mlx[cpu]`
 on Linux, so CI runs the MLX tests on CPU; without it those tests skip.
+
+## ADR-020: One terminal look for every script, drawn by a small Rich module with a sh fallback
+
+**Status:** Accepted (issue #88, building on the training view of #87)
+
+**Context.** The workflow scripts printed bare `==>` lines and then went quiet while pip, pytest,
+or a download ran, and each script styled its own output. The installers run before anything is
+installed, and `build_site.sh` runs on Vercel with no askphysics, so the look cannot depend on the
+package being importable.
+
+**Decision.**
+
+- `scripts/lib.sh` is the one set of helpers (`ui_begin`, `phase`, `gate`, `ui_result`, `ui_ready`,
+  `ui_end`). When `python -m askphysics.shell_ui` can be imported it draws with Rich, in the theme
+  of `ui.py`; when it cannot, a pure-sh renderer with the same glyphs and columns draws instead.
+  `install.sh` embeds that renderer (it is piped from `curl`), and a test keeps the copies equal.
+  `install.ps1` has the matching look natively in PowerShell.
+- The renderer is a module run with `python -m`, not a CLI subcommand: importing `askphysics.cli`
+  costs about 0.7 s (sympy, Pint), and every step of every script calls it. `ui.py` no longer
+  imports `pretty`, so the module starts in about 0.1 s. The #87 `model phase` command is gone;
+  scripts call the module.
+- Off a terminal, under `NO_COLOR`, or with `TERM=dumb`, output is plain `start:` and `done:`
+  lines with no escape codes; `DRY_RUN=1` prints `-- title` and `+ command` as before.
+- A long command's output is folded into three dimmed lines and saved in full to
+  `$TMPDIR/askphysics-logs/`; a failed step prints the command, the last lines, and the log path.
+- The eval ETA prices the remaining examples by kind (classify and plan cost different amounts),
+  so it shows after the first example and does not swing with the mix. The rescue pass now runs
+  after scoring, over just the misses, so it has a known length and its own bar; the results are
+  the same as before because every example is decoded greedily and independently.
+
+**Consequences.** There are two renderers to keep alike (Rich and sh), checked by a test that
+compares their plain output and the width of the ready panel. Rich and the module are used only by
+the scripts and the CLI; the website bundle leaves them out. Rich is already a dependency, so
+nothing new is installed.
+

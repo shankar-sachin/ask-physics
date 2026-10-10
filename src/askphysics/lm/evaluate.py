@@ -88,6 +88,28 @@ class EvalReport:
         return json.dumps(asdict(self), indent=2)
 
 
+@dataclass(frozen=True)
+class EvalTick:
+    """Where an eval stands after one example, for a progress display.
+
+    ``stage`` is ``score`` (the model under test, over every example) or ``rescue`` (the bigger
+    model, over just the misses; its ``total`` is known only once scoring has finished).
+    The counts are running totals: the display shows rates as they settle.
+    """
+
+    stage: str
+    done: int
+    total: int
+    task: str  # "classify" or "plan": what the example just finished was
+    plans: int = 0  # plan examples scored so far
+    valid: int = 0  # ...of which the plan computed the gold answer
+    right: int = 0  # ...of which the router's answer was right
+    confident: int = 0  # ...confidently wrong
+    rescue_tried: int = 0
+    rescued: int = 0
+    rescue_confident: int = 0
+
+
 def _payload(prompt: str, token: str) -> dict[str, Any]:
     data: dict[str, Any] = json.loads(prompt[len(token) :])
     return data
@@ -226,6 +248,7 @@ def evaluate_tasks(
     rescue: Decoder | None = None,
     rescue_attempts: int = 1,
     on_progress: Callable[[int], None] | None = None,
+    on_tick: Callable[[EvalTick], None] | None = None,
 ) -> EvalReport:
     """Decode every example and score it against its gold target.
 
@@ -234,14 +257,39 @@ def evaluate_tasks(
 
     ``rescue`` is a bigger model that plans every question the main model did not get
     right, as the pipeline's escalation does. Its router answer counts as rescued when it
-    is right by the same rule.
+    is right by the same rule. The rescue pass runs after scoring, over just the misses, so
+    it has a known length (and its own progress).
+
+    ``on_progress`` gets the number of examples scored so far; ``on_tick`` gets an
+    ``EvalTick`` after each example of either pass.
     """
     report = EvalReport(attempts=attempts)
     category_hits = 0
     plan_hits = {"equation": 0, "target": 0, "knowns": 0, "answer": 0}
     routed_hits = {"right": 0, "flagged": 0, "confident": 0, "tries": 0}
     rescue_hits = {"tried": 0, "rescued": 0, "confident": 0}
-    for done, e in enumerate(examples, start=1):
+    misses: list[tuple[dict[str, Any], Quantity | None]] = []
+    pool = list(examples)
+
+    def tick(stage: str, done: int, total: int, task: str) -> None:
+        if on_tick is not None:
+            on_tick(
+                EvalTick(
+                    stage,
+                    done,
+                    total,
+                    task,
+                    plans=report.plan_examples,
+                    valid=plan_hits["answer"],
+                    right=routed_hits["right"],
+                    confident=routed_hits["confident"],
+                    rescue_tried=len(misses) if stage == "rescue" else 0,
+                    rescued=rescue_hits["rescued"],
+                    rescue_confident=rescue_hits["confident"],
+                )
+            )
+
+    for done, e in enumerate(pool, start=1):
         if e.task == "classify":
             question = _payload(e.prompt, CLASSIFY)["question"]
             gold_c = Classification.model_validate_json(_gold(e.target))
@@ -299,12 +347,7 @@ def evaluate_tasks(
             else:
                 routed_hits["flagged"] += 1
             if rescue is not None and not right:
-                rescue_hits["tried"] += 1
-                saved = route_plan(rescue, payload, store, rescue_attempts)
-                if _is_right(saved, want):
-                    rescue_hits["rescued"] += 1
-                elif saved.passed:
-                    rescue_hits["confident"] += 1
+                misses.append((payload, want))
             if not score.answer and len(report.failures) < max_failures:
                 report.failures.append(
                     {
@@ -317,6 +360,17 @@ def evaluate_tasks(
                 )
         if on_progress:
             on_progress(done)
+        tick("score", done, len(pool), e.task)
+    if rescue is not None:
+        tick("rescue", 0, len(misses), "plan")
+        for n, (payload, want) in enumerate(misses, start=1):
+            rescue_hits["tried"] += 1
+            saved = route_plan(rescue, payload, store, rescue_attempts)
+            if _is_right(saved, want):
+                rescue_hits["rescued"] += 1
+            elif saved.passed:
+                rescue_hits["confident"] += 1
+            tick("rescue", n, len(misses), "plan")
     if report.classify_examples:
         report.category_accuracy = category_hits / report.classify_examples
     if report.plan_examples:

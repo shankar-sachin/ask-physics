@@ -118,7 +118,6 @@ if [ -n "$device" ]; then
 else
   resolved=$(askphysics model backend --backend "$backend")
 fi
-say "Training backend: $resolved"
 
 corpus=build/corpus/prose.jsonl
 if [ "$wants_prose" = 1 ] && [ -z "$prose" ]; then
@@ -144,8 +143,9 @@ if [ "$resume" = 1 ]; then
   if [ "$fresh_data" = 1 ] || [ "$fresh_tokenizer" = 1 ]; then
     fail "--resume can't rebuild the data or tokenizer: the run would no longer match"
   fi
-  say "Resuming $model"
+  ui_begin "Train $model" "Resume on $resolved from the last checkpoint" 0 20
 else
+  ui_begin "Train $model" "Back up, build data, train, and score; $steps steps on $resolved" 0 20
   if [ -d "$installed" ]; then
     stamp="$model-$(date +%Y%m%d-%H%M%S)"
     sh "$(dirname "$0")/models.sh" backup "$model" "$stamp"
@@ -175,7 +175,7 @@ if [ "$bench" = 1 ] && [ "$resolved" = torch ]; then
   phase "Checking training speed (about a minute)" askphysics model bench --model "$model" \
     --batch-size "$batch" --plan-steps "$steps"
 elif [ "$bench" = 1 ]; then
-  say "Skipping the torch speed check: this run trains with $resolved"
+  info "Skipping the torch speed check: this run trains with $resolved"
 fi
 
 set -- askphysics model train --model "$model" --data "$data" --tokenizer "$tokenizer" \
@@ -194,8 +194,14 @@ if [ "$evaluate" = 1 ]; then
   phase "Scoring the new $model" askphysics model eval --model "$model" --data "$data" \
     --examples "$eval_examples"
   if [ -n "$baseline" ]; then
-    run python3 "$(dirname "$0")/compare_evals.py" "$baseline/eval.json" "$installed/eval.json"
-    say "Keep the new one, or put the old one back: sh scripts/models.sh restore $model"
+    phase_live "Comparing with the previous $model" python3 "$(dirname "$0")/compare_evals.py" \
+      "$baseline/eval.json" "$installed/eval.json"
   fi
 fi
-say "Done: $model"
+if [ -n "$baseline" ]; then
+  ui_end "Trained $model" "Training failed" \
+    "sh scripts/models.sh restore $model::put the previous one back" \
+    "sh scripts/eval.sh $model::score it again on new questions"
+else
+  ui_end "Trained $model" "Training failed" "sh scripts/eval.sh $model::score it on held-out questions"
+fi
