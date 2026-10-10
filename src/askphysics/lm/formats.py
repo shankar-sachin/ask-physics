@@ -88,7 +88,9 @@ _RANGE = re.compile(
 
 def _spelled(number: str, unit: str | None) -> tuple[str, str] | None:
     """A (canonical number, unit) pair, or None if the number overflows or the unit is not one."""
-    if unit is None or not is_valid_unit(unit) or not math.isfinite(float(number)):
+    if unit is None or unit == "in" or not is_valid_unit(unit):
+        return None  # "from 12 to 3 in 4 s": "in" is the word, not inches
+    if not math.isfinite(float(number)):
         return None
     return format_number(float(number)), unit
 

@@ -659,18 +659,19 @@ def assignable_options(
     (number, unit) pairs not yet taken. A table constant or an assumed 0 is only
     allowed when the variables still to fill (``pending``, including ``variable``) outnumber
     the unused quantities that fit them; otherwise a stated value would go unused, and a
-    question never states a value for nothing. Falls back to ``options`` if nothing is left.
+    question never states a value for nothing. Once every quantity that fits is taken and no
+    constant or 0 applies, nothing is left: the plan fails rather than write one quantity into
+    two variables ("an average speed of 23.2 m/s" as both v0 and v).
     """
     fitting = [q for q in unused if _fits(q[1], variable)]
     slots = sum(1 for v in pending if _fits(v.unit, variable))
     fillers_ok = slots > len(fitting)
-    narrowed = [
+    return [
         o
         for o in options
         if (o.origin == "given" and (o.number, o.unit) in fitting)
         or (o.origin != "given" and fillers_ok)
     ]
-    return narrowed or list(options)
 
 
 def target_options(
