@@ -52,7 +52,7 @@ def test_train_backs_up_scores_both_and_compares(tmp_path: Path) -> None:
     prose.write_text("{}\n")
     result = _run("train.sh", "fermi-solem-1", "--data", str(tmp_path / "data"),
                   "--tokenizer", str(tmp_path / "tok.json"), "--prose", str(prose),
-                  tmp_path=tmp_path)  # fmt: skip
+                  "--backend", "torch", tmp_path=tmp_path)  # fmt: skip
     assert result.returncode == 0, result.stderr
     steps = [c.split(" ")[0:3] for c in _commands(result)]
     assert steps == [
@@ -85,7 +85,8 @@ def test_train_refuses_a_run_with_no_task_steps(tmp_path: Path) -> None:
 
 def test_train_resume_skips_backup_and_rebuilds(tmp_path: Path) -> None:
     (tmp_path / "models" / "fermi-tellus-1").mkdir(parents=True)
-    result = _run("train.sh", "fermi-tellus-1", "--resume", "--no-eval", tmp_path=tmp_path)
+    result = _run("train.sh", "fermi-tellus-1", "--resume", "--no-eval", "--backend", "torch",
+                  tmp_path=tmp_path)  # fmt: skip
     assert result.returncode == 0, result.stderr
     assert _commands(result) == [
         "askphysics model bench --model fermi-tellus-1 --batch-size 32 --plan-steps 1500",
@@ -99,7 +100,7 @@ def test_train_resume_skips_backup_and_rebuilds(tmp_path: Path) -> None:
 
 def test_train_precision_and_no_bench(tmp_path: Path) -> None:
     result = _run("train.sh", "fermi-tellus-1", "--precision", "fp32", "--no-bench", "--no-eval",
-                  tmp_path=tmp_path)  # fmt: skip
+                  "--backend", "torch", tmp_path=tmp_path)  # fmt: skip
     assert result.returncode == 0, result.stderr
     commands = _commands(result)
     assert not any(c.startswith("askphysics model bench") for c in commands)
