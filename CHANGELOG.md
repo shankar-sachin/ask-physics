@@ -99,6 +99,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   This stops training runs at many batch widths from filling memory until an allocation
   fails.
 
+- Torch training releases the GPU's cached buffers whenever an optimizer step's batch width
+  differs from the previous step's, so widths that come and go don't pile up in the cache.
+  The training math is unchanged: the same seed gives the same weights and metrics.
+
 - Training no longer eats all the memory. solem's run on a 48 GB Mac grew to 58 GB,
   swapped 16 GB, and slowed from 4,800 to 250 tokens/s within 150 steps. Training data
   is now stored compactly (4 bytes a token instead of about 36), only the validation

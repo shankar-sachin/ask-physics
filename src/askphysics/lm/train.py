@@ -269,6 +269,23 @@ def _release_cached_memory(device: torch.device) -> None:
         torch.cuda.empty_cache()
 
 
+class _WidthFlush:
+    """Releases cached device memory when an optimizer step's batch width differs from the
+    previous step's. MPS keeps a cached buffer per shape, so every new width adds to the
+    cache until the watermark (``mps_env``) frees it. Flushing on a change keeps it short.
+    The training math does not change."""
+
+    def __init__(self, device: torch.device) -> None:
+        self._device = device
+        self._width: int | None = None
+
+    def before_step(self, width: int) -> None:
+        """Note the width of the step about to run, flushing first if it changed."""
+        if self._width is not None and width != self._width:
+            _release_cached_memory(self._device)
+        self._width = width
+
+
 def _peak_memory_gb() -> float:
     """Peak resident memory of this process so far, in GB (ru_maxrss is bytes on macOS)."""
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -655,6 +672,7 @@ def train(
     tokens_seen = torch.zeros((), dtype=torch.long, device=device)
     window_tokens, window_t0 = 0, time.perf_counter()
     log = _metric_writer(out_dir, metrics, on_log)
+    flush = _WidthFlush(device)
 
     def checkpoint(step: int) -> None:
         save_model(model, tokenizer, out_dir)
@@ -671,6 +689,7 @@ def train(
             )
             for _ in range(cfg.grad_accum)
         ]
+        flush.before_step(max(inputs.shape[1] for inputs, _ in micro_batches))
         for group in opt.param_groups:
             group["lr"] = lr_at(step, cfg, resumed)
         loss = _optimizer_step(model, opt, micro_batches, cfg, device, dtype)

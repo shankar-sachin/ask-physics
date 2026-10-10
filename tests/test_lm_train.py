@@ -1,3 +1,4 @@
+import itertools
 import json
 import random
 import re
@@ -9,6 +10,7 @@ import torch
 from typer.testing import CliRunner
 
 from askphysics import cli
+from askphysics.lm import train as train_module
 from askphysics.lm.checkpoints import load_model
 from askphysics.lm.config import LUNA, ModelConfig
 from askphysics.lm.factory import Example, build_dataset, read_examples
@@ -24,6 +26,7 @@ from askphysics.lm.train import (
     _optimizer_step,
     _peak_memory_gb,
     _save_optimizer,
+    _WidthFlush,
     bucket_width,
     lr_at,
     make_batch,
@@ -388,3 +391,52 @@ def test_prose_steps_must_leave_task_steps(
         train(
             LUNA, tokenizer, dataset, tmp_path / "luna", cfg, prose=["Some prose here. " * 20] * 30
         )
+
+
+def test_width_flush_releases_the_cache_only_when_the_width_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    released: list[str] = []
+    monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    flush = _WidthFlush(torch.device("mps"))
+    for width in (64, 64, 96, 96, 64, 64, 1024):
+        flush.before_step(width)
+    # The first step has nothing to compare with; then 64 to 96, 96 to 64, and 64 to 1024.
+    assert released == ["mps", "mps", "mps"]
+
+
+def test_train_flushes_on_each_width_change_and_not_otherwise(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    widths: list[int] = []
+    real_make_batch = train_module.make_batch
+
+    def recording_make_batch(*args: object, **kwargs: object) -> tuple[torch.Tensor, torch.Tensor]:
+        inputs, labels = real_make_batch(*args, **kwargs)  # type: ignore[arg-type]
+        widths.append(inputs.shape[1])
+        return inputs, labels
+
+    released: list[str] = []
+    monkeypatch.setattr(train_module, "make_batch", recording_make_batch)
+    monkeypatch.setattr(
+        train_module, "_release_cached_memory", lambda device: released.append(device.type)
+    )
+    cfg = TrainConfig(
+        **{
+            **FAST.__dict__,
+            "steps": 16,
+            "grad_accum": 2,
+            "flush_every": 0,
+            "eval_every": 1000,
+            "checkpoint_every": 1000,
+        }
+    )
+    train(LUNA, tokenizer, dataset, tmp_path / "flush", cfg)
+    # Each optimizer step is grad_accum micro-batches; the step's width is its widest one.
+    per_step = [
+        max(widths[i : i + cfg.grad_accum]) for i in range(0, cfg.steps * cfg.grad_accum, 2)
+    ]
+    changes = sum(a != b for a, b in itertools.pairwise(per_step))
+    assert changes > 0  # the width does move, so the flush is exercised
+    # The evaluation after the last step releases the cache too.
+    assert released == ["cpu"] * (changes + 1)
