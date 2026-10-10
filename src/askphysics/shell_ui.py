@@ -48,6 +48,10 @@ PRODUCT = "Ask Physics"
 ROW_SEPARATOR = "::"  # between a command and what it does, in --row and --next
 
 
+def _steps(count: int) -> str:
+    return "step" if count == 1 else "steps"
+
+
 def split_row(row: str) -> tuple[str, str]:
     """``"askphysics ask::ask a question"`` as (command, description)."""
     command, _, description = row.partition(ROW_SEPARATOR)
@@ -130,12 +134,12 @@ def summary(
     elapsed = format_elapsed(seconds) if seconds is not None else ""
     if is_plain(console):
         if ok:
-            bits = [f"{passed} of {steps} steps"] if steps else []
+            bits = [f"{passed} of {steps} {_steps(steps)}"] if steps else []
             bits += [elapsed] if elapsed else []
             summary_line = f"ok: {title}" + (f" ({', '.join(bits)})" if bits else "")
             console.print(Text(summary_line), soft_wrap=True)
         else:
-            lead = f"{len(failed)} of {steps} steps failed: " if steps else "failed: "
+            lead = f"{len(failed)} of {steps} {_steps(steps)} failed: " if steps else "failed: "
             tail = f"; {elapsed}" if elapsed else ""
             console.print(
                 Text(f"failed: {title} ({lead}{', '.join(failed)}{tail})"), soft_wrap=True
@@ -155,7 +159,9 @@ def summary(
     parts: list[str] = []
     if steps and ok:
         parts.append(
-            f"{passed} of {steps} steps passed" if passed != steps else f"all {steps} steps"
+            f"{passed} of {steps} {_steps(steps)} passed"
+            if passed != steps
+            else f"all {steps} {_steps(steps)}"
         )
     elif steps:
         parts.append(f"{len(failed)} of {steps} failed: {', '.join(failed)}")
@@ -174,6 +180,7 @@ def summary(
         for i, (command, about) in enumerate(nexts):
             grid.add_row("next" if i == 0 else "", command, about)
         rows += [Text(""), grid]
+    console.print()
     console.print(Padding(Constrain(Group(*rows), width - INDENT), (0, 0, 0, INDENT)))
     console.print()
 
@@ -189,7 +196,7 @@ def ready(console: Console, title: str, rows: Sequence[tuple[str, str]], footer:
         if footer:
             console.print(Text(f"{PLAIN_INDENT}{footer}"), soft_wrap=True)
         return
-    grid = Table.grid(padding=(0, 3))
+    grid = Table.grid(padding=(0, 4))
     grid.add_column(style="brand", no_wrap=True)
     grid.add_column(style="muted", overflow="fold")
     for command, about in rows:

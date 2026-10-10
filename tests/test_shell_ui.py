@@ -64,6 +64,12 @@ def test_a_summary_after_a_clean_run_reads_all_clear_with_the_time_and_what_to_r
     assert "      make ask                 try it" in shown
 
 
+def test_a_summary_of_a_single_step_says_step() -> None:
+    console, buffer = _console(terminal=True)
+    shell_ui.summary(console, title="Scored", steps=1, passed=1, seconds=52)
+    assert "✓ Scored   all 1 step  ·  52s" in _shown(buffer)
+
+
 def test_a_summary_after_a_failure_names_what_failed() -> None:
     console, buffer = _console(terminal=True)
     shell_ui.summary(console, title="Not ready", steps=6, passed=4, failed=["mypy", "pytest"])
@@ -74,6 +80,7 @@ def test_a_summary_after_a_failure_names_what_failed() -> None:
     ("kwargs", "expected"),
     [
         ({"steps": 6, "passed": 6, "seconds": 112}, ["ok: Done (6 of 6 steps, 1m 52s)"]),
+        ({"steps": 1, "passed": 1, "seconds": 4}, ["ok: Done (1 of 1 step, 4s)"]),
         ({"seconds": 4}, ["ok: Done (4s)"]),
         ({}, ["ok: Done"]),
         (
@@ -107,8 +114,8 @@ def test_the_ready_panel_lists_commands_with_what_they_do() -> None:
     )
     shown = _shown(buffer)
     assert "╭─ ✓ Ask Physics is ready" in shown
-    assert "source .venv/bin/activate   in each new terminal" in shown
-    assert re.search(r"make ask {20}ask something", shown)
+    assert "source .venv/bin/activate    in each new terminal" in shown
+    assert re.search(r"make ask {21}ask something", shown)
     assert max(len(line) for line in shown.splitlines()) <= 100
 
 

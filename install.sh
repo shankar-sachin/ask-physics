@@ -299,16 +299,18 @@ fb_summary() {
   shift 5
   fb_el=""
   [ -z "$fb_secs" ] || fb_el=$(fb_fmt "$fb_secs")
+  fb_unit=steps
+  [ "$fb_steps" -ne 1 ] || fb_unit=step
   if [ "$FB_PRETTY" != 1 ]; then
     if [ -z "$fb_bad" ]; then
       fb_bits=""
-      [ "$fb_steps" -le 0 ] || fb_bits="$fb_passed of $fb_steps steps"
+      [ "$fb_steps" -le 0 ] || fb_bits="$fb_passed of $fb_steps $fb_unit"
       [ -z "$fb_el" ] || fb_bits="${fb_bits}${fb_bits:+, }$fb_el"
       printf 'ok: %s%s\n' "$fb_title" "${fb_bits:+ ($fb_bits)}"
     else
       fb_count=$(printf '%s' "$fb_bad" | awk -F', ' '{print NF}')
       fb_bits="failed: $fb_bad"
-      [ "$fb_steps" -le 0 ] || fb_bits="$fb_count of $fb_steps steps failed: $fb_bad"
+      [ "$fb_steps" -le 0 ] || fb_bits="$fb_count of $fb_steps $fb_unit failed: $fb_bad"
       [ -z "$fb_el" ] || fb_bits="$fb_bits; $fb_el"
       printf 'failed: %s (%s)\n' "$fb_title" "$fb_bits"
     fi
@@ -320,7 +322,7 @@ fb_summary() {
     done
     return 0
   fi
-  printf '  %s' "$FB_MUTED"
+  printf '\n  %s' "$FB_MUTED"
   fb_repeat "$FB_RULE" $((FB_WIDTH - 2))
   printf '%s\n' "$FB_RST"
   if [ -z "$fb_bad" ]; then
@@ -333,9 +335,9 @@ fb_summary() {
   if [ "$fb_steps" -gt 0 ]; then
     if [ -z "$fb_bad" ]; then
       if [ "$fb_passed" = "$fb_steps" ]; then
-        fb_bits="all $fb_steps steps"
+        fb_bits="all $fb_steps $fb_unit"
       else
-        fb_bits="$fb_passed of $fb_steps steps passed"
+        fb_bits="$fb_passed of $fb_steps $fb_unit passed"
       fi
     else
       fb_count=$(printf '%s' "$fb_bad" | awk -F', ' '{print NF}')
@@ -390,9 +392,9 @@ fb_ready() {
     fb_about=""
     case $fb_row_text in *::*) fb_about=${fb_row_text#*::} ;; esac
     printf '  %s│%s   %s%s%s' "$FB_OK" "$FB_RST" "$FB_BRAND" "$fb_cmd" "$FB_RST"
-    fb_repeat ' ' $((fb_cmdw - ${#fb_cmd} + 3))
+    fb_repeat ' ' $((fb_cmdw - ${#fb_cmd} + 4))
     printf '%s%s%s' "$FB_MUTED" "$fb_about" "$FB_RST"
-    fb_repeat ' ' $((fb_inner - 6 - fb_cmdw - ${#fb_about}))
+    fb_repeat ' ' $((fb_inner - 7 - fb_cmdw - ${#fb_about}))
     printf '%s│%s\n' "$FB_OK" "$FB_RST"
   done
   printf '  %s│%s' "$FB_OK" "$FB_RST"
@@ -507,6 +509,6 @@ if [ "$newpath" = 1 ]; then
 fi
 fb_summary "Ask Physics is installed" "$total" "$n" "$(($(date +%s) - t0))" ""
 fb_ready "Ask Physics is ready" \
-  'askphysics ask "How fast does a ball dropped from 20 m hit the ground?"::ask a question' \
+  'askphysics ask "A 20 m drop: how fast does it land?"::ask a question' \
   "askphysics --help::see every command" \
   "uv tool uninstall askphysics::remove it again"

@@ -431,7 +431,11 @@ def report_sections(
     if rescue_with is not None:
         sections.append(
             [
-                Row(f"{rescue_with} tried on {report.rescue_tried} misses", None),
+                Row(
+                    f"{rescue_with} tried on {report.rescue_tried} "
+                    f"{'miss' if report.rescue_tried == 1 else 'misses'}",
+                    None,
+                ),
                 Row("rescued", report.rescue_rate),
                 Row("right after escalation", report.routed_with_rescue_rate),
                 Row(

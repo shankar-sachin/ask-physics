@@ -273,6 +273,23 @@ PARSERS: dict[str, Callable[[], OutputParser]] = {
 }
 
 
+def pytest_text(summary: str, *, style: str = "muted") -> Text:
+    """pytest's counts with the good ones green and the bad ones red: ``144 passed · 1 failed``."""
+    counts, _, percent = summary.partition("  ")  # live counts end with "  34%"
+    text = Text(style=style)
+    for i, part in enumerate(counts.split(" · ")):
+        if i:
+            text.append(" · ", style="faint")
+        kind = part.split()[1] if len(part.split()) > 1 else ""
+        text.append(part, style="ok" if kind == "passed" else "bad" if kind in BAD_KINDS else style)
+    if percent:
+        text.append("  " + percent, style=style)
+    return text
+
+
+BAD_KINDS = frozenset({"failed", "error", "errors"})
+
+
 class _Running:
     """The live block of a running step: its line, then the last few lines of output, dimmed."""
 
@@ -305,7 +322,12 @@ class _Running:
             self.lines.append(line)
 
     def __rich__(self) -> RenderableType:
-        detail = Text(self.parser.live() if self.parser else "", style="muted")
+        shown = self.parser.live() if self.parser else ""
+        detail = (
+            pytest_text(shown)
+            if isinstance(self.parser, PytestOutput)
+            else Text(shown, style="muted")
+        )
         rows: list[RenderableType] = [
             step_row(
                 self._spinner,
@@ -330,7 +352,7 @@ def finished_row(
     *,
     width: int,
     counter: str = "",
-    detail: str = "",
+    detail: str | Text = "",
     pad: int = 0,
     skipped: bool = False,
     indent: int = INDENT,
@@ -342,14 +364,14 @@ def finished_row(
         mark, title_style, detail_style = Text("✓", style="ok"), "value", "muted"
     else:
         mark, title_style, detail_style = Text("✗", style="bad"), "bad", "bad"
-    if code and not skipped and not detail:
+    if code and not skipped and not str(detail):
         detail = f"exit {code}"
     return step_row(
         mark,
         Text(title, style=title_style),
         width=width,
         counter=counter,
-        detail=Text(detail, style=detail_style),
+        detail=detail if isinstance(detail, Text) else Text(detail, style=detail_style),
         right=Text(format_elapsed(seconds), style="muted") if seconds is not None else None,
         pad=pad,
         indent=indent,
@@ -370,15 +392,33 @@ def _plain_finish(
     return Text(f"failed: {label} (exit {code}, {elapsed})")
 
 
+_ERRORISH = re.compile(r"^(E\s|FAILED\b|ERROR\b|error[:\[]|Error[:\[])")
+_RULED = re.compile(r"^[=_\-]{3,}\s*(.*?)\s*[=_\-]{3,}$")
+
+
+def _undecorated(line: str) -> str:
+    """``===== FAILURES =====`` as ``FAILURES``: the rulers pytest draws are noise here."""
+    hit = _RULED.match(line.strip())
+    return hit.group(1) if hit and hit.group(1) else line
+
+
 def failure_panel(
     command: Sequence[str], code: int, output: Sequence[str], log: Path | None, *, width: int
 ) -> RenderableType:
     """What a failed command left behind: the command, the last lines of output, the log."""
     body: list[RenderableType] = [Text.assemble(("$ ", "muted"), (display_command(command), "eq"))]
-    shown = [line for line in output if line.strip()][-FAILURE_LINES:]
+    shown = [_undecorated(line) for line in output if line.strip()][-FAILURE_LINES:]
     if shown:
         body.append(Text(""))
-        body.extend(Text(line, no_wrap=True, overflow="ellipsis") for line in shown)
+        body.extend(
+            Text(
+                line,
+                style="bad" if _ERRORISH.match(line) else "",
+                no_wrap=True,
+                overflow="ellipsis",
+            )
+            for line in shown
+        )
     panel = Panel(
         Group(*body),
         title=Text(f"exit {code}", style="bad"),
@@ -427,7 +467,7 @@ def run_phase(
     width = frame_width(console)
     t0 = clock()
     code: int
-    detail = ""
+    detail: str | Text = ""
     output: list[str] = []
     saved: Path | None = None
     try:
@@ -449,6 +489,8 @@ def run_phase(
             code, output, saved = _run_captured(console, command, running, log)
             # A failed command shows its exit code, except pytest, whose counts say what failed.
             detail = parser.done() if parser and (code == 0 or parse == "pytest") else ""
+            if isinstance(parser, PytestOutput) and detail:
+                detail = pytest_text(str(detail))
     except FileNotFoundError:
         output = [f"cannot run {command[0]}: not found"]
         code = 127

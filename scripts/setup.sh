@@ -45,5 +45,5 @@ phase "Check the data" .venv/bin/askphysics validate-data
 ui_end "Setup complete"
 ui_ready "Ask Physics is ready" \
   "source .venv/bin/activate::in each new terminal" \
-  'askphysics ask "How fast does a ball dropped from 20 m hit the ground?"::ask a question' \
-  "sh scripts/check.sh::run every gate before a commit"
+  'askphysics ask "A 20 m drop: how fast does it land?"::ask a question' \
+  "sh scripts/check.sh::run every gate"

@@ -659,7 +659,7 @@ def eval_cmd(
         console.print(f"    [muted]got     [/] {safe(str(f['got']))}")
     if real_report is not None:
         _show_real(model, real_report, real)
-    console.print(f"[ok]✓[/] full report in {safe(str(model_dir / 'eval.json'))}")
+    console.print(f"  [ok]✓[/] full report in {safe(str(model_dir / 'eval.json'))}")
 
 
 def _show_real(model: str, report: RealReport, path: Path) -> None:

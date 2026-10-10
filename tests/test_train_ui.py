@@ -13,11 +13,13 @@ from askphysics.train_ui import (
     LastLine,
     PytestOutput,
     _Running,
+    _undecorated,
     display_command,
     failure_panel,
     finished_row,
     format_elapsed,
     is_plain,
+    pytest_text,
     run_phase,
     step_row,
 )
@@ -290,3 +292,27 @@ def test_a_step_row_is_one_line_at_a_narrow_width() -> None:
     console, buffer = _console(terminal=True, width=60)
     console.print(step_row(Text("✓"), Text("A very long title " * 4), width=60, right=Text("9s")))
     assert len(_shown(buffer).splitlines()) == 1
+
+
+def test_pytest_counts_are_green_for_passed_red_for_failed_and_the_percent_stays_quiet() -> None:
+    text = pytest_text("144 passed · 1 failed · 2 skipped  54%")
+    styles = {text.plain[span.start : span.end]: str(span.style) for span in text.spans}
+    assert styles["144 passed"] == "ok" and styles["1 failed"] == "bad"
+    assert styles["2 skipped"] == "muted" and styles["  54%"] == "muted"
+    assert text.plain == "144 passed · 1 failed · 2 skipped  54%"
+
+
+def test_a_failure_panel_drops_the_rulers_and_reddens_the_error_lines() -> None:
+    assert _undecorated("===== FAILURES =====") == "FAILURES"
+    assert _undecorated("_____ test_triple _____") == "test_triple"
+    assert _undecorated("-- two dashes --") == "-- two dashes --"  # too short to be a ruler
+    assert _undecorated("=====") == "====="  # nothing to keep: left as it was
+    assert _undecorated("plain line") == "plain line"
+    console, buffer = _console(terminal=True)
+    output = ["=== FAILURES ===", "E   assert 6 == 9", "FAILED tests/x.py::t - assert 6 == 9", "ok"]
+    console.print(failure_panel(["pytest"], 1, output, None, width=100))
+    assert "===" not in _shown(buffer)
+    raw = buffer.getvalue()
+    bad = "\x1b[1;91m"  # the theme's red on a 16-colour terminal
+    assert bad + "E   assert 6 == 9" in raw and bad + "FAILED tests/x.py::t" in raw
+    assert bad + "ok" not in raw
