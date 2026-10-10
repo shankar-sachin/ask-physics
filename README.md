@@ -16,6 +16,12 @@
 
 <p align="center"><b><em>100% free, forever. That's why it's the best way to go.</em></b></p>
 
+<p align="center">
+  <a href="https://askphysics.vercel.app"><img src="docs/images/demo.webp" alt="Demo: askphysics answers how fast a rock dropped from 45 m lands, shows the six pipeline stages, solves v² = v₀² + 2ad with units checked to 29.7 m/s, then refuses &quot;How much does the color blue weigh?&quot; with the reason and a question it can answer instead" width="820"></a>
+</p>
+
+<p align="center"><sub>40 seconds of the demo. The full two-minute video is on <a href="https://askphysics.vercel.app">askphysics.vercel.app</a>.</sub></p>
+
 Ask any physics question, from a textbook problem to "how many rubber ducks
 would it take to stop a freight train?", and get an answer you can check: the
 equations it used (with ids and sources), every assumption spelled out, units
@@ -230,6 +236,10 @@ and a license, and data never enters the database without passing
 `askphysics-dev validate-data`. Security reports go through
 [`SECURITY.md`](SECURITY.md). Participation is covered by the
 [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
+Not ready to send a pull request? Ask it something absurd and
+[open an issue](https://github.com/shankar-sachin/ask-physics/issues/new) with what it got wrong,
+or star the repository so more people find it.
 
 ## Limitations
 
