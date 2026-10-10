@@ -179,7 +179,8 @@ commands are in [`TRAINING.md`](TRAINING.md).
 - Users never train: the maintainer trains and ships the weights as GitHub
   release assets, pinned by a checksum manifest and fetched with
   `askphysics model pull` (ADR-012). The installers and the Homebrew formula
-  fetch tellus and solem; celeste comes down on first escalation.
+  fetch tellus and solem, the first `ask` fetches whichever of them is still missing, and
+  celeste comes down on first escalation (`ASKPHYSICS_AUTO_PULL=0` stops both).
 
 ## Known limits
 

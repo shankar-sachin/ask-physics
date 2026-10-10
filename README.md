@@ -136,9 +136,10 @@ itself. Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quickstart
 
-Requires Python 3.11 or newer. No API keys, ever. `askphysics model pull`
-downloads the Fermi models once their weights are published (v0.4); until you
-pull or train one, the default language model is a deterministic fake.
+Requires Python 3.11 or newer. No API keys, ever. Once the Fermi models' weights are
+published (v0.4), the first `askphysics ask` downloads them by itself (set
+`ASKPHYSICS_AUTO_PULL=0` to stop that, and use `askphysics model pull` yourself); until
+then, or without a download, the default language model is a deterministic fake.
 
 ```bash
 git clone https://github.com/shankar-sachin/ask-physics.git
