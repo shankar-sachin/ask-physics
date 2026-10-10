@@ -8,6 +8,18 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `model train --checkpoint-blocks` (and `scripts/train.sh --checkpoint-blocks`) works on
+  the torch backend too. Each block's activations are recomputed in the backward pass instead of
+  stored, for a model whose activations don't fit on the GPU; evaluation never recomputes.
+- Training on Apple Silicon uses MLX (ADR-019). On an arm64 Mac, `askphysics model train`
+  runs on MLX by default (`--backend auto`): it stays inside a memory limit (70% of RAM by
+  default, `--mlx-memory-gb`) where torch's MPS backend grew past 40 GB and swapped. The
+  options are `--backend torch|mlx`, `--mlx-cache-gb`, and `--checkpoint-blocks` (recompute each
+  block's activations in the backward pass, for models whose activations don't fit). Weights,
+  metrics, and checkpoints are the same format either way, so a model trained on MLX loads
+  unchanged; a run resumes only on the backend that started it. `askphysics model backend`
+  prints the choice, and `scripts/train.sh` takes `--backend` and `--checkpoint-blocks`. The
+  `mlx` extra is Mac-only; Linux and Windows keep torch.
 - `askphysics model train --grad-accum N` (and `scripts/train.sh --grad-accum N`)
   runs N micro-batches per optimizer step, so celeste can train at an effective
   batch of 32 when 32 at once doesn't fit in memory.
@@ -82,6 +94,25 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the models learn how real questions are phrased.
 
 ### Fixed
+
+- The training progress bar shows its time remaining. Its speed was averaged over 30 s,
+  shorter than the 45 s between log lines, so the ETA always read `-:--:--`.
+
+- On a Mac, torch's MPS backend frees cached GPU buffers once they reach 70% of the
+  GPU's working set, and stops at 50%, unless `PYTORCH_MPS_HIGH_WATERMARK_RATIO` or
+  `PYTORCH_MPS_LOW_WATERMARK_RATIO` is set in your environment, which always wins. The
+  defaults are set before torch is imported, so every `askphysics` command gets them.
+  This stops training runs at many batch widths from filling memory until an allocation
+  fails.
+
+- `askphysics model bench` times the batch widths training really uses (64, 96, 128, ...
+  up to the model's context, which is now its default `--width`, not 512) and runs an
+  evaluation pass, so its memory reading covers training and evaluation.
+
+- Torch training releases the GPU's cached buffers when an optimizer step's batch width
+  differs from the previous step's and the unused cache is over a quarter of the device's
+  memory, so widths that come and go don't pile up in the cache. CPU never flushes. The
+  training math is unchanged: the same seed gives the same weights and metrics.
 
 - Training no longer eats all the memory. solem's run on a 48 GB Mac grew to 58 GB,
   swapped 16 GB, and slowed from 4,800 to 250 tokens/s within 150 steps. Training data

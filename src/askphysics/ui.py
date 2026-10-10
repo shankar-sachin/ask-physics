@@ -199,6 +199,11 @@ def answer_card(answer: Answer, equations: Mapping[str, Equation] | None = None)
     )
 
 
+# Rich estimates speed over this many seconds of updates. The trainer logs about every 45 s,
+# and Rich's default window of 30 s holds at most one update, so the ETA would never show.
+TRAINING_SPEED_WINDOW = 600.0
+
+
 def training_progress(console: Console) -> Progress:
     """Live progress for ``askphysics model train``."""
     return Progress(
@@ -212,6 +217,7 @@ def training_progress(console: Console) -> Progress:
         TextColumn("[muted]eta"),
         TimeRemainingColumn(),
         console=console,
+        speed_estimate_period=TRAINING_SPEED_WINDOW,
     )
 
 

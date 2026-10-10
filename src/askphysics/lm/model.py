@@ -13,6 +13,7 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+from torch.utils.checkpoint import checkpoint
 
 from askphysics.lm.config import ModelConfig
 
@@ -107,11 +108,18 @@ class Block(nn.Module):
 
 
 class FermiLM(nn.Module):
-    """A Fermi language model. ``forward`` returns logits, and the loss when targets are given."""
+    """A Fermi language model. ``forward`` returns logits, and the loss when targets are given.
+
+    ``checkpoint_blocks`` (off by default) recomputes each block's activations in the backward
+    pass instead of storing them: less memory, more compute. It applies only in training
+    (``self.training``, with gradients on and no KV cache), so evaluation and decoding never
+    recompute.
+    """
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.config = config
+        self.checkpoint_blocks = False
         self.embed = nn.Embedding(config.vocab_size, config.d_model)
         self.blocks = nn.ModuleList(Block(config) for _ in range(config.n_layers))
         self.norm = RMSNorm(config.d_model)
@@ -176,8 +184,13 @@ class FermiLM(nn.Module):
         sin: Tensor = self.rope_sin  # type: ignore[assignment]
         x = self.embed(ids)
         new_past: KVCache = []
+        recompute = self.checkpoint_blocks and self.training and past is None
+        recompute = recompute and torch.is_grad_enabled()
         for i, block in enumerate(self.blocks):
-            x, kv = block(x, cos, sin, None if past is None else past[i])
+            if recompute:
+                x, kv = checkpoint(block, x, cos, sin, None, use_reentrant=False)
+            else:
+                x, kv = block(x, cos, sin, None if past is None else past[i])
             new_past.append(kv)
         logits = F.linear(self.norm(x), self.embed.weight)  # tied output head
         return logits, new_past

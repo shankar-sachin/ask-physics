@@ -9,6 +9,7 @@ from askphysics.ui import (
     answer_card,
     confidence_meter,
     tolerate_narrow_encodings,
+    training_progress,
 )
 
 
@@ -119,3 +120,11 @@ def test_models_line_names_each_stage_and_retries() -> None:
     assert models_line(answer).plain == (
         "tellus classified · celeste planned (attempt 6) · template explained"
     )
+
+
+def test_training_progress_estimates_speed_over_a_window_longer_than_its_updates() -> None:
+    # The trainer logs about every 45 s; Rich's default 30 s window would hold one update at
+    # most, so the ETA column would always read -:--:--.
+    progress = training_progress(Console(record=True, file=io.StringIO()))
+    assert progress.speed_estimate_period == 600
+    assert progress.speed_estimate_period > 45

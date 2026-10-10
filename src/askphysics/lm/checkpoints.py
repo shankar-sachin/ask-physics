@@ -9,6 +9,9 @@ Layout of a model directory::
     <dir>/model.safetensors   weights, with the config JSON in the metadata
     <dir>/config.json         the ModelConfig, human-readable
     <dir>/tokenizer.json      the tokenizer the model was trained with
+
+The MLX trainer (``lm/mlx_train.py``, ADR-019) writes the same layout through the
+helpers below, so a model trained on a Mac loads here unchanged.
 """
 
 from __future__ import annotations
@@ -30,9 +33,13 @@ __all__ = [
     "CONFIG_FILE",
     "TOKENIZER_FILE",
     "WEIGHTS_FILE",
+    "check_tokenizer_fits",
     "default_model_dir",
     "load_model",
+    "model_metadata",
+    "read_config",
     "save_model",
+    "write_config_and_tokenizer",
 ]
 
 
@@ -40,23 +47,37 @@ def _config_json(config: ModelConfig) -> str:
     return json.dumps(asdict(config), sort_keys=True)
 
 
-def save_model(model: FermiLM, tokenizer: Tokenizer, directory: Path) -> None:
-    """Write weights, config, and tokenizer to ``directory`` (created if needed)."""
-    if tokenizer.vocab_size > model.config.vocab_size:
+def model_metadata(config: ModelConfig) -> dict[str, str]:
+    """The string metadata stored in ``model.safetensors`` with the weights."""
+    return {"config": _config_json(config), "format_version": str(FORMAT_VERSION)}
+
+
+def check_tokenizer_fits(config: ModelConfig, tokenizer: Tokenizer) -> None:
+    """Raise ``ConfigError`` when the tokenizer has more tokens than the model's embeddings."""
+    if tokenizer.vocab_size > config.vocab_size:
         raise ConfigError(
-            f"tokenizer has {tokenizer.vocab_size} tokens but the model only "
-            f"{model.config.vocab_size}"
+            f"tokenizer has {tokenizer.vocab_size} tokens but the model only {config.vocab_size}"
         )
+
+
+def write_config_and_tokenizer(directory: Path, config: ModelConfig, tokenizer: Tokenizer) -> None:
+    """Write ``config.json`` and ``tokenizer.json`` (the weights are written by the caller)."""
     directory.mkdir(parents=True, exist_ok=True)
-    state = {k: v.detach().to("cpu").contiguous() for k, v in model.state_dict().items()}
-    metadata = {"config": _config_json(model.config), "format_version": str(FORMAT_VERSION)}
-    save_file(state, str(directory / WEIGHTS_FILE), metadata=metadata)
-    (directory / CONFIG_FILE).write_text(_config_json(model.config), encoding="utf-8")
+    (directory / CONFIG_FILE).write_text(_config_json(config), encoding="utf-8")
     tokenizer.save(directory / TOKENIZER_FILE)
 
 
-def load_model(directory: Path, device: torch.device | None = None) -> tuple[FermiLM, Tokenizer]:
-    """Load a model saved by ``save_model``, in eval mode.
+def save_model(model: FermiLM, tokenizer: Tokenizer, directory: Path) -> None:
+    """Write weights, config, and tokenizer to ``directory`` (created if needed)."""
+    check_tokenizer_fits(model.config, tokenizer)
+    directory.mkdir(parents=True, exist_ok=True)
+    state = {k: v.detach().to("cpu").contiguous() for k, v in model.state_dict().items()}
+    save_file(state, str(directory / WEIGHTS_FILE), metadata=model_metadata(model.config))
+    write_config_and_tokenizer(directory, model.config, tokenizer)
+
+
+def read_config(directory: Path) -> ModelConfig:
+    """The config of a model saved by ``save_model``, checked against its weights.
 
     Raises:
         ConfigError: files are missing, the config doesn't match the weights'
@@ -68,7 +89,7 @@ def load_model(directory: Path, device: torch.device | None = None) -> tuple[Fer
 
     from safetensors import safe_open
 
-    with safe_open(str(directory / WEIGHTS_FILE), framework="pt") as f:
+    with safe_open(str(directory / WEIGHTS_FILE), framework="np") as f:
         metadata = f.metadata() or {}
     config_text = (directory / CONFIG_FILE).read_text(encoding="utf-8")
     config = ModelConfig(**json.loads(config_text))
@@ -79,7 +100,17 @@ def load_model(directory: Path, device: torch.device | None = None) -> tuple[Fer
             f"model was trained on task format {metadata.get('format_version')}, "
             f"this askphysics uses {FORMAT_VERSION}; retrain or upgrade"
         )
+    return config
 
+
+def load_model(directory: Path, device: torch.device | None = None) -> tuple[FermiLM, Tokenizer]:
+    """Load a model saved by ``save_model``, in eval mode.
+
+    Raises:
+        ConfigError: files are missing, the config doesn't match the weights'
+            metadata, or the task format version is different.
+    """
+    config = read_config(directory)
     model = FermiLM(config)
     target = device or torch.device("cpu")
     model.load_state_dict(load_file(str(directory / WEIGHTS_FILE), device=str(target)))

@@ -25,12 +25,15 @@ a step when the one before it worked. Each prints its options with `--help`, and
 `python3 scripts/compare_evals.py OLD/eval.json NEW/eval.json` compares any two reports.
 
 `train.sh` starts with a one-minute speed check (`askphysics model bench`). It times a few
-training steps on each device and precision this machine has, and prints the tokens per
-second for each and how many hours the run will take. If the projection is far longer than
+training steps on each device and precision this machine has, at every batch width the
+training buckets produce up to the model's context (64, 96, ... 1024), then runs an evaluation
+pass at each width so the memory it reports covers both. It prints the tokens per second for
+each and how many hours the run will take. If the projection is far longer than
 a night, stop and find out why rather than leaving it running. On a Mac, train plugged in
 with the lid open: on battery macOS throttles the GPU and sleeps even under `caffeinate`.
 `--precision fp32` (or `bf16`) trains in the format the check found fastest, and
-`--no-bench` skips the check.
+`--no-bench` skips the check. On a Mac the run trains with MLX (below), and the check, which
+times torch only, is skipped.
 
 The rest of this page is what those scripts run, step by step.
 
@@ -39,7 +42,7 @@ The rest of this page is what those scripts run, step by step.
 ```bash
 git clone https://github.com/shankar-sachin/ask-physics && cd ask-physics
 python3 -m venv .venv && source .venv/bin/activate
-make install                      # pip install -e ".[dev]"; macOS torch includes MPS
+make install                      # pip install -e ".[dev]"; on an arm64 Mac it also installs mlx
 python -c "import torch; print(torch.backends.mps.is_available())"   # want: True
 make check                        # lint, typecheck, tests
 askphysics validate-data          # the seed data the factory builds from
@@ -123,6 +126,30 @@ caffeinate -dims askphysics model train --model fermi-tellus-1 \
 - Train tellus first and check it before spending hours on solem. Train
   celeste only if solem's held-out results leave room for it to help
   (open question Q16).
+
+### Backends and memory (ADR-019)
+
+On an Apple Silicon Mac, `model train` trains with MLX by default: it is faster, and it stays
+inside a memory limit where torch's MPS backend grew past 40 GB and swapped. The first line of
+output names the backend (`... steps · mlx · → dir`). Nothing else changes: the weights,
+`metrics.jsonl`, and `training_summary.json` are the same, and `ask`, `model eval`, and the
+website still run on torch.
+
+- `--backend torch` trains on torch instead. `--backend mlx` fails with a message if mlx is
+  missing (`pip install -e ".[mlx]"` on the Mac). `askphysics model backend` prints the choice.
+- A run resumes only on the backend that started it. Resuming a torch run with MLX, or the
+  reverse, stops with a message that names the backend to use.
+- `--mlx-memory-gb N` sets the memory limit MLX works to stay under (default 70% of system
+  RAM). It is a guideline: when memory and swap run out, MLX raises an error instead of
+  swapping the machine.
+- `--mlx-cache-gb N` caps the memory MLX keeps for reuse between steps (default 4).
+- `--checkpoint-blocks` recomputes each block's activations in the backward pass instead of
+  storing them. Attention's (heads, T, T) matrix is the largest activation: at 1024 tokens a
+  layer holds about 0.5 to 1 GB of it. Use the flag when a model's activations don't fit, for
+  example celeste at batch 16; it costs extra compute. It works on torch too, where it only
+  applies to training (evaluation never recomputes).
+- `scripts/train.sh` takes the same choices as `--backend`, `--checkpoint-blocks`, and
+  `--device`, and skips the torch speed check when the run is MLX.
 
 ### The prose corpus (ADR-017)
 
@@ -259,6 +286,22 @@ askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a
 - Send the `model info` table, `metrics.jsonl`, and the `model eval` table;
   they feed the model cards and the v0.4 exit criteria (90% valid plans on
   unseen templates, 0.1% or less confidently wrong).
+
+## Troubleshooting
+
+### Out of memory on MPS
+
+If a run stops with `MPS backend out of memory`, either halve `--batch-size` and double
+`--grad-accum`, or pass `--checkpoint-blocks`.
+
+- Halving and doubling keeps the same number of sequences per optimizer step, and each step
+  now runs as twice as many micro-batches. `--resume` with the new sizes is fine: it picks up
+  partway through a shuffled pass over the task rows. The batches it sees won't match an
+  uninterrupted run exactly, since the sampler's random state isn't saved in the checkpoint,
+  but the data mix and the learning rate schedule are the same.
+- `--checkpoint-blocks` keeps the batch and recomputes activations in the backward pass. It
+  costs extra compute.
+- Check `mem_gb` in `metrics.jsonl` to see whether the change helped.
 
 ## 7. Results so far
 

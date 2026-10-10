@@ -5,6 +5,9 @@ loss only counts target tokens, so the models learn to write answers, not
 to parrot inputs. AdamW with linear warmup and cosine decay, gradient
 clipping, and bf16 autocast on MPS and CUDA. Checkpoints (weights,
 optimizer moments, step) are safetensors and JSON only, never pickle.
+
+This is the torch trainer. On Apple Silicon the MLX trainer (``lm/mlx_train.py``,
+ADR-019) runs the same loop and shares the data, batch, and logging code here.
 """
 
 from __future__ import annotations
@@ -21,10 +24,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, overload
 
+import numpy as np
 import torch
 from safetensors.torch import load_file, save_file
 from torch import Tensor
 
+from askphysics.errors import ConfigError
 from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import ModelConfig
 from askphysics.lm.device import select_device
@@ -69,6 +74,9 @@ class TrainConfig:
     # ``prose_share`` of later batches keep it from fading. Both need ``prose`` texts.
     prose_steps: int = 0
     prose_share: float = 0.0
+    # Recompute each block's activations in the backward pass instead of storing them: less
+    # memory, more compute. Both backends honour it (ADR-019).
+    checkpoint_blocks: bool = False
 
 
 Row = tuple[list[int], int]  # token ids, index of the first target token
@@ -210,16 +218,16 @@ def bucket_width(n: int, smallest: int) -> int:
     return width
 
 
-def make_batch(
+def numpy_batch(
     rows: Sequence[Row],
     pad_id: int,
-    device: torch.device,
     *,
     multiple: int = 1,
     max_width: int | None = None,
-) -> tuple[Tensor, Tensor]:
-    """Inputs and next-token labels; prompt and padding positions are ignored by the loss.
+) -> tuple[np.ndarray, np.ndarray]:
+    """Inputs and next-token labels as int64 arrays of shape (rows, width).
 
+    Prompt and padding positions hold ``IGNORE_INDEX`` in the labels, so the loss skips them.
     The width comes from ``bucket_width``: with the default 64 it is one of 64, 96, 128,
     192, 256, 384, 512, 768, or 1024. It is capped at ``max_width`` but never cut below
     the longest row. On Apple GPUs (MPS) every new shape grows a per-shape cache, so a
@@ -229,15 +237,28 @@ def make_batch(
     width = bucket_width(longest, multiple)
     if max_width is not None:
         width = max(min(width, max_width), longest)
-    inputs = torch.full((len(rows), width), pad_id, dtype=torch.long)
-    labels = torch.full((len(rows), width), IGNORE_INDEX, dtype=torch.long)
+    inputs = np.full((len(rows), width), pad_id, dtype=np.int64)
+    labels = np.full((len(rows), width), IGNORE_INDEX, dtype=np.int64)
     for i, (ids, target_start) in enumerate(rows):
-        seq = torch.tensor(ids, dtype=torch.long)
+        seq = np.asarray(ids, dtype=np.int64)
         n = len(ids) - 1
         inputs[i, :n] = seq[:-1]
         labels[i, :n] = seq[1:]
         labels[i, : target_start - 1] = IGNORE_INDEX  # only learn to write the target
-    return inputs.to(device), labels.to(device)
+    return inputs, labels
+
+
+def make_batch(
+    rows: Sequence[Row],
+    pad_id: int,
+    device: torch.device,
+    *,
+    multiple: int = 1,
+    max_width: int | None = None,
+) -> tuple[Tensor, Tensor]:
+    """``numpy_batch`` as torch tensors on ``device``."""
+    inputs, labels = numpy_batch(rows, pad_id, multiple=multiple, max_width=max_width)
+    return torch.from_numpy(inputs).to(device), torch.from_numpy(labels).to(device)
 
 
 def _release_cached_memory(device: torch.device) -> None:
@@ -246,6 +267,64 @@ def _release_cached_memory(device: torch.device) -> None:
         torch.mps.empty_cache()
     elif device.type == "cuda":
         torch.cuda.empty_cache()
+
+
+CACHE_SHARE = 0.25  # flush when the unused cache is above this share of device memory
+
+
+def _cache_is_large(device: torch.device) -> bool:
+    """Whether the cache on ``device`` holds more than ``CACHE_SHARE`` of its memory.
+
+    The cache is memory the device has reserved but no tensor uses: on MPS, driver-allocated
+    minus current-allocated bytes against the recommended working set; on CUDA, reserved minus
+    allocated bytes against the device's total memory. CPU has no such cache, so it is never
+    large. When the device's memory API is missing (an older torch) or fails, this returns
+    True, so the caller flushes on every width change as it did before this check existed.
+    """
+    if device.type == "cpu":
+        return False
+    try:
+        if device.type == "mps":
+            names = (
+                "driver_allocated_memory",
+                "current_allocated_memory",
+                "recommended_max_memory",
+            )
+            if not all(hasattr(torch.mps, name) for name in names):
+                return True
+            cached = torch.mps.driver_allocated_memory() - torch.mps.current_allocated_memory()
+            total = torch.mps.recommended_max_memory()
+        elif device.type == "cuda":
+            names = ("memory_reserved", "memory_allocated", "get_device_properties")
+            if not all(hasattr(torch.cuda, name) for name in names):
+                return True
+            cached = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+            total = torch.cuda.get_device_properties(device).total_memory
+        else:
+            return True
+    except RuntimeError:
+        return True
+    return cached > CACHE_SHARE * total
+
+
+class _WidthFlush:
+    """Releases cached device memory when an optimizer step's batch width differs from the
+    previous step's, but only while the cache is large (over ``CACHE_SHARE`` of the device's
+    memory, see ``_cache_is_large``). MPS keeps a cached buffer per shape, so new widths add
+    to the cache until the watermark (``mps_env``) frees it; a flush on every change would
+    throw away a cache that is still useful, and widths change on about half of all steps.
+    CPU never flushes. The training math does not change."""
+
+    def __init__(self, device: torch.device) -> None:
+        self._device = device
+        self._width: int | None = None
+
+    def before_step(self, width: int) -> None:
+        """Record the width of the step about to run, flushing first if it changed and the
+        cache is large."""
+        if self._width is not None and width != self._width and _cache_is_large(self._device):
+            _release_cached_memory(self._device)
+        self._width = width
 
 
 def _peak_memory_gb() -> float:
@@ -312,11 +391,32 @@ def _save_optimizer(
         for name, value in slots.items():
             tensors[f"{idx}.{name}"] = torch.as_tensor(value).detach().to("cpu").contiguous()
     save_file(tensors, str(directory / OPTIMIZER_FILE))
-    meta = {"step": step, "lr": lr, "param_groups": [
+    meta = {"step": step, "lr": lr, "backend": "torch", "param_groups": [
         {k: v for k, v in g.items() if k != "params"} | {"params": g["params"]}
         for g in state["param_groups"]
     ]}  # fmt: skip
     (directory / STATE_FILE).write_text(json.dumps(meta), encoding="utf-8")
+
+
+def checkpoint_backend(directory: Path) -> str:
+    """The backend that wrote the optimizer state in ``directory``. Checkpoints from before
+    the field existed were all torch's."""
+    meta = json.loads((directory / STATE_FILE).read_text(encoding="utf-8"))
+    return str(meta.get("backend", "torch"))
+
+
+def check_backend(directory: Path, backend: str) -> None:
+    """Raise ``ConfigError`` unless ``directory`` was trained with ``backend``.
+
+    The two trainers keep their optimizer state in different layouts, so a run resumes only
+    on the backend that started it (ADR-019).
+    """
+    found = checkpoint_backend(directory)
+    if found != backend:
+        raise ConfigError(
+            f"{directory} was trained with the {found} backend, not {backend}; resume it with "
+            f"--backend {found}, or train into a new --out"
+        )
 
 
 def _resume_lr(directory: Path, step: int) -> float | None:
@@ -408,10 +508,18 @@ def evaluate_by_task(
     device: torch.device,
 ) -> dict[str, float]:
     """``val_loss`` over every sample, plus ``val_loss_<task>`` for each task."""
+    return task_scores(samples, lambda sample: evaluate(model, sample, cfg, pad_id, device))
+
+
+def task_scores(
+    samples: dict[str, TokenizedSet], score: Callable[[TokenizedSet], float]
+) -> dict[str, float]:
+    """Combine per-task losses from ``score``: ``val_loss`` weights each task by its target
+    tokens, and each task is also reported as ``val_loss_<task>``. Both backends use this."""
     out: dict[str, float] = {}
     total, weight = 0.0, 0
     for task, sample in samples.items():
-        loss = evaluate(model, sample, cfg, pad_id, device)
+        loss = score(sample)
         out[f"val_loss_{task}"] = round(loss, 4)
         n = sum(len(ids) - start for ids, start in sample.rows)
         total += loss * n
@@ -419,33 +527,40 @@ def evaluate_by_task(
     return {"val_loss": round(total / weight, 4) if weight else float("nan"), **out}
 
 
-def train(
-    config: ModelConfig,
-    tokenizer: Tokenizer,
-    data_dir: Path,
-    out_dir: Path,
-    cfg: TrainConfig,
-    *,
-    resume: bool = False,
-    on_log: Callable[[dict[str, Any]], None] | None = None,
-    prose: Sequence[str] = (),
-) -> list[dict[str, Any]]:
-    """Train ``config`` on the factory data in ``data_dir``, saving to ``out_dir``.
+@dataclass
+class TrainData:
+    """The tokenized data for one run: training rows, validation samples, and prose."""
 
-    With ``prose`` paragraphs, the first ``cfg.prose_steps`` steps are a language-modeling
-    stage on them, and ``cfg.prose_share`` of later batches mix them back in (ADR-016).
-    Their held-out paragraphs are reported as ``val_loss_prose``, apart from ``val_loss``.
-    """
+    train: TokenizedSet
+    val: TokenizedSet  # the fixed per-task validation sample, before splitting by task
+    val_samples: dict[str, TokenizedSet]
+    prose_train: TokenizedSet
+    prose_val: TokenizedSet
+    prose_paragraphs: int
+
+
+def check_run_settings(config: ModelConfig, tokenizer: Tokenizer, cfg: TrainConfig) -> None:
+    """Raise ``ValueError`` for settings no run can use, before any data is read."""
     if cfg.grad_accum < 1:
         raise ValueError(f"grad_accum must be at least 1, not {cfg.grad_accum}")
     if tokenizer.vocab_size > config.vocab_size:
         raise ValueError(
             f"tokenizer has {tokenizer.vocab_size} tokens; {config.name} only {config.vocab_size}"
         )
-    device = select_device(cfg.device)
-    torch.manual_seed(cfg.seed)
-    rng = random.Random(cfg.seed)
 
+
+def prepare_data(
+    config: ModelConfig,
+    tokenizer: Tokenizer,
+    data_dir: Path,
+    cfg: TrainConfig,
+    prose: Sequence[str],
+) -> TrainData:
+    """Tokenize the splits and the prose for a run, and check the prose settings against them.
+
+    Raises:
+        ValueError: no training example fits the context, or the prose settings can't work.
+    """
     train_set = tokenize_examples(
         read_examples(data_dir / "train"), tokenizer, config.context_length
     )
@@ -474,12 +589,110 @@ def train(
             f"prose_steps ({cfg.prose_steps}) must be fewer than steps ({cfg.steps}), "
             "or the model never trains on the tasks"
         )
+    return TrainData(
+        train=train_set,
+        val=val_set,
+        val_samples=val_samples,
+        prose_train=prose_train,
+        prose_val=prose_val,
+        prose_paragraphs=len(prose),
+    )
+
+
+class BatchSampler:
+    """Which rows each micro-batch trains on (ADR-016): a shuffled pass over the training
+    rows, with prose mixed in as the config says. Both backends draw through this, so one
+    seed and one config give the same batches on either."""
+
+    def __init__(self, data: TrainData, cfg: TrainConfig, rng: random.Random, start: int) -> None:
+        self._data, self._cfg, self._rng = data, cfg, rng
+        self._order = list(range(len(data.train)))
+        rng.shuffle(self._order)
+        # A resumed run carries on through the pass where its checkpoint stopped.
+        self._cursor = (start * cfg.batch_size * cfg.grad_accum) % len(self._order)
+
+    def next_rows(self, step: int) -> list[Row]:
+        """The rows of one micro-batch of optimizer step ``step``."""
+        cfg, rng = self._cfg, self._rng
+        prose = self._data.prose_train.rows
+        if prose and (step < cfg.prose_steps or rng.random() < cfg.prose_share):
+            return rng.sample(prose, min(cfg.batch_size, len(prose)))
+        if self._cursor + cfg.batch_size > len(self._order):
+            rng.shuffle(self._order)
+            self._cursor = 0
+        rows = self._data.train.rows
+        picked = [rows[i] for i in self._order[self._cursor : self._cursor + cfg.batch_size]]
+        self._cursor += cfg.batch_size
+        return picked
+
+
+def _metric_writer(
+    out_dir: Path, metrics: list[dict[str, Any]], on_log: Callable[[dict[str, Any]], None] | None
+) -> Callable[[dict[str, Any]], None]:
+    """A logger that appends each entry to ``metrics.jsonl`` and to ``metrics``, then calls
+    ``on_log``."""
+
+    def log(entry: dict[str, Any]) -> None:
+        metrics.append(entry)
+        with (out_dir / METRICS_FILE).open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+        if on_log:
+            on_log(entry)
+
+    return log
+
+
+def write_summary(
+    out_dir: Path,
+    config: ModelConfig,
+    data: TrainData,
+    cfg: TrainConfig,
+    *,
+    device: str,
+    backend: str,
+) -> None:
+    """``training_summary.json``: the model, the data it saw, the settings, and the device."""
+    summary = {"config": config.name, "train_examples": len(data.train),
+               "skipped_too_long": data.train.skipped, "val_examples": len(data.val),
+               "prose_paragraphs": data.prose_paragraphs, "prose_rows": len(data.prose_train),
+               "backend": backend, "device": device,
+               "train": asdict(cfg) | {"device": device}}  # fmt: skip
+    (out_dir / "training_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+
+def train(
+    config: ModelConfig,
+    tokenizer: Tokenizer,
+    data_dir: Path,
+    out_dir: Path,
+    cfg: TrainConfig,
+    *,
+    resume: bool = False,
+    on_log: Callable[[dict[str, Any]], None] | None = None,
+    prose: Sequence[str] = (),
+) -> list[dict[str, Any]]:
+    """Train ``config`` on the factory data in ``data_dir``, saving to ``out_dir``.
+
+    With ``prose`` paragraphs, the first ``cfg.prose_steps`` steps are a language-modeling
+    stage on them, and ``cfg.prose_share`` of later batches mix them back in (ADR-016).
+    Their held-out paragraphs are reported as ``val_loss_prose``, apart from ``val_loss``.
+
+    Raises:
+        ConfigError: ``resume`` and the checkpoint in ``out_dir`` came from the MLX backend.
+    """
+    check_run_settings(config, tokenizer, cfg)
+    device = select_device(cfg.device)
+    torch.manual_seed(cfg.seed)
+    rng = random.Random(cfg.seed)
+    data = prepare_data(config, tokenizer, data_dir, cfg, prose)
 
     model = FermiLM(config).to(device)
+    model.checkpoint_blocks = cfg.checkpoint_blocks
     opt = _optimizer(model, cfg)
     start = 0
     resumed: tuple[int, float] | None = None
     if resume and (out_dir / STATE_FILE).exists():
+        check_backend(out_dir, "torch")
         from askphysics.lm.checkpoints import load_model
 
         loaded, _ = load_model(out_dir, device)
@@ -491,9 +704,7 @@ def train(
     model.train()
 
     dtype = autocast_dtype(device, cfg.precision)
-    order = list(range(len(train_set)))
-    rng.shuffle(order)
-    cursor = (start * cfg.batch_size * cfg.grad_accum) % len(order)
+    sampler = BatchSampler(data, cfg, rng, start)
     metrics: list[dict[str, Any]] = []
     out_dir.mkdir(parents=True, exist_ok=True)
     if start == 0:
@@ -502,38 +713,25 @@ def train(
     # never waits for the accelerator. The rate is over the window since the last reset.
     tokens_seen = torch.zeros((), dtype=torch.long, device=device)
     window_tokens, window_t0 = 0, time.perf_counter()
-
-    def log(entry: dict[str, Any]) -> None:
-        metrics.append(entry)
-        with (out_dir / METRICS_FILE).open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
-        if on_log:
-            on_log(entry)
+    log = _metric_writer(out_dir, metrics, on_log)
+    flush = _WidthFlush(device)
 
     def checkpoint(step: int) -> None:
         save_model(model, tokenizer, out_dir)
         _save_optimizer(opt, step, out_dir, lr=lr_at(max(0, step - 1), cfg, resumed))
 
     for step in range(start, cfg.steps):
-        micro_batches: list[tuple[Tensor, Tensor]] = []
-        for _ in range(cfg.grad_accum):
-            if prose_train.rows and (step < cfg.prose_steps or rng.random() < cfg.prose_share):
-                rows = rng.sample(prose_train.rows, min(cfg.batch_size, len(prose_train.rows)))
-            else:
-                if cursor + cfg.batch_size > len(order):
-                    rng.shuffle(order)
-                    cursor = 0
-                rows = [train_set.rows[i] for i in order[cursor : cursor + cfg.batch_size]]
-                cursor += cfg.batch_size
-            micro_batches.append(
-                make_batch(
-                    rows,
-                    tokenizer.pad_id,
-                    device,
-                    multiple=cfg.pad_multiple,
-                    max_width=config.context_length,
-                )
+        micro_batches = [
+            make_batch(
+                sampler.next_rows(step),
+                tokenizer.pad_id,
+                device,
+                multiple=cfg.pad_multiple,
+                max_width=config.context_length,
             )
+            for _ in range(cfg.grad_accum)
+        ]
+        flush.before_step(max(inputs.shape[1] for inputs, _ in micro_batches))
         for group in opt.param_groups:
             group["lr"] = lr_at(step, cfg, resumed)
         loss = _optimizer_step(model, opt, micro_batches, cfg, device, dtype)
@@ -549,10 +747,10 @@ def train(
                  "lr": lr_at(step, cfg, resumed),
                  "target_tokens_per_s": round(rate, 1),
                  "mem_gb": _peak_memory_gb()})  # fmt: skip
-        if val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
-            scores = evaluate_by_task(model, val_samples, cfg, tokenizer.pad_id, device)
-            if prose_val.rows:
-                prose_loss = evaluate(model, prose_val, cfg, tokenizer.pad_id, device)
+        if data.val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
+            scores = evaluate_by_task(model, data.val_samples, cfg, tokenizer.pad_id, device)
+            if data.prose_val.rows:
+                prose_loss = evaluate(model, data.prose_val, cfg, tokenizer.pad_id, device)
                 scores["val_loss_prose"] = round(prose_loss, 4)
             log({"step": done, **scores})
             _release_cached_memory(device)
@@ -565,11 +763,7 @@ def train(
             _release_cached_memory(device)
 
     checkpoint(cfg.steps)
-    summary = {"config": config.name, "train_examples": len(train_set),
-               "skipped_too_long": train_set.skipped, "val_examples": len(val_set),
-               "prose_paragraphs": len(prose), "prose_rows": len(prose_train),
-               "device": device.type, "train": asdict(cfg) | {"device": device.type}}  # fmt: skip
-    (out_dir / "training_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    write_summary(out_dir, config, data, cfg, device=device.type, backend="torch")
     return metrics
 
 

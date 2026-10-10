@@ -35,6 +35,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Training on Apple Silicon with MLX (ADR-019). Mac-only; `model train` falls back to torch
+# when mlx is missing. `pip install -e ".[mlx]"` on an arm64 Mac adds it.
+mlx = ["mlx>=0.29; sys_platform == 'darwin' and platform_machine == 'arm64'"]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
@@ -42,6 +45,8 @@ dev = [
     "mypy>=1.11",
     "pyyaml>=6.0",
     "types-PyYAML>=6.0",
+    "mlx>=0.29; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx[cpu]>=0.29; sys_platform == 'linux'",  # runs the MLX tests on CPU in CI
 ]
 
 [project.scripts]
@@ -139,3 +144,15 @@ plugins = ["pydantic.mypy"]
 # See ADR-007 in docs/DECISIONS.md: incomplete third-party type information.
 module = ["sympy.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# MLX (ADR-019) ships type hints, but its nn.Module and parameters() are untyped, and it is
+# only installed on Macs and in CI's Linux dev environment. Its modules are the only ones
+# that call into it.
+module = ["mlx", "mlx.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["askphysics.lm.mlx_model", "askphysics.lm.mlx_train"]
+disallow_untyped_calls = false
+disallow_subclassing_any = false

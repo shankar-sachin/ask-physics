@@ -1,3 +1,4 @@
+import itertools
 import json
 import random
 import re
@@ -9,6 +10,7 @@ import torch
 from typer.testing import CliRunner
 
 from askphysics import cli
+from askphysics.lm import train as train_module
 from askphysics.lm.checkpoints import load_model
 from askphysics.lm.config import LUNA, ModelConfig
 from askphysics.lm.factory import Example, build_dataset, read_examples
@@ -24,6 +26,7 @@ from askphysics.lm.train import (
     _optimizer_step,
     _peak_memory_gb,
     _save_optimizer,
+    _WidthFlush,
     bucket_width,
     lr_at,
     make_batch,
@@ -295,6 +298,56 @@ def test_grad_accum_trains_and_is_recorded(
     assert summary["train"]["batch_size"] == cfg.batch_size
 
 
+def test_torch_trainer_recomputes_blocks_only_when_asked(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from askphysics.lm import model as model_module
+
+    calls: list[int] = []
+    real = model_module.checkpoint
+
+    def counting(*args: object, **kwargs: object) -> object:
+        calls.append(1)
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(model_module, "checkpoint", counting)
+    # Only the final evaluation runs (in eval mode), so every recomputation is a training one.
+    base = {**FAST.__dict__, "steps": 4, "eval_every": 1000, "checkpoint_every": 1000}
+    train(LUNA, tokenizer, dataset, tmp_path / "plain", TrainConfig(**base))
+    assert calls == []
+    checkpointed = TrainConfig(**{**base, "checkpoint_blocks": True})
+    train(LUNA, tokenizer, dataset, tmp_path / "checkpointed", checkpointed)
+    assert len(calls) == base["steps"] * LUNA.n_layers
+    plain_model, _ = load_model(tmp_path / "plain")
+    ckpt_model, _ = load_model(tmp_path / "checkpointed")
+    for p, q in zip(plain_model.parameters(), ckpt_model.parameters(), strict=True):
+        assert torch.allclose(p, q, atol=1e-6)
+
+
+def test_cli_accepts_checkpoint_blocks_on_torch(
+    tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, TrainConfig] = {}
+
+    def fake_train(*args: object, **kwargs: object) -> list[dict[str, object]]:
+        seen["cfg"] = args[4]  # type: ignore[assignment]
+        return []
+
+    monkeypatch.setattr(train_module, "train", fake_train)
+    tok_path = tmp_path / "tok.json"
+    tokenizer.save(tok_path)
+    r = CliRunner().invoke(
+        cli.app,
+        [
+            "model", "train", "--model", "fermi-luna-1", "--backend", "torch", "--device", "cpu",
+            "--checkpoint-blocks", "--steps", "5", "--tokenizer", str(tok_path),
+            "--data", str(tmp_path), "--out", str(tmp_path / "out"),
+        ],
+    )  # fmt: skip
+    assert r.exit_code == 0, r.output
+    assert seen["cfg"].checkpoint_blocks is True
+
+
 def test_cli_rejects_zero_grad_accum() -> None:
     r = CliRunner().invoke(cli.app, ["model", "train", "--grad-accum", "0"])
     # CI forces color, and rich styles each hyphen of the option name on its own.
@@ -388,3 +441,139 @@ def test_prose_steps_must_leave_task_steps(
         train(
             LUNA, tokenizer, dataset, tmp_path / "luna", cfg, prose=["Some prose here. " * 20] * 30
         )
+
+
+def _mps_memory(
+    monkeypatch: pytest.MonkeyPatch, driver: int, current: int, total: int
+) -> list[str]:
+    """Mock the MPS memory readings (bytes) and empty_cache; returns the list of flushes."""
+    released: list[str] = []
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: driver)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: current)
+    monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: total)
+    monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    return released
+
+
+def test_mps_width_change_flushes_only_when_the_cache_is_large(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    total = 100 * 1024**3
+    gb = 1024**3
+    # 5 GB cached of 100 GB (5%): below the 25% share, so the width changes don't flush.
+    released = _mps_memory(monkeypatch, driver=30 * gb, current=25 * gb, total=total)
+    flush = _WidthFlush(torch.device("mps"))
+    for width in (64, 96, 64, 1024):
+        flush.before_step(width)
+    assert released == []
+    # 55 GB cached of 100 GB (55%): above the share, so each width change flushes.
+    released = _mps_memory(monkeypatch, driver=60 * gb, current=5 * gb, total=total)
+    flush = _WidthFlush(torch.device("mps"))
+    for width in (64, 64, 96, 96, 64, 64, 1024):
+        flush.before_step(width)
+    assert released == ["mps", "mps", "mps"]  # 64 to 96, 96 to 64, 64 to 1024
+    # Exactly at the share does not flush: the cache must be over it.
+    released = _mps_memory(monkeypatch, driver=50 * gb, current=25 * gb, total=total)
+    flush = _WidthFlush(torch.device("mps"))
+    flush.before_step(64)
+    flush.before_step(96)
+    assert released == []
+
+
+def test_cuda_width_change_flushes_only_when_the_cache_is_large(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gb = 1024**3
+    released: list[str] = []
+
+    class Props:
+        total_memory = 80 * gb
+
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: Props())
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: released.append("cuda"))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 10 * gb)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 15 * gb)
+    flush = _WidthFlush(torch.device("cuda"))
+    flush.before_step(64)
+    flush.before_step(96)  # 5 GB cached of 80 GB: small
+    assert released == []
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 40 * gb)
+    flush.before_step(64)  # 30 GB cached of 80 GB: large
+    assert released == ["cuda"]
+
+
+def test_cpu_never_flushes_and_never_reads_device_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unexpected(*args: object, **kwargs: object) -> int:
+        raise AssertionError("the memory API was read on CPU")
+
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", unexpected)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", unexpected)
+    released: list[str] = []
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: released.append("cuda"))
+    monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    flush = _WidthFlush(torch.device("cpu"))
+    for width in (64, 96, 1024, 64):
+        flush.before_step(width)
+    assert released == []
+
+
+def test_older_torch_without_the_memory_api_flushes_on_every_width_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    released: list[str] = []
+    monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    monkeypatch.delattr(torch.mps, "recommended_max_memory", raising=False)
+    flush = _WidthFlush(torch.device("mps"))
+    for width in (64, 96, 96, 64):
+        flush.before_step(width)
+    assert released == ["mps", "mps"]
+
+    released.clear()
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", _raise_runtime)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: 0)
+    monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: 1, raising=False)
+    flush = _WidthFlush(torch.device("mps"))
+    flush.before_step(64)
+    flush.before_step(96)  # the device refuses to report its memory: flush as before
+    assert released == ["mps"]
+
+
+def _raise_runtime() -> int:
+    raise RuntimeError("no MPS device")
+
+
+def test_train_flushes_on_each_width_change_and_not_otherwise(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    widths: list[int] = []
+    real_make_batch = train_module.make_batch
+
+    def recording_make_batch(*args: object, **kwargs: object) -> tuple[torch.Tensor, torch.Tensor]:
+        inputs, labels = real_make_batch(*args, **kwargs)  # type: ignore[arg-type]
+        widths.append(inputs.shape[1])
+        return inputs, labels
+
+    released: list[str] = []
+    monkeypatch.setattr(train_module, "make_batch", recording_make_batch)
+    monkeypatch.setattr(
+        train_module, "_release_cached_memory", lambda device: released.append(device.type)
+    )
+    cfg = TrainConfig(
+        **{
+            **FAST.__dict__,
+            "steps": 16,
+            "grad_accum": 2,
+            "flush_every": 0,
+            "eval_every": 1000,
+            "checkpoint_every": 1000,
+        }
+    )
+    train(LUNA, tokenizer, dataset, tmp_path / "flush", cfg)
+    # Each optimizer step is grad_accum micro-batches; the step's width is its widest one.
+    per_step = [
+        max(widths[i : i + cfg.grad_accum]) for i in range(0, cfg.steps * cfg.grad_accum, 2)
+    ]
+    changes = sum(a != b for a, b in itertools.pairwise(per_step))
+    assert changes > 0  # the width does move, so the flush is exercised
+    # CPU never flushes on a width change; only the evaluation after the last step releases.
+    assert released == ["cpu"]

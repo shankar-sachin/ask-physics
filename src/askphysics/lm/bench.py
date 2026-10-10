@@ -13,7 +13,13 @@ import torch
 
 from askphysics.lm.config import ModelConfig
 from askphysics.lm.model import FermiLM
-from askphysics.lm.train import TrainConfig, _optimizer, _release_cached_memory, autocast_dtype
+from askphysics.lm.train import (
+    TrainConfig,
+    _optimizer,
+    _release_cached_memory,
+    autocast_dtype,
+    bucket_width,
+)
 
 _GB = 1024**3
 
@@ -47,16 +53,17 @@ def available_settings() -> list[tuple[str, str]]:
 
 
 def bench_widths(width: int) -> list[int]:
-    """The power-of-two widths from 64 up to ``width``, the shapes the training buckets use.
-
-    A ``width`` below 64 benchmarks just that width.
+    """The batch widths training uses up to ``width``: the buckets ``bucket_width`` gives
+    (64, 96, 128, ... 1024 with the default), then ``width`` itself, the cut-off at the
+    context length that ``numpy_batch`` applies. A ``width`` below 64 benchmarks just that.
     """
     widths: list[int] = []
-    w = 64
-    while w <= width:
-        widths.append(w)
-        w *= 2
-    return widths or [width]
+    n = 1
+    while (bucket := bucket_width(n, TrainConfig().pad_multiple)) < width:
+        widths.append(bucket)
+        n = bucket + 1
+    widths.append(width)
+    return widths
 
 
 def projected_hours(tokens_per_s: float, steps: int, batch_size: int, width: float) -> float:
@@ -139,6 +146,14 @@ def _time_setting(
     seconds = time.perf_counter() - t0
     total_steps = steps * len(widths)
     total_tokens = steps * sum(batch_size * width for width in widths)
+    # An evaluation pass after timing, as training runs one: no gradients, fp32. Its
+    # activations count toward the memory read below, so that covers training and evaluation.
+    model.eval()
+    with torch.no_grad():
+        for inputs, labels in batches:
+            model(inputs, labels)
+    model.train()
+    _sync(device)
     return BenchResult(
         device_name,
         precision,
@@ -160,9 +175,9 @@ def bench(
 ) -> list[BenchResult]:
     """Time ``steps`` full training steps per width for each (device, precision) setting.
 
-    ``width`` is the largest width: each power of two from 64 up to it is timed ``steps`` times,
-    round-robin. A setting that fails (unknown device, out of memory, unsupported op) is
-    reported in ``error`` rather than raised.
+    ``width`` is the largest width: each training bucket up to it is timed ``steps`` times,
+    round-robin, then every width gets one evaluation pass. A setting that fails (unknown
+    device, out of memory, unsupported op) is reported in ``error`` rather than raised.
     """
     widths = bench_widths(width)
     results: list[BenchResult] = []
