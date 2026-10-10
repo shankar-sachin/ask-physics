@@ -9,7 +9,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Two install pages on the website: `/installers` (every way to install, each with a copy button:
-  curl, irm, Homebrew, WinGet, the Windows installer, the raw scripts) and `/more-installers` (for
+  curl, irm, Homebrew, WinGet, pip, the Windows installer, the raw scripts) and `/more-installers` (for
   developers: the `sh` and `wget` variants, pinning with `ASKPHYSICS_REF`, source installs,
   uninstalling, verifying a download, and a table of every release with its installers, fetched
   from the GitHub API in the browser).

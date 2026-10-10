@@ -100,6 +100,12 @@ irm https://askphysics.vercel.app/install.ps1 | iex
 brew install shankar-sachin/tap/askphysics
 ```
 
+**pip** (Python 3.11+, from v0.4.0)
+
+```bash
+pip install askphysics
+```
+
 The scripts install `askphysics` into its own isolated environment with
 [uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
 touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.3.0`.
