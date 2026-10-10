@@ -1,4 +1,4 @@
-"""The live training view for ``askphysics model train``.
+"""The live training view for ``askphysics-dev model train``.
 
 On a terminal: the progress bar with a live panel under it (phase, loss sparkline, learning
 rate, speed, backend and device, memory), and a summary panel at the end. Anywhere else (CI,

@@ -1,7 +1,4 @@
-import functools
 import json
-import shutil
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -10,15 +7,7 @@ from tests.conftest import DEMO_QUESTION
 from typer.testing import CliRunner
 
 from askphysics import cli
-from askphysics.data.loader import (
-    CONSTANTS_FILE,
-    EQUATIONS_FILE,
-    EXAMPLES_FILE,
-    FERMI_FILE,
-    default_data_dir,
-    load_all,
-)
-from askphysics.errors import ConfigError, DataValidationError
+from askphysics.errors import ConfigError
 
 runner = CliRunner()
 
@@ -27,62 +16,6 @@ def test_version_prints_the_package_version() -> None:
     result = runner.invoke(cli.app, ["version"])
     assert result.exit_code == 0
     assert "0.3.0" in result.output
-
-
-def test_validate_data_passes() -> None:
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 0
-    assert "all valid" in result.output
-
-
-def test_validate_data_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken(**_: object) -> None:
-        raise DataValidationError(["equation x: invalid unit 'blorps'"])
-
-    monkeypatch.setattr(cli, "load_all", broken)
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 1
-    assert "blorps" in result.output
-
-
-def _copy_data_with_example_edit(tmp_path: Path, edit: Callable[[Any], None]) -> Path:
-    for name in (EQUATIONS_FILE, EXAMPLES_FILE, CONSTANTS_FILE, FERMI_FILE):
-        shutil.copy(default_data_dir() / name, tmp_path / name)
-    examples = tmp_path / EXAMPLES_FILE
-    data = json.loads(examples.read_text())
-    edit(data)
-    examples.write_text(json.dumps(data))
-    return tmp_path
-
-
-def _validate_data_from(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> None:
-    """Make ``validate-data`` read the given copy of the seed data."""
-    monkeypatch.setattr(cli, "load_all", functools.partial(load_all, data_dir))
-
-
-def test_validate_data_fails_a_worked_example_with_the_wrong_value(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def scale_answer(d: list[dict[str, Any]]) -> None:
-        d[0]["final_answer"]["value"] *= 1000  # ex_kin_001: 15 m/s becomes 15000 m/s
-
-    _validate_data_from(monkeypatch, _copy_data_with_example_edit(tmp_path, scale_answer))
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 1
-    assert "data validation failed" in result.output
-    assert "re-solve gives" in result.output
-
-
-def test_validate_data_fails_a_worked_example_with_the_wrong_dimension(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def wrong_unit(d: list[dict[str, Any]]) -> None:
-        d[0]["final_answer"]["unit"] = "s"  # ex_kin_001 asks for a speed, not a time
-
-    _validate_data_from(monkeypatch, _copy_data_with_example_edit(tmp_path, wrong_unit))
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 1
-    assert "does not match" in result.output
 
 
 def test_ask_renders_answer() -> None:
@@ -163,50 +96,9 @@ def test_ask_takes_an_unquoted_question() -> None:
     assert "19.8057" in result.output
 
 
-def test_pull_with_nothing_published_says_so() -> None:
-    result = runner.invoke(cli.app, ["model", "pull"])
-    assert result.exit_code == 1
-    assert "no trained weights are published" in result.output
-    quiet = runner.invoke(cli.app, ["model", "pull", "--if-published"])
-    assert quiet.exit_code == 0 and "no trained weights are published" in quiet.output
-
-
-def test_pull_downloads_and_verifies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    import hashlib
-    import io
-
-    from askphysics.lm import weights
-
-    files = {"model.safetensors": b"w" * 10, "config.json": b"{}", "tokenizer.json": b"{}"}
-    pinned = weights.PinnedModel("fermi-tellus-1", "r", tuple(
-        weights.PinnedFile(n, f"https://example.test/{n}", len(b), hashlib.sha256(b).hexdigest())
-        for n, b in files.items()
-    ))  # fmt: skip
-    monkeypatch.setattr(weights, "read_manifest", lambda path=None: {pinned.name: pinned})
-    monkeypatch.setattr(weights, "_open", lambda url: io.BytesIO(files[url.rsplit("/", 1)[1]]))
-    result = runner.invoke(cli.app, ["model", "pull", "--directory", str(tmp_path)])
-    assert result.exit_code == 0, result.output
-    assert "fermi-tellus-1 downloaded and verified" in result.output
-    assert (tmp_path / "fermi-tellus-1" / "model.safetensors").read_bytes() == files[
-        "model.safetensors"
-    ]
-
-
 def test_ask_without_models_says_how_to_get_them() -> None:
     result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
     assert "No Fermi models are installed" in result.output
-
-
-def test_train_refuses_prose_steps_that_leave_no_task_steps(tmp_path: Path) -> None:
-    prose = tmp_path / "prose.jsonl"
-    prose.write_text('{"source": "s", "title": "t", "text": "Some prose."}\n')
-    result = runner.invoke(
-        cli.app,
-        ["model", "train", "--model", "fermi-luna-1", "--steps", "3000", "--prose", str(prose),
-         "--prose-steps", "3000", "--tokenizer", str(tmp_path / "t.json")],
-    )  # fmt: skip
-    assert result.exit_code == 1
-    assert "never train on the tasks" in result.output and "--steps 6000" in result.output
 
 
 # --- ask downloads published models it is missing (ADR-012) ---------------------------------

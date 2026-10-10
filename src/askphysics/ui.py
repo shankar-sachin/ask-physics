@@ -360,7 +360,7 @@ def training_progress(
     clock: Callable[[], float] = time.monotonic,
     now: Callable[[], datetime] = datetime.now,
 ) -> TrainingProgress:
-    """Live progress for ``askphysics model train``."""
+    """Live progress for ``askphysics-dev model train``."""
     return TrainingProgress(console, clock=clock, now=now)
 
 

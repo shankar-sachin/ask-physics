@@ -25,7 +25,7 @@ make lint        # ruff check + ruff format --check
 make format      # ruff format + ruff check --fix
 make typecheck   # mypy (strict on src/ and evals/)
 make ask Q="How fast does a falling object hit the ground if dropped from 20 m?"
-askphysics validate-data
+askphysics-dev validate-data
 ```
 
 All four of lint, typecheck, test, and validate-data must pass before a
@@ -41,7 +41,7 @@ commit.
    module boundaries.
 3. **Every equation has a source and a license.** No exceptions.
 4. **Never silently add data to the DB.** Data changes go through
-   `askphysics validate-data`, are listed in the PR, and are never made as a
+   `askphysics-dev validate-data`, are listed in the PR, and are never made as a
    side effect of another task.
 5. **The LLM never emits expressions.** Plans reference equation ids;
    expressions come only from reviewed JSON. Never call `sympify` on

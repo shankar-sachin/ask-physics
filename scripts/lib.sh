@@ -494,7 +494,7 @@ ui_ok() { UI_OK=$1; }
 # Run a long step as a named phase: a spinner with the time so far while it runs, then a tick
 # and how long it took. Plain lines when output is not a terminal.
 # phase_live is for a command that draws its own live display, such as training.
-#   phase "Building data" askphysics model build-data ...
+#   phase "Building data" askphysics-dev model build-data ...
 phase() {
   _phase "" "" "$@"
 }
@@ -636,14 +636,15 @@ to_repo_root() {
   cd "$root" || fail "can't enter $root"
 }
 
-# Make sure askphysics is runnable, activating the repo's .venv when it isn't on PATH.
-need_askphysics() {
-  if ! command -v askphysics >/dev/null 2>&1 && [ -f .venv/bin/activate ]; then
+# Make sure askphysics-dev (the maintainer commands, ADR-022) is runnable, activating the repo's
+# .venv when it isn't on PATH.
+need_askphysics_dev() {
+  if ! command -v askphysics-dev >/dev/null 2>&1 && [ -f .venv/bin/activate ]; then
     # shellcheck disable=SC1091
     . .venv/bin/activate
   fi
-  if [ "${DRY_RUN:-}" != "1" ] && ! command -v askphysics >/dev/null 2>&1; then
-    fail "askphysics isn't installed here; run: sh scripts/setup.sh"
+  if [ "${DRY_RUN:-}" != "1" ] && ! command -v askphysics-dev >/dev/null 2>&1; then
+    fail "askphysics-dev isn't installed here; run: sh scripts/setup.sh"
   fi
 }
 
