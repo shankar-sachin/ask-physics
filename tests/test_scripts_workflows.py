@@ -74,6 +74,43 @@ def test_train_backs_up_scores_both_and_compares(tmp_path: Path) -> None:
     assert train.endswith("--precision auto")
 
 
+def test_train_backs_up_when_run_by_a_relative_path(tmp_path: Path) -> None:
+    # Run from the directory above the repo, as `sh ask-physics/scripts/train.sh` would be. The
+    # backup step must still find models.sh after train.sh has changed into the repo root.
+    repo = SCRIPTS.parent
+    (tmp_path / "models" / "fermi-solem-1").mkdir(parents=True)
+    prose = tmp_path / "prose.jsonl"
+    prose.write_text("{}\n")
+    env = {
+        **os.environ,
+        "NO_CAFFEINATE": "1",
+        "DRY_RUN": "1",
+        "ASKPHYSICS_MODEL_DIR": str(tmp_path / "models"),
+        "ASKPHYSICS_BACKUP_DIR": str(tmp_path / "backups"),
+    }
+    args = [
+        "fermi-solem-1",
+        "--data",
+        str(tmp_path / "data"),
+        "--tokenizer",
+        str(tmp_path / "tok.json"),
+        "--prose",
+        str(prose),
+        "--backend",
+        "torch",
+    ]
+    result = subprocess.run(
+        ["sh", f"{repo.name}/scripts/train.sh", *args],
+        cwd=repo.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert _commands(result)[0] == f"mkdir -p {tmp_path / 'backups'}"
+
+
 def test_train_refuses_a_run_with_no_task_steps(tmp_path: Path) -> None:
     # --steps 3000 with --prose-steps 3000 once spent a whole night on prose alone.
     prose = tmp_path / "prose.jsonl"

@@ -73,6 +73,9 @@ an open-source license, and Ask Physics never ships them.
 | Space Grotesk (font) | OFL-1.1 | The Space Grotesk Project Authors | <https://github.com/floriankarsten/space-grotesk> |
 | JetBrains Mono (font) | OFL-1.1 | The JetBrains Mono Project Authors | <https://github.com/JetBrains/JetBrainsMono> |
 | Inter (font) | OFL-1.1 | The Inter Project Authors | <https://github.com/rsms/inter> |
+| KaTeX 0.16.11 (typesets formulas on the docs pages; loaded from jsDelivr) | MIT | Khan Academy and other contributors | <https://github.com/KaTeX/KaTeX> |
+| Octicons (GitHub mark in the docs page header, inlined) | MIT | GitHub Inc. | <https://github.com/primer/octicons> |
+| micropip (installs packages inside Pyodide) | MPL-2.0 | the Pyodide developers | <https://github.com/pyodide/micropip> |
 
 The site is static: these load in the visitor's browser from their own
 servers (jsDelivr, PyPI, Google Fonts). Ask Physics's own code on the site is

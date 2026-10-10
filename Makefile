@@ -30,7 +30,7 @@ ask:  ## Ask a question with the fake LLM: make ask Q="..."
 validate:  ## Validate all seed data
 	askphysics validate-data
 
-check: lint typecheck test  ## Everything CI runs
+check: lint typecheck validate test  ## Everything a commit needs (CI also runs the CLI and site smoke tests)
 
 screenshots:  ## Regenerate docs/images from real CLI output (needs Node + Playwright)
 	$(PYTHON) scripts/screenshots.py
