@@ -292,10 +292,13 @@ def test_memory_limits_are_set_for_the_run_and_restored(
 
 
 def test_precision_names_map_to_compute_dtypes() -> None:
-    assert mlx_dtype("fp32") == mx.float32
-    assert mlx_dtype("bf16") == mx.bfloat16 and mlx_dtype("auto") == mx.bfloat16
+    assert mlx_dtype("fp32", on_gpu=True) == mx.float32
+    assert mlx_dtype("bf16", on_gpu=False) == mx.bfloat16
+    # auto follows the device, as torch's does: bf16 on the GPU, fp32 on the CPU.
+    assert mlx_dtype("auto", on_gpu=True) == mx.bfloat16
+    assert mlx_dtype("auto", on_gpu=False) == mx.float32
     with pytest.raises(ValueError, match="unknown precision"):
-        mlx_dtype("fp16")
+        mlx_dtype("fp16", on_gpu=True)
 
 
 def test_cuda_is_refused_by_the_mlx_trainer(

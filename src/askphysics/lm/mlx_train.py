@@ -72,15 +72,19 @@ EVAL_DTYPE = mx.float32
 StepFn = Callable[[mx.array, list[tuple[mx.array, mx.array]]], mx.array]
 
 
-def mlx_dtype(precision: str) -> mx.Dtype:
-    """The compute dtype of the forward pass for ``precision``: ``auto`` and ``bf16`` are
-    bfloat16, ``fp32`` is float32. Parameters are fp32 whatever this says.
+def mlx_dtype(precision: str, on_gpu: bool) -> mx.Dtype:
+    """The compute dtype of the forward pass for ``precision``. ``bf16`` is bfloat16 and
+    ``fp32`` is float32; ``auto`` is bfloat16 on the GPU and float32 on the CPU, as the torch
+    trainer's ``auto`` is bf16 on mps and cuda and fp32 on cpu. Parameters are fp32 whatever
+    this says.
 
     Raises:
         ValueError: ``precision`` is not one of ``PRECISIONS``.
     """
     if precision not in PRECISIONS:
         raise ValueError(f"unknown precision {precision!r}; choose from {', '.join(PRECISIONS)}")
+    if precision == "auto":
+        return mx.bfloat16 if on_gpu else mx.float32
     return mx.float32 if precision == "fp32" else mx.bfloat16
 
 
@@ -257,6 +261,11 @@ def system_memory_gb() -> float:
     return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / 1e9
 
 
+def _on_gpu() -> bool:
+    """True when MLX computes on the GPU (the default on a Mac, where it is the Metal GPU)."""
+    return mx.default_device().type == mx.DeviceType.gpu
+
+
 def _device(prefer: str | None) -> mx.Device | None:
     """The MLX device for ``--device``: None keeps MLX's default (the GPU on a Mac)."""
     if prefer is None:
@@ -300,7 +309,6 @@ def train_mlx(
             or ``cfg.device`` is not one MLX can use.
     """
     check_run_settings(config, tokenizer, cfg)
-    dtype = mlx_dtype(cfg.precision)
     device = _device(cfg.device)
     limit_gb = (
         memory_limit_gb if memory_limit_gb is not None else MEMORY_FRACTION * system_memory_gb()
@@ -308,9 +316,10 @@ def train_mlx(
     previous_device = mx.default_device()
     previous_limit = mx.set_cache_limit(int(cache_limit_gb * 1e9))
     previous_memory = mx.set_memory_limit(int(limit_gb * 1e9))
-    if device is not None:
-        mx.set_default_device(device)
     try:
+        if device is not None:
+            mx.set_default_device(device)
+        dtype = mlx_dtype(cfg.precision, on_gpu=_on_gpu())
         return _run(
             config,
             tokenizer,
