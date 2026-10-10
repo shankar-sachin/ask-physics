@@ -733,7 +733,9 @@ class DataFactory:
             unit=p.unit,
             assume=assume,
         )
-        prompt = explain_prompt(p.question, p.value, p.unit, [p.equation], p.plan.assumptions)
+        prompt = explain_prompt(
+            p.question, quantity(p.value, p.unit), [p.equation], p.plan.assumptions
+        )
         split = "val" if template.held_out else self._split(p.template)
         return Example("explain", split, f"{p.template}+{template.id}", prompt, text + END)
 

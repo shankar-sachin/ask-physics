@@ -119,9 +119,8 @@ def test_classify_targets(examples: list[Example]) -> None:
 def test_explain_targets_only_use_allowed_numbers(examples: list[Example]) -> None:
     for e in (x for x in examples if x.task == "explain"):
         payload = _payload(e.prompt, EXPLAIN)
-        allowed = set(
-            explain_numbers(payload["question"], payload["result"]["value"], payload["assumptions"])
-        )
+        result = quantity(payload["result"]["value"], payload["result"]["unit"])
+        allowed = set(explain_numbers(payload["question"], result, payload["assumptions"]))
         text = e.target[: -len(END)]
         assert set(extract_numbers(text)) <= allowed, text
         assert f"[{payload['equations'][0]['id']}]" in text

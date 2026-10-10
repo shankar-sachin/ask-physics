@@ -59,15 +59,45 @@ def test_plans_with_retrieved_equations_only(luna: FermiClient, store: DataStore
     assert set(out.equation_ids) <= {"newton_second_law", "kin_v_at"}
 
 
-def test_explains(luna: FermiClient) -> None:
-    payload = {
-        "question": QUESTION,
-        "result": {"value": 6.0, "unit": "newton"},
-        "equation_ids": ["newton_second_law"],
-        "assumptions": [],
-        "sanity": {"issues": []},
-    }
-    assert isinstance(luna.complete_text(system="", user=json.dumps(payload)), str)
+def _end_bias(luna: FermiClient, monkeypatch: pytest.MonkeyPatch, bias: float) -> None:
+    """Shift the end token's score by ``bias`` on every step of the loaded model."""
+    decoder = luna.decoder
+    original = decoder.model.step
+
+    def biased(ids: torch.Tensor, past: object = None) -> tuple[torch.Tensor, object]:
+        logits, new_past = original(ids, past)  # type: ignore[arg-type]
+        logits[..., decoder.tokenizer.end_id] += bias
+        return logits, new_past
+
+    monkeypatch.setattr(decoder.model, "step", biased)
+
+
+EXPLAIN_PAYLOAD = {
+    "question": QUESTION,
+    "result": {"value": 6.0, "unit": "newton"},
+    "equation_ids": ["newton_second_law"],
+    "assumptions": [],
+    "sanity": {"issues": []},
+}
+
+
+def test_explains(luna: FermiClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    _end_bias(luna, monkeypatch, 1000.0)  # an untrained model would otherwise never finish
+    assert isinstance(luna.complete_text(system="", user=json.dumps(EXPLAIN_PAYLOAD)), str)
+
+
+def test_an_unparseable_unit_is_an_llm_error(luna: FermiClient) -> None:
+    payload = {**EXPLAIN_PAYLOAD, "result": {"value": 6.0, "unit": "not a unit"}}
+    with pytest.raises(LLMError, match="can't read"):
+        luna.complete_text(system="", user=json.dumps(payload))
+
+
+def test_an_unfinished_explanation_is_an_llm_error(
+    luna: FermiClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _end_bias(luna, monkeypatch, -1e9)  # never writes its end token
+    with pytest.raises(LLMError):
+        luna.complete_text(system="", user=json.dumps(EXPLAIN_PAYLOAD))
 
 
 def test_unreadable_payloads_are_llm_errors(luna: FermiClient) -> None:

@@ -9,6 +9,7 @@ answers; anything else is a bug and is allowed to propagate.
     ├── DataValidationError
     ├── LLMError
     │   └── LLMResponseFormatError
+    ├── EmptyQuestionError
     ├── OutOfScopeError
     ├── RetrievalEmptyError
     ├── PlanValidationError
@@ -52,6 +53,10 @@ class LLMError(AskPhysicsError):
 
 class LLMResponseFormatError(LLMError):
     """The LLM returned output that does not match the requested schema."""
+
+
+class EmptyQuestionError(AskPhysicsError):
+    """The question is blank after normalization, so there is nothing to answer."""
 
 
 class OutOfScopeError(AskPhysicsError):
