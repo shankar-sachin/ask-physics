@@ -33,10 +33,10 @@ def _edit(path: Path, fn: Any) -> None:
 
 def test_every_seed_file_validates(store: DataStore) -> None:
     assert store.summary() == {
-        "equations": 110,
+        "equations": 111,
         "examples": 20,
         "constants": 11,
-        "fermi_assumptions": 8,
+        "fermi_assumptions": 12,
     }
 
 
