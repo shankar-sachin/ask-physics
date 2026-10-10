@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 import torch
+from safetensors.torch import load_file
 from typer.testing import CliRunner
 
 from askphysics import cli
@@ -289,9 +290,11 @@ def test_on_step_reports_every_step_and_changes_nothing(
     plain = train(LUNA, tokenizer, dataset, tmp_path / "b", config)
     assert seen == list(range(13))  # the start, then each step as it finishes
     assert _without_timing(shown) == _without_timing(plain)  # a display hook never alters training
-    assert (tmp_path / "a" / "model.safetensors").read_bytes() == (
-        tmp_path / "b" / "model.safetensors"
-    ).read_bytes()
+    # Compare tensors, not file bytes: safetensors may order its JSON header differently.
+    shown_w = load_file(tmp_path / "a" / "model.safetensors")
+    plain_w = load_file(tmp_path / "b" / "model.safetensors")
+    assert shown_w.keys() == plain_w.keys()
+    assert all(torch.equal(shown_w[k], plain_w[k]) for k in shown_w)
 
 
 def test_grad_accum_must_be_positive(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:
