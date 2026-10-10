@@ -23,12 +23,18 @@ import re
 from collections.abc import Iterable, Sequence
 
 from askphysics.errors import AskPhysicsError
-from askphysics.lm.formats import format_number, quantity_ranges, question_quantities
+from askphysics.lm.formats import (
+    NUMBER_SPELLINGS,
+    format_number,
+    parse_number,
+    quantity_ranges,
+    question_quantities,
+)
 from askphysics.lm.templates import VAR_SYNONYMS
 from askphysics.models import Equation, Variable
 from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
 
-_NUMBER = r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
+_NUMBER = NUMBER_SPELLINGS
 _UNIT = r"[A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?"
 _SYMBOL = r"[A-Za-z][A-Za-z0-9_]*"
 # A quantity: a number not glued to an identifier or an exponent, then an optional unit.
@@ -67,7 +73,7 @@ _BARE_ASK = re.compile(r"(?:^|[.!?]\s+)(?P<span>[^.!?=]{1,60}?)\s*(?:=\s*)?\?")
 
 
 def _quantity(match: re.Match[str]) -> tuple[str, str] | None:
-    number = float(match.group("number"))
+    number = parse_number(match.group("number"))
     if not math.isfinite(number):
         return None
     unit = match.group("unit")

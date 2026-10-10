@@ -97,7 +97,13 @@ MAX_ASSUMPTIONS = 6
 # ("roughly roughly roughly ...").
 NO_REPEAT_WORDS = 6
 
-_TRAILING_RUN = re.compile(r"(?<![A-Za-z_0-9.^*])(?<!\*\* )(\d+(?:\.\d*)?)$")
+# The number being written at the end of the text, with an exponent if it has started one:
+# "20", "9.", "5e-0".
+_TRAILING_RUN = re.compile(r"(?<![A-Za-z_0-9.^*])(?<!\*\* )(\d+(?:\.\d*)?(?:[eE][-+]?\d*)?)$")
+# A number that ends on a bare "e": "5e" is the start of an exponent or of a unit like "eV".
+_BARE_EXPONENT = re.compile(r"(\d+(?:\.\d*)?)[eE]")
+# A piece that can only continue a number: "." for decimals, "e", "e-", "+" for exponents.
+_NUMBER_PIECE = re.compile(r"[.eE+-][0-9.eE+-]*$")
 _TRAILING_EXPONENT = re.compile(r"(\^|\*\*\s?)\d*$")
 _TRAILING_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -158,7 +164,11 @@ def number_guard_ok(prefix: str, piece: str, allowed: Sequence[str]) -> bool:
     """Would appending ``piece`` keep every number in the text inside ``allowed``?
 
     Digits glued to letters (``v0``, ``m1``) are identifiers, not numbers, and
-    are not checked. Signs are ignored: ``-9.8`` is fine if ``9.8`` is allowed.
+    are not checked. Signs are ignored: ``-9.8`` is fine if ``9.8`` is allowed. A number is
+    spelled the way ``format_number`` spells it, so ``5e-07`` is one number: its "e", sign,
+    and exponent digits each have to keep some allowed number reachable. A "." after a whole
+    allowed number ends the sentence ("The answer is 10."); a digit after it is checked on
+    its own step, so ``10.7`` is still refused unless it is allowed.
     """
     stripped = [a.lstrip("-") for a in allowed]
     match = _TRAILING_RUN.search(prefix)
@@ -169,11 +179,13 @@ def number_guard_ok(prefix: str, piece: str, allowed: Sequence[str]) -> bool:
         if not run and _TRAILING_EXPONENT.search(prefix):
             return True  # a unit exponent like m^3 or second ** 2
         return any(a.startswith(run + piece) for a in stripped)
-    if piece == "." and run:
-        return any(a.startswith(run + ".") for a in stripped)
-    if run:  # this piece closes the number
-        return run.rstrip(".") in stripped
-    return True
+    if not run:
+        return True
+    if _NUMBER_PIECE.match(piece) and any(a.startswith(run + piece) for a in stripped):
+        return True  # the number goes on: "9" then ".", "5" then "e", "5e" then "-"
+    if piece[0].isalpha() and (bare := _BARE_EXPONENT.fullmatch(run)):
+        run = bare.group(1)  # "5e" then "V": a unit that starts with e, not an exponent
+    return run.rstrip(".") in stripped  # otherwise this piece closes the number
 
 
 @dataclass

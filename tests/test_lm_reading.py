@@ -33,6 +33,12 @@ from askphysics.lm.reading import (
         ("mu equals 0.3", [("mu", "0.3", "dimensionless")]),
         ("the speed was 6.3e+20 m/s", [("speed", "6.3e+20", "m/s")]),
         ("a 5 kg ball moving at 3 m/s", []),
+        # A number is read whole, in any of the spellings `lm/formats.py` reads (#97).
+        ("mu = 3 x 10^-3", [("mu", "0.003", "dimensionless")]),
+        ("the emissivity is 4.0 x 10^-2", [("emissivity", "0.04", "dimensionless")]),
+        ("eps = 1,530", [("eps", "1530", "dimensionless")]),
+        ("fs is 4.00 x 10^14 Hz", [("fs", "400000000000000", "Hz")]),
+        ("Q = - 25 nC", [("Q", "-25", "nC")]),
     ],
 )
 def test_labels(text: str, expected: list[tuple[str, str, str]]) -> None:

@@ -31,18 +31,55 @@ FILLER_NUMBERS = ("0",)
 # "v = 0" or "1/2 m v^2". A structural number is never a known value.
 STRUCTURAL_NUMBERS = ("0", "1")
 
+# One number, spelled any of the ways a question writes it:
+#   plain       20, 9.8
+#   grouped     1,530 (a thousands comma: no space after it, so "3, 4 and 5" is three numbers)
+#   e-notation  3.56e-13, 7.5e+19
+#   times ten   4.00 x 10^14, 1.0*10^6, 6.30x10^5, 2 x 10**3, and x as a multiplication sign
+#   power       10^14 (one number, 1e14: never the 10 and the 14)
+# The mantissa is read as written, so "4.00 x 10^14" is exactly the float "4.00e14" and not
+# 4.00 * 10**14 (which can be off in the last digit).
+_UNSIGNED = (
+    r"(?:10\s*(?:\^|\*\*)\s*[-\u2212+]?\d+"
+    r"|(?:[1-9]\d{0,2}(?:,\d{3})+(?!\d)(?:\.\d+)?|\d+(?:\.\d+)?)"
+    r"(?:[eE][-+]?\d+|\s*[\u00d7xX*]\s*10\s*(?:\^|\*\*)\s*[-\u2212+]?\d+)?)"
+)
+# A minus belongs to the number when something that is not a digit or a letter comes before it
+# ("-25 nC", "(-3 N)"), so the dash in "10-20 m" is a range. A minus set apart from its number
+# ("Q = - 25 nC", "(- 3 N)") joins it only after "=" or "(".
+_SIGNED = r"(?:[-\u2212]|(?<=[(=])\s*[-\u2212]\s+(?=\d))?" + _UNSIGNED
 # Not preceded by identifier characters or an exponent: the 2 in m/s^2, the 1 in m^-1, or
 # second ** 2 is no number.
-_NUMBER = re.compile(
-    r"(?<![A-Za-z0-9_.^*])(?<!\*\* )(?<!\^-)(?<!\*\* -)-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
-)
-# A unit starts with a letter; "^-" allows negative exponents ("s^-1", "m^-1").
+_NUMBER = re.compile(r"(?<![A-Za-z0-9_.^*])(?<!\*\* )(?<!\^-)(?<!\*\* -)" + _SIGNED)
+# The same spellings without the lookbehinds, for modules that read numbers in their own context
+# (``lm/reading.py``): they use ``parse_number`` for the value.
+NUMBER_SPELLINGS = _SIGNED
+# A unit starts with a letter; "^-" allows negative exponents ("s^-1", "m^-1"). It follows the
+# number after spaces, or after one hyphen ("a 5-kg cart", "a 90.0-MHz station"); a hyphen
+# before a number is a range dash instead ("10-20 m").
 # The number is atomic, so "7.5e+19" is never split into 7.5 and the unit "e".
 _UNIT_AFTER_NUMBER = re.compile(
     "(?>"
     + _NUMBER.pattern
-    + r")\s*([A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?)"
+    + r")(?:\s*|-)([A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?)"
 )
+_TIMES_TEN_PARTS = re.compile(
+    r"(?P<sign>-?)(?:(?P<mantissa>[\d.]+)[\u00d7xX*])?10(?:\^|\*\*)(?P<exponent>[-+]?\d+)"
+)
+
+
+def parse_number(text: str) -> float:
+    """The value of a number as ``_NUMBER`` matched it, from its digits as written.
+
+    "1,530" is 1530 and "4.00 x 10^14" is the float "4.00e14", read in one step so no digit
+    is rounded by a multiplication. Overflow is ``inf`` (the caller skips it).
+    """
+    compact = re.sub(r"[\s,]", "", text).replace("\u2212", "-")
+    times_ten = _TIMES_TEN_PARTS.fullmatch(compact)
+    if times_ten:
+        mantissa = times_ten["mantissa"] or "1"
+        compact = f"{times_ten['sign']}{mantissa}e{times_ten['exponent']}"
+    return float(compact)
 
 
 def dumps(value: Any) -> str:
@@ -63,9 +100,10 @@ def extract_numbers(text: str) -> list[str]:
     """Numbers written in ``text``, canonically formatted, in order of appearance."""
     out: list[str] = []
     for match in _NUMBER.finditer(text):
-        if not math.isfinite(float(match.group())):
+        value = parse_number(match.group())
+        if not math.isfinite(value):
             continue  # "1e999" overflows; it can't be copied into a plan anyway
-        formatted = format_number(float(match.group()))
+        formatted = format_number(value)
         if formatted not in out:
             out.append(formatted)
     return out
@@ -84,7 +122,7 @@ def extract_units(text: str) -> list[str]:
 # "from 0 to 20 m/s", "from 5 km/h up to 9 km/h": the unit after the second number is also
 # the first one's when the first has none. The first number may carry a unit of its own.
 _UNIT = r"[A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?"
-_PLAIN_NUMBER = r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
+_PLAIN_NUMBER = r"[-\u2212]?" + _UNSIGNED
 _RANGE = re.compile(
     r"\bfrom\s+(?P<a>(?>" + _PLAIN_NUMBER + r"))(?:\s*(?P<ua>" + _UNIT + r"))?"
     r"\s+(?:up\s+)?to\s+(?P<b>(?>" + _PLAIN_NUMBER + r"))\s*(?P<ub>" + _UNIT + r")",
@@ -96,9 +134,10 @@ def _spelled(number: str, unit: str | None) -> tuple[str, str] | None:
     """A (canonical number, unit) pair, or None if the number overflows or the unit is not one."""
     if unit is None or unit == "in" or not is_valid_unit(unit):
         return None  # "from 12 to 3 in 4 s": "in" is the word, not inches
-    if not math.isfinite(float(number)):
+    value = parse_number(number)
+    if not math.isfinite(value):
         return None
-    return format_number(float(number)), unit
+    return format_number(value), unit
 
 
 def quantity_ranges(text: str) -> list[tuple[tuple[str, str], tuple[str, str]]]:
@@ -125,15 +164,15 @@ def _unit_quantities(text: str) -> list[tuple[int, str, str]]:
     found: dict[int, tuple[str, str]] = {}
     for match in _UNIT_AFTER_NUMBER.finditer(text):
         unit = match.group(1)
-        number = match.group()[: match.start(1) - match.start()].strip()
-        if is_valid_unit(unit) and math.isfinite(float(number)):
-            found[match.start()] = (format_number(float(number)), unit)
+        value = parse_number(match.group()[: match.start(1) - match.start()].rstrip("-"))
+        if is_valid_unit(unit) and math.isfinite(value):
+            found[match.start()] = (format_number(value), unit)
     for m in _RANGE.finditer(text):
         # A bare first number ("from 0 to 20 m/s") is a quantity in the second's unit.
         if m.start("a") not in found and _spelled(m.group("a"), m.group("ua")) is None:
             end = _spelled(m.group("b"), m.group("ub"))
             if end is not None:
-                found[m.start("a")] = (format_number(float(m.group("a"))), end[1])
+                found[m.start("a")] = (format_number(parse_number(m.group("a"))), end[1])
     return [(pos, n, u) for pos, (n, u) in sorted(found.items())]
 
 
@@ -155,9 +194,9 @@ def stated_quantities(text: str) -> list[tuple[str, str]]:
     """
     with_unit = {pos for pos, _, _ in _unit_quantities(text)}
     bare = [
-        (format_number(float(m.group())), "dimensionless")
+        (format_number(parse_number(m.group())), "dimensionless")
         for m in _NUMBER.finditer(text)
-        if m.start() not in with_unit and math.isfinite(float(m.group()))
+        if m.start() not in with_unit and math.isfinite(parse_number(m.group()))
     ]
     return question_quantities(text) + bare
 
