@@ -72,7 +72,7 @@ from askphysics.models import (
     Variable,
 )
 from askphysics.prose import GENERIC_REASONS, content_words
-from askphysics.solver.units import check_dimensions, quantity
+from askphysics.solver.units import Quantity, check_dimensions, quantity
 
 CATEGORIES = ("standard", "fermi", "out_of_scope")
 DOMAINS = (
@@ -1072,8 +1072,7 @@ def _choose_assumptions(decoder: Decoder, options: Sequence[str]) -> list[str]:
 def decode_explanation(
     decoder: Decoder,
     question: str,
-    value: float,
-    unit: str,
+    result: Quantity,
     equations: Sequence[Equation],
     assumptions: Sequence[str],
     issues: Sequence[str] = (),
@@ -1086,9 +1085,9 @@ def decode_explanation(
     The explanation may use the whole context window left after its prompt. If it does not
     end within that, this raises ``LLMError`` so the pipeline degrades to the template.
     """
-    decoder.start(explain_prompt(question, value, unit, equations, assumptions, issues))
+    decoder.start(explain_prompt(question, result, equations, assumptions, issues))
     generator = torch.Generator(device="cpu").manual_seed(seed)
-    numbers = explain_numbers(question, value, assumptions)
+    numbers = explain_numbers(question, result, assumptions)
     return decoder.free_text(
         numbers,
         until_end_token=True,

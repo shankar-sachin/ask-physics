@@ -236,9 +236,9 @@ def test_explanation_numbers_are_constrained(
     _end_bias(decoder, monkeypatch, after=20, bias=1000.0)
     eqs = [store.equations["kin_v_squared"]]
     text = decode_explanation(
-        decoder, QUESTION, 19.8057, "m/s", eqs, ["No drag"], temperature=1.0, seed=3
+        decoder, QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"], temperature=1.0, seed=3
     )
-    allowed = set(explain_numbers(QUESTION, 19.8057, ["No drag"]))
+    allowed = set(explain_numbers(QUESTION, quantity(19.8057, "m/s"), ["No drag"]))
     assert set(extract_numbers(text)) <= allowed
 
 
@@ -249,7 +249,7 @@ def test_explanations_are_not_cut_at_the_slot_cap(
     decoder = Decoder(FermiLM(LUNA), tokenizer)  # the default 48-token slot cap
     _end_bias(decoder, monkeypatch, after=100, bias=1000.0)
     eqs = [store.equations["kin_v_squared"]]
-    text = decode_explanation(decoder, QUESTION, 19.8057, "m/s", eqs, ["No drag"])
+    text = decode_explanation(decoder, QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"])
     assert len(tokenizer.encode(text)) > 48
 
 
@@ -257,7 +257,7 @@ def test_explanation_without_an_end_token_is_an_llm_error(
     store: DataStore, tokenizer: Tokenizer, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     eqs = [store.equations["kin_v_squared"]]
-    prompt = explain_prompt(QUESTION, 19.8057, "m/s", eqs, ["No drag"])
+    prompt = explain_prompt(QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"])
     room = 30  # tokens left after the prompt; the model never writes its end token
     tiny = ModelConfig(
         name="tiny",
@@ -271,7 +271,7 @@ def test_explanation_without_an_end_token_is_an_llm_error(
     decoder = Decoder(FermiLM(tiny), tokenizer)
     _end_bias(decoder, monkeypatch, after=0, bias=-1e9)
     with pytest.raises(LLMError, match="end token"):
-        decode_explanation(decoder, QUESTION, 19.8057, "m/s", eqs, ["No drag"])
+        decode_explanation(decoder, QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"])
 
 
 def test_greedy_decoding_is_deterministic(store: DataStore, tokenizer: Tokenizer) -> None:

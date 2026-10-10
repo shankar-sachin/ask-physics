@@ -86,6 +86,12 @@ def test_explains(luna: FermiClient, monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(luna.complete_text(system="", user=json.dumps(EXPLAIN_PAYLOAD)), str)
 
 
+def test_an_unparseable_unit_is_an_llm_error(luna: FermiClient) -> None:
+    payload = {**EXPLAIN_PAYLOAD, "result": {"value": 6.0, "unit": "not a unit"}}
+    with pytest.raises(LLMError, match="can't read"):
+        luna.complete_text(system="", user=json.dumps(payload))
+
+
 def test_an_unfinished_explanation_is_an_llm_error(
     luna: FermiClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
