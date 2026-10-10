@@ -2034,5 +2034,25 @@
     "source": "OpenStax University Physics Volume 2, Chapter 13 (reference; entry written by the project)",
     "license": "MIT",
     "confidence_in_entry": 0.98
+  },
+  {
+    "id": "sound_speed_ideal_gas",
+    "name": "Speed of sound in an ideal gas",
+    "latex": "v = \\sqrt{\\frac{\\gamma R T}{M}}",
+    "sympy_expr": "v = sqrt(gamma*R*T/M)",
+    "variables": [
+      {"symbol": "v", "name": "speed of sound", "unit": "m/s", "description": "Speed of sound waves in the gas", "typical_range": [10.0, 5000.0]},
+      {"symbol": "gamma", "name": "adiabatic index", "unit": "dimensionless", "description": "Ratio of the heat capacities at constant pressure and volume", "typical_range": [1.0, 1.7]},
+      {"symbol": "R", "name": "molar gas constant", "unit": "J/(mol*K)", "description": "Universal gas constant", "typical_range": null},
+      {"symbol": "T", "name": "temperature", "unit": "K", "description": "Absolute temperature of the gas", "typical_range": [1.0, 5000.0]},
+      {"symbol": "M", "name": "molar mass", "unit": "kg/mol", "description": "Mass of one mole of the gas", "typical_range": [0.002, 0.3]}
+    ],
+    "domain": "waves",
+    "assumptions": ["Ideal gas", "Sound compressions are adiabatic"],
+    "validity_conditions": ["Sound wavelength far longer than the mean free path"],
+    "tags": ["speed of sound", "sound", "air", "gas", "how fast sound travels", "sound speed", "adiabatic", "temperature"],
+    "source": "OpenStax University Physics Volume 1, Chapter 17 (reference; entry written by the project)",
+    "license": "MIT",
+    "confidence_in_entry": 0.98
   }
 ]

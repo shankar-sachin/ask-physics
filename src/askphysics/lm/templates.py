@@ -353,6 +353,8 @@ VAR_SYNONYMS: dict[str, tuple[str, ...]] = {
     "average induced emf": ("average induced emf", "average emf", "induced voltage"),
     "number of turns": ("number of turns", "turns", "coil turns"),
     "coil area": ("coil area", "area of the coil"),
+    "adiabatic index": ("adiabatic index", "heat capacity ratio", "ratio of specific heats"),
+    "molar mass": ("molar mass", "mass per mole"),
 }
 
 # --------------------------------------------------------------------------- generic questions
