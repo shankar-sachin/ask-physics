@@ -218,6 +218,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `askphysics ask ""` (and a whitespace-only question) prints a refusal that says the question
   is empty, instead of a pydantic traceback. `Pipeline.run` returns a refused answer for a
   blank question, and `Pipeline.solve` raises `EmptyQuestionError` for one (#76).
+- `askphysics validate-data` now checks what `docs/DATA_SCHEMA.md` lists for worked examples:
+  each example re-solves through Noether within 0.1% of its `final_answer`, and each
+  `final_answer` unit has the unknown's dimension. Before, only pytest ran these, so a bad
+  example passed the data gate (#78).
 
 ## [0.3.0] - 2026-10-06
 

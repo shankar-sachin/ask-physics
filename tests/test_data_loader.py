@@ -8,12 +8,14 @@ import pytest
 from askphysics.data.loader import (
     CONSTANTS_FILE,
     EQUATIONS_FILE,
+    EXAMPLE_TOLERANCE,
     EXAMPLES_FILE,
     FERMI_FILE,
     DataStore,
     default_data_dir,
     load_all,
     validate_equation,
+    validate_store,
 )
 from askphysics.errors import DataValidationError
 
@@ -114,25 +116,41 @@ def test_broken_and_missing_files(data_dir: Path) -> None:
     assert any("must be a JSON array" in p for p in problems)
 
 
-def test_every_worked_example_re_solves(store: DataStore) -> None:
-    """Noether solves each example to within 0.1% of its stated answer (v0.4 exit criterion)."""
-    from askphysics.models import Plan
-    from askphysics.pipeline import compute
-    from askphysics.solver.units import quantity
+def _example(entries: list[dict[str, Any]], example_id: str) -> dict[str, Any]:
+    return next(e for e in entries if e["id"] == example_id)
 
+
+def test_every_worked_example_re_solves(store: DataStore) -> None:
+    """Noether re-solves each example to within 0.1% of its stated answer (v0.4 exit criterion).
+
+    The check runs in validate_store, so validate-data enforces it as well as pytest.
+    """
     assert len(store.examples) >= 15
-    for ex in store.examples.values():
-        plan = Plan(
-            equation_ids=ex.equations_used,
-            target=ex.unknowns[0],
-            unknowns=ex.unknowns,
-            known_values=ex.known_values,
-            assumptions=[],
-            strategy=ex.solution_steps[0],
-        )
-        result = compute(plan, data=store)
-        got = quantity(result.value, result.unit).to(ex.final_answer.unit).magnitude
-        assert got == pytest.approx(ex.final_answer.value, rel=1e-3), ex.id
+    assert validate_store(store) == []
+
+
+def test_a_wrong_example_value_fails_the_re_solve(data_dir: Path) -> None:
+    def scale_answer(d: list[dict[str, Any]]) -> None:
+        _example(d, "ex_kin_001")["final_answer"]["value"] *= 1000
+
+    _edit(data_dir / EXAMPLES_FILE, scale_answer)
+    assert any("ex_kin_001: re-solve gives" in p for p in _problems(data_dir))
+
+
+def test_a_wrong_example_dimension_fails(data_dir: Path) -> None:
+    _edit(
+        data_dir / EXAMPLES_FILE,
+        lambda d: _example(d, "ex_kin_001")["final_answer"].update(unit="s"),
+    )
+    assert any("ex_kin_001: final_answer unit 's' does not match" in p for p in _problems(data_dir))
+
+
+def test_a_re_solve_within_tolerance_passes(data_dir: Path) -> None:
+    def nudge_answer(d: list[dict[str, Any]]) -> None:
+        _example(d, "ex_kin_001")["final_answer"]["value"] *= 1 + EXAMPLE_TOLERANCE / 2
+
+    _edit(data_dir / EXAMPLES_FILE, nudge_answer)
+    load_all(data_dir)  # raises DataValidationError if the re-solve check fails
 
 
 def test_worked_examples_do_not_read_like_eval_questions(store: DataStore) -> None:

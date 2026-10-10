@@ -1,11 +1,23 @@
+import functools
 import json
+import shutil
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from tests.conftest import DEMO_QUESTION
 from typer.testing import CliRunner
 
 from askphysics import cli
+from askphysics.data.loader import (
+    CONSTANTS_FILE,
+    EQUATIONS_FILE,
+    EXAMPLES_FILE,
+    FERMI_FILE,
+    default_data_dir,
+    load_all,
+)
 from askphysics.errors import DataValidationError
 
 runner = CliRunner()
@@ -31,6 +43,46 @@ def test_validate_data_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None
     result = runner.invoke(cli.app, ["validate-data"])
     assert result.exit_code == 1
     assert "blorps" in result.output
+
+
+def _copy_data_with_example_edit(tmp_path: Path, edit: Callable[[Any], None]) -> Path:
+    for name in (EQUATIONS_FILE, EXAMPLES_FILE, CONSTANTS_FILE, FERMI_FILE):
+        shutil.copy(default_data_dir() / name, tmp_path / name)
+    examples = tmp_path / EXAMPLES_FILE
+    data = json.loads(examples.read_text())
+    edit(data)
+    examples.write_text(json.dumps(data))
+    return tmp_path
+
+
+def _validate_data_from(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> None:
+    """Make ``validate-data`` read the given copy of the seed data."""
+    monkeypatch.setattr(cli, "load_all", functools.partial(load_all, data_dir))
+
+
+def test_validate_data_fails_a_worked_example_with_the_wrong_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def scale_answer(d: list[dict[str, Any]]) -> None:
+        d[0]["final_answer"]["value"] *= 1000  # ex_kin_001: 15 m/s becomes 15000 m/s
+
+    _validate_data_from(monkeypatch, _copy_data_with_example_edit(tmp_path, scale_answer))
+    result = runner.invoke(cli.app, ["validate-data"])
+    assert result.exit_code == 1
+    assert "data validation failed" in result.output
+    assert "re-solve gives" in result.output
+
+
+def test_validate_data_fails_a_worked_example_with_the_wrong_dimension(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def wrong_unit(d: list[dict[str, Any]]) -> None:
+        d[0]["final_answer"]["unit"] = "s"  # ex_kin_001 asks for a speed, not a time
+
+    _validate_data_from(monkeypatch, _copy_data_with_example_edit(tmp_path, wrong_unit))
+    result = runner.invoke(cli.app, ["validate-data"])
+    assert result.exit_code == 1
+    assert "does not match" in result.output
 
 
 def test_ask_renders_answer() -> None:

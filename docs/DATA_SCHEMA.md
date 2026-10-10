@@ -150,7 +150,8 @@ Validation runs in two layers:
   unknown's declared unit in the equation that defines it.
 - Every example re-solves: Noether solves `equations_used` for the first
   unknown (chaining them when there are several) and lands within 0.1% of
-  `final_answer` (`tests/test_data_loader.py`, a v0.4 exit criterion).
+  `final_answer` (checked by `validate_store`, so `askphysics validate-data` runs it; a v0.4
+  exit criterion).
 - No example reads like an eval question (same word-overlap check the data
   factory uses).
 - (v0.4) Re-solving with `solve_for` reproduces `final_answer` within 0.1%.
