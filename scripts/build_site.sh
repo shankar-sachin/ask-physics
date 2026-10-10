@@ -11,7 +11,7 @@ mkdir -p "$out/installers" "$out/images" "$out/py"
 # The page, the installers (copied as-is), and the artwork.
 cp web/index.html web/styles.css web/app.js web/worker.js "$out/"
 cp install.sh install.ps1 "$out/installers/"
-cp docs/images/logo.svg docs/images/banner.png docs/images/fermi-*.jpg "$out/images/"
+cp docs/images/logo.svg docs/images/banner.png docs/images/fermi-*.jpg docs/images/demo.mp4 docs/images/demo-poster.jpg "$out/images/"
 
 # The Python package the browser runs. Leave out the terminal and torch code:
 # the pipeline never imports it, and Pyodide can't load torch anyway. Of the
