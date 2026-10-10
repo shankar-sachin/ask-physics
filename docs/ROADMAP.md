@@ -39,7 +39,7 @@ tested on `fermi-luna-1`, without needing a GPU.
 - Data factory: standard, Fermi, out-of-scope, and explanation examples from
   the database, every standard example verified by Noether.
 - Training loop with seeded runs, bf16 autocast, checkpoints, and resumption.
-- CLI: `askphysics model build-data`, `train-tokenizer`, `train`, `info`.
+- CLI: `askphysics-dev model build-data`, `train-tokenizer`, `train`, `info`.
 - `torch` and `safetensors` as dependencies; CI on CPU wheels.
 
 **Exit criteria**
@@ -92,8 +92,8 @@ explains itself in its docs.
 - Model cards with measured throughput, training curves, eval results, and
   the OpenStax attribution.
 - Ship the trained weights (ADR-012): GitHub release assets pinned by a
-  checksum manifest, `askphysics model pull`, the installers and Homebrew
-  formula fetching tellus and solem, and celeste on first escalation.
+  checksum manifest, a download at install time (installers and Homebrew) and on
+  the first question, and celeste on first escalation if the user agrees (ADR-022).
 - Real-phrasing data from OpenStax *Physics* (ADR-016), uses (1) and (2): an
   eval of real questions with project-written gold plans the maintainer
   reviews, and its other questions as classify examples.

@@ -90,7 +90,7 @@ config, tests, and the demo. Anthropic is the first real provider.
 
 ## ADR-004: src layout and a Typer CLI
 
-**Status:** Accepted (v0.1.0)
+**Status:** Accepted (v0.1.0). Amended by ADR-022: there are two entry points, `askphysics` for users and `askphysics-dev` for maintainers.
 
 **Context.** We need a package layout that prevents accidentally importing
 from the working directory instead of the installed package, and a CLI that
@@ -251,7 +251,7 @@ Pro with 48 GB of unified memory.
 
 ## ADR-010: Model routing: split and escalate locally, usage tiers online
 
-**Status:** Accepted (v0.2.0), decided by the maintainer
+**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: celeste's escalation try runs only if celeste is installed or the user agrees to download it.
 
 **Context.** Three model sizes trade speed for quality. The maintainer
 specified a scheme: start on solem, get one celeste, drop to tellus after
@@ -312,7 +312,7 @@ installed, without loading weights; `llm/fermi_client.py` wraps each one.
 
 ## ADR-011: Install channels: curl, irm, and a Homebrew tap
 
-**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-023: WinGet is now a channel.
+**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: every channel downloads the models when it installs, and the Homebrew formula keeps them in `var`. Amended by ADR-023: WinGet is now a channel.
 
 **Context.** People should be able to try Ask Physics with one command,
 without knowing what a virtualenv is. The package depends on torch, whose
@@ -346,7 +346,7 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 
 ## ADR-012: Ship trained weights; users never train
 
-**Status:** Accepted (v0.2.0), decided by the maintainer
+**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: the installers run the hidden `install-models`, Homebrew downloads in `post_install`, and the maintainer commands this record names (`model pull`, `model package`) are `askphysics-dev` commands. celeste no longer downloads by itself on its first escalation: the CLI asks first.
 
 **Context.** The Fermi models are trained from scratch (ADR-009), which takes
 hours to a day on an M5 Pro. Asking every user to do that would make Ask
@@ -962,7 +962,8 @@ nothing new is installed.
 
 **Status:** Proposed. Phase 1 (the backend, the decoder seam, and parity tests) is implemented on
 `feat/browser-inference`; the speed and memory below are estimates until phase 2 measures them in
-real Pyodide (issue #66).
+real Pyodide (issue #66). The hosting of the site's weights is decided by the maintainer: Hugging Face
+Hub (last section below).
 
 **Context.** The website runs the real `askphysics` package in Pyodide in a Web Worker (ADR-013).
 Pyodide has numpy, SymPy, and pydantic, but no torch, so the Fermi models cannot run there as
@@ -996,8 +997,8 @@ but the browser has no torch.
 - **Both loaders refuse the same files.** The checks on a saved model (files present, `config.json`
   against the weights' metadata, task format version) moved from `checkpoints.py` into
   `lm/config.py`, torch-free, and both loaders call them.
-- **Not decided here:** where the weights are hosted for the site (Q20 in `OPEN_QUESTIONS.md`, which
-  needs the maintainer), and which matrix-product kernel Pyodide should use (below).
+- **Where the site gets the weights is decided below** (Hugging Face Hub). **Not decided here:** which
+  matrix-product kernel Pyodide should use (below).
 
 **Alternatives.**
 
@@ -1090,9 +1091,131 @@ smaller one with a plain message instead of failing (issue #66, third item). All
   and ADR-019 stand for them.
 - Phase 2 (needs real Pyodide, so not done here): wire `FermiClient` to the numpy engine in the
   worker; measure speed and memory in headless Chromium (`scripts/site_smoke.mjs`) and choose the
-  kernel; settle where the weights are hosted (Q20); add the loading and progress states; smoke-test
+  kernel; point the loader at the Hugging Face mirror (below); add the loading and progress states; smoke-test
   the eval questions through the built site. Tellus and solem ship only if those numbers are
   acceptable; celeste waits for a faster engine.
+
+**Where the site gets the weights (decided by the maintainer).** The site fetches tellus and solem
+from a **public model repository on the Hugging Face Hub**. This replaces Q20, which is closed.
+
+- *Why not the release assets the CLI uses.* GitHub release assets send no CORS headers
+  (checked 2026-10-10 against a public asset with an `Origin: https://askphysics.vercel.app`
+  header): `github.com/<repo>/releases/download/...` answers `302` with none, and the redirect
+  target, `release-assets.githubusercontent.com`, sends none either, so a cross-origin `fetch()`
+  from the site is blocked (GitHub community discussion #45446).
+  `raw.githubusercontent.com` does send them, but serves git content, and weights are never in git
+  (CLAUDE.md, golden rule 6).
+- *Why not Vercel static files.* Same origin, so no CORS, but the plan limits (I could not confirm
+  whether 100 MB on Hobby is per file or per deployment) and the bandwidth (66 MB per first visit,
+  so about 1,500 first visits on Hobby's 100 GB a month) would have become a constraint of ours,
+  and the build would have depended on GitHub being reachable from Vercel.
+- *Why Hugging Face.* It is free for public open weights, visitors need no account, it is built to
+  be fetched from browsers (to be confirmed with a real `fetch()` from the site's origin in phase
+  2), it puts no size pressure on the Vercel deployment, and it adds no server of ours (ADR-013).
+- *The risk, and why it is acceptable.* Hugging Face describes free public storage as best-effort
+  (https://huggingface.co/docs/hub/en/storage-limits), and the terms are not ours. Our files are
+  about 66 MB for tellus and solem together, far below anything that policy would bite on, so the
+  risk is low. Celeste (about 240 MB) stays off the site anyway (above).
+- *Nothing about the CLI changes.* GitHub release assets remain the canonical, checksummed source
+  (ADR-012, `weights.json`). The mirror holds the same bytes under the same file names. The browser
+  fetches them from Hugging Face and checks the same sha256 as `weights.json` pins, refusing a
+  mismatch, so the mirror is not trusted and a change of host is a change of URL. Uploading to the
+  mirror becomes a step of the weights release in `docs/RELEASING.md` in phase 2.
+- *Not done yet.* No Hugging Face repository exists, and the site wiring (URLs, the loading bar,
+  the hash check in the worker) is phase 2. Until then the site fetches no weights and stays on the
+  stand-in planner.
+
+---
+
+## ADR-022: Users get `askphysics`; maintainers get `askphysics-dev`
+
+**Status:** Accepted (v0.4), decided by the maintainer
+
+**Context.** `askphysics` carried everything: `ask` and `version`, but also `validate-data` and
+`model build-data / train-tokenizer / train / backend / bench / eval / pull / package / info`.
+Users never train (ADR-012), yet every one of those showed up in `askphysics --help`, in the docs,
+and in messages that told people to run `askphysics model pull`. Models also had to arrive without
+anyone typing a command: the curl and irm installers ran a pull, pip relied on the first question
+(#107), and Homebrew printed a caveat asking the user to run it, because a formula cannot write to
+the user's home directory.
+
+**Decision.**
+
+- **Two console scripts.** `askphysics` (`askphysics.cli:app`) has `ask` and `version`, and a
+  hidden `install-models` (below). `askphysics-dev` (`askphysics.devcli:main`) has `validate-data`
+  and the `model` group (`build-data`, `train-tokenizer`, `train`, `backend`, `bench`, `eval`,
+  `pull`, `package`, `info`) with the same names and options as before. Nothing else was user
+  facing, so nothing else is kept on `askphysics`. `askphysics --help` lists only `ask` and
+  `version`, and the user docs, the README's install and usage sections, the installers' output,
+  and every message `ask` prints name no maintainer command. Older ADRs and CHANGELOG entries keep
+  the names they were written with: read `askphysics model ...` there as `askphysics-dev model ...`.
+- **A guard.** `askphysics-dev` refuses to run, with one line on stderr and exit status 1, unless
+  it is a development install: `askphysics` is imported from `<repo>/src/askphysics` and the
+  repo's `pyproject.toml` (whose `[project]` name is `askphysics`) sits beside `src`. A source
+  checkout with `pip install -e` satisfies it, so contributors, CI, and `scripts/*.sh` are
+  unaffected; a wheel in `site-packages` or a `uv tool` install never does. The check runs in the
+  console script before anything is parsed (so not even `--help` prints) and again in the app's
+  callback. It is a guard against mistakes, not security: anyone can import `askphysics.devcli`.
+  There is no override variable.
+- **A hidden install command.** `askphysics install-models` (`hidden=True`, absent from `--help`
+  and the docs) is the verified download that `ask` does on a first question, done at install time:
+  tellus and solem, whichever is missing, into `$ASKPHYSICS_MODEL_DIR` (default
+  `~/.cache/askphysics/models`). It never replaces a complete local model, ignores
+  `ASKPHYSICS_AUTO_PULL` (installing asked for the download), succeeds quietly while nothing is
+  published, and exits 1 when a download fails. `install.sh` and `install.ps1` call it; on failure
+  they say the models will download on the first question instead, which is what happens. They
+  fall back to the old pull when the installed release has no `install-models` (anything before
+  v0.4), so an installer served from `main` still works with the latest release.
+- **celeste asks first.** tellus and solem download without asking (the maintainer's wish), but
+  celeste is 240 MB and rarely needed, so it never downloads by itself. When a question reaches
+  its escalation try and it is published but not installed, the CLI asks (`This question needs
+  celeste-1 (about 240.1 MB, a one-time download) to try harder`, with the size from the
+  manifest): `y` downloads it now with the usual verified pull and progress display and goes on
+  with it, `n` skips it, `a` (always) and `never` are saved. A no is remembered for the rest of
+  that `ask` (one question per run, however many escalation tries are configured), and the
+  skipped try is dropped as if celeste weren't there: it counts as neither an attempt nor the
+  failure the answer reports. The choice is `preferences.json` in the models directory
+  (`$ASKPHYSICS_MODEL_DIR`, default `~/.cache/askphysics/models`; delete the file to reset it),
+  and `ASKPHYSICS_CELESTE_DOWNLOAD=ask|always|never` overrides it. Nothing is ever asked without
+  an interactive terminal: with `--json`, a pipe, or no stdin, and on the website, celeste is
+  skipped unless it is installed or the saved choice is `always`. The prompt lives in the CLI
+  only. `Pipeline.from_settings` and `build_roster` take two optional callbacks,
+  `confirm_download(name, size) -> bool` and `download(name)`; without them (the default, and
+  the website) nothing is downloaded and celeste isn't routed unless installed. The same rule
+  covers `--model fermi-celeste-1`. `ASKPHYSICS_AUTO_PULL=0` turns every download that happens
+  while asking off, celeste's included.
+- **Every channel downloads at install time, with no user command.** curl and irm: the installer
+  runs `install-models`. pip: the first `ask` downloads (ADR-012, #107); its messages never name a
+  command. Homebrew: below.
+- **Homebrew keeps the models in `var`.** The tap formula (in `shankar-sachin/homebrew-tap`)
+  installs a small wrapper for `askphysics` that sets `ASKPHYSICS_MODEL_DIR` to
+  `#{var}/askphysics/models` unless the caller already set it, and runs `askphysics
+  install-models` in `post_install`. The snippet is in `docs/RELEASING.md`. I chose the environment
+  variable over a search path (the user directory first, then a read-only system directory)
+  because the directory `post_install` fills must be the one the program reads, and the one the
+  first question fills if `post_install` failed. A search path would need a second setting (where
+  the system directory is: Homebrew's prefix varies by platform), a rule for which copy wins and
+  where a download goes, and a change to every place that joins a models directory and a model name
+  (`installed_models`, `FermiClient`, `install`, the router). `ASKPHYSICS_MODEL_DIR` already
+  exists, is read in one place (`lm/paths.py`), and `ask` and `install-models` both honour it
+  (tests pin both).
+
+**Consequences.**
+
+- Contributors, scripts, CI, `CLAUDE.md`, and the docs say `askphysics-dev`. The installer
+  workflow no longer runs `validate-data` (it needs a checkout); CI's editable install still does.
+- The wheel still carries the `askphysics-dev` entry point, so `pip install` and `uv tool install`
+  put an executable by that name on the PATH. It does nothing but refuse, and the formula removes
+  it. Not listing it in `askphysics --help` or the docs is the extent of hiding it.
+- The tap formula is a separate repository and was not changed here; until the maintainer applies
+  the snippet, a brew install gets its models on the first question. The snippet has not been
+  run against Homebrew.
+- `brew uninstall` leaves `var/askphysics/models` behind (the caveat says how to remove it). On a
+  shared Homebrew a second user cannot write there; their first question degrades to the stand-in
+  with the permission error, and `ASKPHYSICS_MODEL_DIR` points them elsewhere.
+- Installed models are not replaced when a later release publishes new weights (the download
+  skips what is installed; unchanged from #107). That matters more now that Homebrew keeps models
+  across upgrades: Q21.
 
 ---
 

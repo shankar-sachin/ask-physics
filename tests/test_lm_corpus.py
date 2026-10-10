@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from askphysics import cli
+from askphysics import devcli
 from askphysics.lm.config import LUNA
 from askphysics.lm.corpus import (
     PROSE_TASK,
@@ -101,7 +101,7 @@ def test_cli_trains_with_prose(dataset: Path, tmp_path: Path) -> None:
     prose = _write(tmp_path / "p.jsonl", PARAGRAPHS)
     tok = tmp_path / "tok.json"
     r = runner.invoke(
-        cli.app,
+        devcli.app,
         ["model", "train-tokenizer", "--data", str(dataset), "--out", str(tok),
          "--vocab-size", "512", "--prose", str(prose)],
     )  # fmt: skip
@@ -109,9 +109,9 @@ def test_cli_trains_with_prose(dataset: Path, tmp_path: Path) -> None:
     args = ["model", "train", "--data", str(dataset), "--tokenizer", str(tok),
             "--out", str(tmp_path / "luna"), "--steps", "4", "--batch-size", "2",
             "--device", "cpu"]  # fmt: skip
-    r = runner.invoke(cli.app, [*args, "--prose", str(prose), "--prose-steps", "2"])
+    r = runner.invoke(devcli.app, [*args, "--prose", str(prose), "--prose-steps", "2"])
     assert r.exit_code == 0, r.output
-    r = runner.invoke(cli.app, [*args, "--prose-steps", "2"])
+    r = runner.invoke(devcli.app, [*args, "--prose-steps", "2"])
     assert r.exit_code == 1 and "need --prose" in r.output
 
 

@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 to_repo_root
-need_askphysics
+need_askphysics_dev
 directory=${directory:-$(models_dir)/$model}
 
 # Word-splits to nothing when --rescue-with isn't given.
@@ -59,11 +59,11 @@ ui_begin "Eval" "$about" "$steps"
 # confidently-wrong count, then a results panel.
 if [ -n "$against" ]; then
   # shellcheck disable=SC2086
-  phase_live "Scoring $against" askphysics model eval --model "$model" --directory "$against" \
+  phase_live "Scoring $against" askphysics-dev model eval --model "$model" --directory "$against" \
     --data "$data" --examples "$examples" $rescue_args
 fi
 # shellcheck disable=SC2086
-phase_live "Scoring $directory" askphysics model eval --model "$model" --directory "$directory" \
+phase_live "Scoring $directory" askphysics-dev model eval --model "$model" --directory "$directory" \
   --data "$data" --examples "$examples" $rescue_args
 if [ -n "$against" ]; then
   phase_live "Comparing the two" python3 "$(dirname "$0")/compare_evals.py" "$against/eval.json" \

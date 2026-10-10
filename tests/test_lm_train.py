@@ -11,7 +11,7 @@ import torch
 from safetensors.torch import load_file
 from typer.testing import CliRunner
 
-from askphysics import cli
+from askphysics import devcli
 from askphysics.lm import train as train_module
 from askphysics.lm.checkpoints import load_model
 from askphysics.lm.config import LUNA, ModelConfig
@@ -380,7 +380,7 @@ def test_cli_accepts_checkpoint_blocks_on_torch(
     tok_path = tmp_path / "tok.json"
     tokenizer.save(tok_path)
     r = CliRunner().invoke(
-        cli.app,
+        devcli.app,
         [
             "model", "train", "--model", "fermi-luna-1", "--backend", "torch", "--device", "cpu",
             "--checkpoint-blocks", "--steps", "5", "--tokenizer", str(tok_path),
@@ -392,7 +392,7 @@ def test_cli_accepts_checkpoint_blocks_on_torch(
 
 
 def test_cli_rejects_zero_grad_accum() -> None:
-    r = CliRunner().invoke(cli.app, ["model", "train", "--grad-accum", "0"])
+    r = CliRunner().invoke(devcli.app, ["model", "train", "--grad-accum", "0"])
     # CI forces color, and rich styles each hyphen of the option name on its own.
     plain = re.sub(r"\x1b\[[0-9;]*m", "", r.output)
     assert r.exit_code != 0 and "--grad-accum" in plain
@@ -429,7 +429,7 @@ def test_cli_end_to_end(tmp_path: Path) -> None:
     runner = CliRunner()
     data, tok, models = tmp_path / "data", tmp_path / "tok.json", tmp_path / "models"
     r = runner.invoke(
-        cli.app,
+        devcli.app,
         [
             "model",
             "build-data",
@@ -444,12 +444,12 @@ def test_cli_end_to_end(tmp_path: Path) -> None:
     assert r.exit_code == 0, r.output
     assert "no eval questions found" in r.output
     r = runner.invoke(
-        cli.app,
+        devcli.app,
         ["model", "train-tokenizer", "--data", str(data), "--out", str(tok), "--vocab-size", "512"],
     )
     assert r.exit_code == 0, r.output
     r = runner.invoke(
-        cli.app,
+        devcli.app,
         [
             "model",
             "train",
@@ -468,11 +468,11 @@ def test_cli_end_to_end(tmp_path: Path) -> None:
         ],
     )
     assert r.exit_code == 0, r.output
-    r = runner.invoke(cli.app, ["model", "info", "--directory", str(models)])
+    r = runner.invoke(devcli.app, ["model", "info", "--directory", str(models)])
     assert r.exit_code == 0 and "fermi-luna-1" in r.output
-    r = runner.invoke(cli.app, ["model", "info", "--directory", str(tmp_path / "empty")])
+    r = runner.invoke(devcli.app, ["model", "info", "--directory", str(tmp_path / "empty")])
     assert "No Fermi models installed" in r.output
-    r = runner.invoke(cli.app, ["model", "train", "--model", "fermi-blackhole-1"])
+    r = runner.invoke(devcli.app, ["model", "train", "--model", "fermi-blackhole-1"])
     assert r.exit_code == 1 and "unknown model" in r.output
 
 

@@ -22,7 +22,7 @@ esac
 release=$1
 shift
 to_repo_root
-need_askphysics
+need_askphysics_dev
 
 if [ $# -gt 0 ]; then
   models=$*
@@ -41,10 +41,10 @@ ui_begin "Release $release" "Package, score, and pin the weights; nothing is upl
 
 attribution=build/corpus/ATTRIBUTION.md
 for name in $models; do
-  set -- askphysics model package --model "$name" --release "$release"
+  set -- askphysics-dev model package --model "$name" --release "$release"
   [ -f "$attribution" ] && set -- "$@" --attribution "$attribution"
   phase "Package $name for $release" "$@"
-  phase_live "Score the packaged $name" askphysics model eval --model "$name" \
+  phase_live "Score the packaged $name" askphysics-dev model eval --model "$name" \
     --directory "build/release/$name" --examples 3000
   # The files this model ships, each with its size and whether its sha256 matches the pin.
   if [ "${DRY_RUN:-}" = "1" ]; then
@@ -58,4 +58,4 @@ done
 ui_end "Packaged $release" "Release failed" \
   "build/release/assets/::attach every file to a GitHub release tagged $release on main" \
   "src/askphysics/lm/weights.json::open a pull request with the new pins" \
-  "askphysics model pull --force::after it merges, checks the published copies"
+  "askphysics-dev model pull --force::after it merges, checks the published copies"

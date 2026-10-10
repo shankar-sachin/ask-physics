@@ -21,7 +21,13 @@ from pydantic import BaseModel, ValidationError
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import AskPhysicsError, LLMError, LLMResponseFormatError, UnitParseError
+from askphysics.errors import (
+    AskPhysicsError,
+    DownloadDeclinedError,
+    LLMError,
+    LLMResponseFormatError,
+    UnitParseError,
+)
 from askphysics.llm.base import Roster
 from askphysics.llm.routing import CELESTE, plan_route
 from askphysics.lm.checkpoints import load_model
@@ -71,11 +77,14 @@ class FermiClient:
         Raises:
             ConfigError: the weights are missing or were trained on another task format.
             LLMError: the weights had to be downloaded and couldn't be.
+            DownloadDeclinedError: the weights had to be downloaded and the user said no.
         """
         if self._decoder is None:
             if self.fetch is not None and not is_installed(self.directory):
                 try:
                     self.fetch()
+                except DownloadDeclinedError:
+                    raise
                 except AskPhysicsError as exc:
                     raise LLMError(f"couldn't download {self.name}: {exc}") from exc
             model, tokenizer = load_model(self.directory, select_device(self.device))
@@ -138,16 +147,32 @@ def _load(user: str) -> dict[str, Any]:
     return payload
 
 
-def build_roster(settings: Settings, data: DataStore, root: Path | None = None) -> Roster:
+def build_roster(
+    settings: Settings,
+    data: DataStore,
+    root: Path | None = None,
+    *,
+    confirm_download: Callable[[str, int], bool] | None = None,
+    download: Callable[[str], object] | None = None,
+) -> Roster:
     """Clients for each stage per ADR-010, sharing one loaded model per name.
+
+    celeste is 240 MB and rarely needed, so it never downloads by itself (ADR-022). When it
+    is published but not installed, it is *available* only if the caller passes
+    ``confirm_download(name, size_in_bytes) -> bool``; the question that reaches its try asks
+    once, and a no (or no callback, as on the website and without a terminal) skips the try
+    as if celeste weren't there. ``download(name)`` performs an approved download (the CLI
+    passes one that draws progress); the default is the plain verified pull. This module does
+    no terminal I/O of its own.
 
     Raises:
         ConfigError: no usable models are installed (see ``plan_route``).
     """
     root = root or default_model_dir()
     installed = installed_models(root)
-    # celeste is rarely needed, so it downloads on the first question that needs it.
-    available = [CELESTE] if settings.auto_pull and CELESTE in read_manifest() else []
+    published = read_manifest()
+    can_ask = settings.auto_pull and confirm_download is not None
+    available = [CELESTE] if can_ask and CELESTE in published else []
     route = plan_route(
         installed,
         forced=settings.model,
@@ -157,9 +182,19 @@ def build_roster(settings: Settings, data: DataStore, root: Path | None = None) 
     )
 
     def fetcher(name: str) -> Callable[[], object] | None:
-        if name in installed or name not in available:
+        if name in installed or name not in available or confirm_download is None:
             return None
-        return lambda: pull([name], root)
+        asked: list[bool] = []  # the answer, so one question is asked once
+
+        def fetch() -> object:
+            if not asked:
+                size = sum(f.size for f in published[name].files)
+                asked.append(confirm_download(name, size))
+            if not asked[0]:
+                raise DownloadDeclinedError(f"{name} wasn't downloaded")
+            return download(name) if download else pull([name], root)
+
+        return fetch
 
     clients = {
         name: FermiClient(

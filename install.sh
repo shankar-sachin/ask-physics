@@ -500,8 +500,14 @@ if [ "${ASKPHYSICS_SKIP_MODELS:-}" = "1" ]; then
   info "Skipping the Fermi models (ASKPHYSICS_SKIP_MODELS=1)"
 else
   n=$((n + 1))
-  fb_live "Download the Fermi models" "$n" "$total" "$bin_dir/askphysics" model pull --if-published \
-    || info "Couldn't download the models just now. Run later: askphysics model pull"
+  # A release before v0.4 has no install-models; there the same download has another name.
+  if "$bin_dir/askphysics" install-models --help >/dev/null 2>&1; then
+    set -- install-models
+  else
+    set -- model pull --if-published
+  fi
+  fb_live "Download the Fermi models" "$n" "$total" "$bin_dir/askphysics" "$@" \
+    || info "Couldn't download the models just now. They will download when you ask your first question."
 fi
 
 if [ "$newpath" = 1 ]; then

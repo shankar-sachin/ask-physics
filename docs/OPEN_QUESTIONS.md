@@ -211,63 +211,16 @@ relevant equation) is possible but changes the task format.
 (ADR-016), and the classifier keeps three categories. Revisit when the
 explain stage can answer in prose without a number.
 
-### Q20. Where do the weights live for the website?
+### Q21. How do installed models update when a release publishes new weights?
 
-**Needs the maintainer's decision.** The site (ADR-013, ADR-021, issue #66) must fetch the Fermi
-weights from the visitor's browser: tellus (about 6 MB), solem (about 60 MB), and celeste (about
-240 MB), bf16 safetensors, pinned by sha256 in `weights.json` (ADR-012). ADR-012 publishes them as
-GitHub release assets, which the CLI downloads fine but a browser may not be able to.
+`install-models` and the first-question download install only models that are missing, and never
+replace a complete one, so a locally trained model is safe (ADR-012, ADR-022). The cost: after a
+release that pins new bytes for tellus or solem, a machine that already has the old files keeps
+them. Homebrew makes this visible, because `var/askphysics/models` survives `brew upgrade`.
+Options: compare sizes and hashes of installed files with the manifest and re-download when they
+differ and the model is recognisably the published one (a marker file written by the download);
+a version stamp in the model folder; or tell users to delete the folder.
 
-What I found (checked 2026-10-10 with `curl` and an `Origin: https://askphysics.vercel.app`
-header against a public release asset, since no weights are published yet):
-
-- **GitHub release assets send no CORS headers.** `github.com/<repo>/releases/download/<tag>/<file>`
-  answers `302` with no `Access-Control-Allow-Origin`, redirecting to
-  `release-assets.githubusercontent.com` (Azure blob storage), whose `206`/`200` response has none
-  either. A cross-origin `fetch()` from the site is blocked by the browser. This matches GitHub
-  community discussion #45446 (asset downloads do not support CORS). `raw.githubusercontent.com`
-  does send `Access-Control-Allow-Origin: *`, but it serves files from git, and weights are never
-  in git (CLAUDE.md, golden rule 6). So the CLI's source of truth cannot be the browser's source.
-- **Vercel static files (the site's own host).** Same origin as the page, so no CORS at all, and
-  `vercel.json` can set long `Cache-Control: immutable` headers. The limits I could reach (a web
-  search of the Vercel docs; the docs site itself was blocked here, so confirm them before
-  relying): static file uploads of 100 MB on Hobby and 1 GB on Pro, and 100 GB (Hobby) or 1 TB
-  (Pro) of Fast Data Transfer a month. I could not confirm whether the 100 MB is per file or per
-  deployment. Against that: tellus (6 MB) fits either way. solem (60 MB) fits per file and, with
-  the site's roughly 15 MB, would fit a 100 MB total only barely. celeste (240 MB) does not fit on
-  Hobby either way and needs Pro. Bandwidth: each first visit costs a visitor 66 MB (tellus plus
-  solem) or 306 MB (with celeste), so 100 GB of transfer is about 1,500 first visits with solem
-  and about 330 with celeste, before browser caching of repeat visits.
-- **Weights would have to reach the Vercel build.** `scripts/build_site.sh` runs on Vercel from
-  the repo. It would download the release assets at build time, check them against `weights.json`,
-  and copy them into `build/site/`. That keeps one source of truth (the release plus the pinned
-  hashes) and nothing in git, but the build then depends on GitHub being reachable from Vercel,
-  and each deploy repeats the download.
-
-Candidates:
-
-1. **Static files on the Vercel site, copied from the release at build time.** No CORS, no new
-   account, one origin, easy caching. Limits above; probably tellus and solem only until the plan
-   or the file sizes are confirmed.
-2. **A CORS-friendly bucket with a custom domain** (for example Cloudflare R2 with a public bucket
-   and a CORS rule, or any object store that lets us set `Access-Control-Allow-Origin`). No size
-   pressure from Vercel and cheap egress, but a new account, a new bill or free-tier cap, and a
-   second place the release process must upload to.
-3. **A public model repository on a host that sends CORS headers** (Hugging Face Hub serves files
-   with CORS, to my knowledge, but I could not check from here). Free for open weights, but an
-   outside dependency, a second upload step, and terms we do not control.
-4. **GitHub Pages** (sends `Access-Control-Allow-Origin: *`; also unverified from here). A Pages
-   deployment made from a workflow that downloads the release assets keeps the weights out of
-   git. Files must stay under 100 MB, so celeste needs splitting or another host.
-5. **A CORS proxy.** Rejected: a third party in the path of every download, or a server of ours,
-   which ADR-013 avoids.
-
-**Recommendation (for the maintainer to accept or change):** serve tellus and solem from the
-Vercel site as static files copied from the pinned release at build time (candidate 1), with
-content-hashed file names and `immutable` caching; confirm the plan's per-file and per-deployment
-limits and the bandwidth before the first deploy. Leave celeste off the site until a faster engine
-exists (ADR-021 estimates minutes per attempt), which also removes the 240 MB file from the
-question. If the Vercel limits turn out to bite, candidate 2 is the next step.
-
-**Default for now:** nothing is published and the site fetches no weights; the site stays on the
-stand-in planner. The CLI keeps using release assets.
+**Default for now:** installed models are kept. A maintainer can force a replacement with
+`askphysics-dev model pull --force`, and a user can delete the models folder so the next question
+downloads again.

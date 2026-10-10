@@ -19,7 +19,7 @@ case ${1:-} in
   -h | --help) usage 0 ;;
 esac
 to_repo_root
-need_askphysics
+need_askphysics_dev
 
 ui_begin "Corpus" "The prose corpus for solem and celeste (ADR-017); quiet stretches are downloads" 1
 gate "Build the corpus" corpus python scripts/build_corpus.py "$@"

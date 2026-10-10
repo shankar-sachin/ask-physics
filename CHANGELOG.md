@@ -8,9 +8,28 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- celeste asks before it downloads (ADR-022). It used to download by itself the first time a
+  question reached its escalation try; now, when it is published but not installed, `askphysics
+  ask` on a terminal asks `This question needs celeste-1 (about 240.1 MB, a one-time download)
+  to try harder. Download it?` with `y`, `n`, `a` (always), and `never`. Yes downloads it with
+  the usual verified pull and progress display and continues with it; no skips it, as if it
+  weren't available, for the rest of that run. `a` and `never` are saved in `preferences.json` in
+  the models folder (delete the file to reset), and `ASKPHYSICS_CELESTE_DOWNLOAD=ask|always|never`
+  overrides it. With `--json`, no terminal, or on the website nothing is asked and celeste is
+  skipped unless it is installed or the choice is `always`. tellus and solem still download by
+  themselves. The pipeline takes the prompt as an optional callback and does no terminal I/O.
+- Homebrew installs download the models. The formula wraps `askphysics` so the models live in
+  Homebrew's `var/askphysics/models` (a place a formula can write; `ASKPHYSICS_MODEL_DIR` already chose
+  the folder, and a value the user sets still wins) and runs a new hidden `askphysics
+  install-models` in `post_install`, so the first brew-installed question needs no download.
+  `install-models` is the checksum-verified download `ask` does on a first question, done at
+  install time for tellus and solem; the curl and irm installers call it too, and when a
+  download fails they say the models will download on the first question. It is not in `--help`
+  and not for users to run (ADR-022; the Ruby snippet is in `docs/RELEASING.md`, not yet tested
+  against Homebrew).
 - `askphysics ask` downloads the published tellus and solem on the first question when they
   aren't installed (issue #66), so a pip or brew install, a skipped installer step, or models
-  published later need no `model pull`. It is the same checksum-verified pull with the same
+  published later need no extra step. It is the same checksum-verified pull with the same
   display, after a one-line heads-up, and `ASKPHYSICS_AUTO_PULL=0` turns it off along with
   celeste's. With `--json` or no terminal the display goes to stderr, a failed download degrades
   the answer and retries on the next `ask`, a locally trained model is never replaced, and
@@ -21,8 +40,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a KV cache and imports no torch and no `safetensors` package, so it can run in the browser under
   Pyodide. The constrained decoder now sits on a small `Engine` seam (`lm/engine.py`) and produces
   the same text over torch or numpy; the rules are written once, and decoding is unchanged.
-  Logits match torch to about 1e-5. The docs add Q20, where the website's weights should be hosted
-  (GitHub release assets send no CORS headers), which needs the maintainer's decision.
+  Logits match torch to about 1e-5. The website's weights will be mirrored on a public Hugging
+  Face Hub repository, because GitHub release assets send no CORS headers; the release assets
+  stay the checksummed source for the CLI (ADR-021; the site wiring is phase 2).
 - Plain questions with no numbers, and their look-alikes, are now trained and checked (issue
   #92; tellus needs retraining to learn them). The data gains one equation
   (`sound_speed_ideal_gas`, 111 in all) and four Fermi assumptions (`car_mass`,
@@ -180,6 +200,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The maintainer commands moved to a second command, `askphysics-dev`: `askphysics-dev
+  validate-data` and `askphysics-dev model build-data / train-tokenizer / train / backend /
+  bench / eval / pull / package / info`, with the same options as before. `askphysics` now has
+  only `ask` and `version`, and none of the messages it prints tells a user to run a
+  maintainer command (the stand-in hint says the models download on the next question).
+  `askphysics-dev` refuses to run unless the package is imported from a source checkout, which
+  `pip install -e` is, so contributors, CI, and the scripts work as before (ADR-022).
+  `make`, the scripts, CI, and the docs use the new name.
 - The rescue pass of `model eval --rescue-with` runs after scoring, over just the misses (it
   used to run inside the scoring loop), so it has a known length and its own progress. Results
   are the same.
@@ -331,6 +359,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `mu0`; `compute` and `sanity_check` rename the table symbol to the equation variable when the
   dimensions match, so a Coulomb constant never stands in for a spring constant. The table and
   equations are unchanged, and `validate-data` checks each alias (#74).
+- The 404 page's electron now passes behind Pip on the top of its orbit instead of over him on
+  both flybys.
 
 ## [0.3.0] - 2026-10-06
 

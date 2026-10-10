@@ -30,7 +30,7 @@ output folded into a few dimmed lines, and a log path if a step fails); see
 example and a clock time to finish, the valid-plan rate and confidently-wrong count as they
 settle, a bar of its own for the `--rescue-with` pass, and a results panel at the end.
 
-`train.sh` starts with a one-minute speed check (`askphysics model bench`). It times a few
+`train.sh` starts with a one-minute speed check (`askphysics-dev model bench`). It times a few
 training steps on each device and precision this machine has, at every batch width the
 training buckets produce up to the model's context (64, 96, ... 1024), then runs an evaluation
 pass at each width so the memory it reports covers both. It prints the tokens per second for
@@ -51,7 +51,7 @@ python3 -m venv .venv && source .venv/bin/activate
 make install                      # pip install -e ".[dev]"; on an arm64 Mac it also installs mlx
 python -c "import torch; print(torch.backends.mps.is_available())"   # want: True
 make check                        # lint, typecheck, validate-data, tests
-askphysics validate-data          # the seed data the factory builds from
+askphysics-dev validate-data          # the seed data the factory builds from
 ```
 
 ## 2. Smoke test (about a minute)
@@ -60,17 +60,17 @@ Train the tiny test model end to end, so a broken setup fails in seconds, not
 hours:
 
 ```bash
-askphysics model build-data --out build/smoke --examples 5000 --workers 4
-askphysics model train-tokenizer --data build/smoke --out build/smoke-tok.json --vocab-size 512
-askphysics model train --model fermi-luna-1 --data build/smoke --tokenizer build/smoke-tok.json \
+askphysics-dev model build-data --out build/smoke --examples 5000 --workers 4
+askphysics-dev model train-tokenizer --data build/smoke --out build/smoke-tok.json --vocab-size 512
+askphysics-dev model train --model fermi-luna-1 --data build/smoke --tokenizer build/smoke-tok.json \
   --out build/smoke-luna --steps 300
 ```
 
 ## 3. Build the real dataset
 
 ```bash
-askphysics model build-data --out build/data --examples 1000000 --workers 10
-askphysics model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192 \
+askphysics-dev model build-data --out build/data --examples 1000000 --workers 10
+askphysics-dev model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192 \
   --prose third_party/openstax-physics/prose.jsonl
 ```
 
@@ -98,8 +98,8 @@ askphysics model train-tokenizer --data build/data --out build/tokenizer.json --
 ## 4. Measure throughput
 
 ```bash
-askphysics model train --model fermi-tellus-1 --steps 200 --batch-size 32 --out build/probe/tellus
-askphysics model train --model fermi-solem-1  --steps 100 --batch-size 32 --out build/probe/solem
+askphysics-dev model train --model fermi-tellus-1 --steps 200 --batch-size 32 --out build/probe/tellus
+askphysics-dev model train --model fermi-solem-1  --steps 100 --batch-size 32 --out build/probe/solem
 ```
 
 Read tokens per second off the progress bar and write them into the table in
@@ -121,7 +121,7 @@ below), so train in short runs and extend only while validation loss keeps
 falling.
 
 ```bash
-caffeinate -dims askphysics model train --model fermi-tellus-1 \
+caffeinate -dims askphysics-dev model train --model fermi-tellus-1 \
   --data build/data --tokenizer build/tokenizer.json --steps 1500 --batch-size 32
 ```
 
@@ -161,7 +161,7 @@ output names the backend (`... steps · mlx · → dir`). Nothing else changes: 
 website still run on torch.
 
 - `--backend torch` trains on torch instead. `--backend mlx` fails with a message if mlx is
-  missing (`pip install -e ".[mlx]"` on the Mac). `askphysics model backend` prints the choice.
+  missing (`pip install -e ".[mlx]"` on the Mac). `askphysics-dev model backend` prints the choice.
 - A run resumes only on the backend that started it. Resuming a torch run with MLX, or the
   reverse, stops with a message that names the backend to use.
 - `--mlx-memory-gb N` sets the memory limit MLX works to stay under (default 70% of system
@@ -184,7 +184,7 @@ once (about 15 minutes for the first run, which downloads the books):
 
 ```bash
 python scripts/build_corpus.py
-askphysics model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192 \
+askphysics-dev model train-tokenizer --data build/data --out build/tokenizer.json --vocab-size 8192 \
   --prose build/corpus/prose.jsonl
 ```
 
@@ -207,7 +207,7 @@ reads real English, and its prose shows it. Give the models that write
 (solem, celeste) a language-modeling stage on the OpenStax text first:
 
 ```bash
-caffeinate -dims askphysics model train --model fermi-solem-1 \
+caffeinate -dims askphysics-dev model train --model fermi-solem-1 \
   --data build/data --tokenizer build/tokenizer.json --steps 3000 --batch-size 32 \
   --prose third_party/openstax-physics/prose.jsonl --prose-steps 200 --prose-share 0.05
 ```
@@ -242,7 +242,7 @@ solem's misses.
 2. Check celeste's speed and memory at full width (about two minutes):
 
    ```bash
-   askphysics model bench --model fermi-celeste-1 --width 1024 --batch-size 32
+   askphysics-dev model bench --model fermi-celeste-1 --width 1024 --batch-size 32
    ```
 
    It has four times solem's parameters, so expect roughly a quarter of solem's
@@ -274,8 +274,8 @@ solem's misses.
 ## 6. Check the results
 
 ```bash
-askphysics model info                                  # params, size, last validation loss
-askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a few minutes
+askphysics-dev model info                                  # params, size, last validation loss
+askphysics-dev model eval --model fermi-tellus-1 --examples 200   # task accuracy, a few minutes
 ```
 
 - The validation split uses held-out templates, so a falling validation loss
@@ -363,7 +363,7 @@ generic templates and 7 scenarios the model memorized every phrasing within
 
 ### Next
 
-1. Run `askphysics model eval` on tellus. If category accuracy and the valid
+1. Run `askphysics-dev model eval` on tellus. If category accuracy and the valid
    plan rate are high, tellus is good enough for its job (reading every
    question) and the classify loss is just prose.
 2. Probe solem's throughput (section 4), then train it in short runs, about

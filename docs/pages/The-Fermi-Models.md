@@ -31,8 +31,8 @@ No outside model ever writes training data.
 
 ## Results
 
-Held-out questions from templates the models never trained on (`askphysics model eval`,
-3,000 classification and 3,000 planning questions each):
+Held-out questions from templates the models never trained on (3,000 classification and
+3,000 planning questions each):
 
 | Check | tellus | solem |
 |---|---|---|
@@ -49,8 +49,9 @@ Speed and real-question results get measured for the v0.4 model cards.
 
 ## Getting them
 
-`askphysics model pull` downloads them, checked byte for byte against the manifest this
-version pins; the installers run it for you, and so does the first `askphysics ask` if they
-are missing (`ASKPHYSICS_AUTO_PULL=0` turns that off). Each model comes with its model card
+The installers and Homebrew download them for you when they install, checked byte for byte
+against the manifest this version pins, and the first `askphysics ask` does the same if they
+are missing (`ASKPHYSICS_AUTO_PULL=0` turns that off). celeste is the exception: it asks
+before downloading (see [Getting started](Getting-Started#celeste-asks-first)). Each model comes with its model card
 (`MODEL_CARD.md`: training, results, speed, credit) in its folder under
 `~/.cache/askphysics/models/`. You can also [train your own](Training-the-Models).

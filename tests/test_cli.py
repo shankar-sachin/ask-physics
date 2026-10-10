@@ -1,7 +1,5 @@
-import functools
 import json
-import shutil
-from collections.abc import Callable
+import re
 from pathlib import Path
 from typing import Any
 
@@ -10,15 +8,7 @@ from tests.conftest import DEMO_QUESTION
 from typer.testing import CliRunner
 
 from askphysics import cli
-from askphysics.data.loader import (
-    CONSTANTS_FILE,
-    EQUATIONS_FILE,
-    EXAMPLES_FILE,
-    FERMI_FILE,
-    default_data_dir,
-    load_all,
-)
-from askphysics.errors import ConfigError, DataValidationError
+from askphysics.errors import ConfigError
 
 runner = CliRunner()
 
@@ -27,62 +17,6 @@ def test_version_prints_the_package_version() -> None:
     result = runner.invoke(cli.app, ["version"])
     assert result.exit_code == 0
     assert "0.3.0" in result.output
-
-
-def test_validate_data_passes() -> None:
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 0
-    assert "all valid" in result.output
-
-
-def test_validate_data_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken(**_: object) -> None:
-        raise DataValidationError(["equation x: invalid unit 'blorps'"])
-
-    monkeypatch.setattr(cli, "load_all", broken)
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 1
-    assert "blorps" in result.output
-
-
-def _copy_data_with_example_edit(tmp_path: Path, edit: Callable[[Any], None]) -> Path:
-    for name in (EQUATIONS_FILE, EXAMPLES_FILE, CONSTANTS_FILE, FERMI_FILE):
-        shutil.copy(default_data_dir() / name, tmp_path / name)
-    examples = tmp_path / EXAMPLES_FILE
-    data = json.loads(examples.read_text())
-    edit(data)
-    examples.write_text(json.dumps(data))
-    return tmp_path
-
-
-def _validate_data_from(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> None:
-    """Make ``validate-data`` read the given copy of the seed data."""
-    monkeypatch.setattr(cli, "load_all", functools.partial(load_all, data_dir))
-
-
-def test_validate_data_fails_a_worked_example_with_the_wrong_value(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def scale_answer(d: list[dict[str, Any]]) -> None:
-        d[0]["final_answer"]["value"] *= 1000  # ex_kin_001: 15 m/s becomes 15000 m/s
-
-    _validate_data_from(monkeypatch, _copy_data_with_example_edit(tmp_path, scale_answer))
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 1
-    assert "data validation failed" in result.output
-    assert "re-solve gives" in result.output
-
-
-def test_validate_data_fails_a_worked_example_with_the_wrong_dimension(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def wrong_unit(d: list[dict[str, Any]]) -> None:
-        d[0]["final_answer"]["unit"] = "s"  # ex_kin_001 asks for a speed, not a time
-
-    _validate_data_from(monkeypatch, _copy_data_with_example_edit(tmp_path, wrong_unit))
-    result = runner.invoke(cli.app, ["validate-data"])
-    assert result.exit_code == 1
-    assert "does not match" in result.output
 
 
 def test_ask_renders_answer() -> None:
@@ -163,50 +97,10 @@ def test_ask_takes_an_unquoted_question() -> None:
     assert "19.8057" in result.output
 
 
-def test_pull_with_nothing_published_says_so() -> None:
-    result = runner.invoke(cli.app, ["model", "pull"])
-    assert result.exit_code == 1
-    assert "no trained weights are published" in result.output
-    quiet = runner.invoke(cli.app, ["model", "pull", "--if-published"])
-    assert quiet.exit_code == 0 and "no trained weights are published" in quiet.output
-
-
-def test_pull_downloads_and_verifies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    import hashlib
-    import io
-
-    from askphysics.lm import weights
-
-    files = {"model.safetensors": b"w" * 10, "config.json": b"{}", "tokenizer.json": b"{}"}
-    pinned = weights.PinnedModel("fermi-tellus-1", "r", tuple(
-        weights.PinnedFile(n, f"https://example.test/{n}", len(b), hashlib.sha256(b).hexdigest())
-        for n, b in files.items()
-    ))  # fmt: skip
-    monkeypatch.setattr(weights, "read_manifest", lambda path=None: {pinned.name: pinned})
-    monkeypatch.setattr(weights, "_open", lambda url: io.BytesIO(files[url.rsplit("/", 1)[1]]))
-    result = runner.invoke(cli.app, ["model", "pull", "--directory", str(tmp_path)])
-    assert result.exit_code == 0, result.output
-    assert "fermi-tellus-1 downloaded and verified" in result.output
-    assert (tmp_path / "fermi-tellus-1" / "model.safetensors").read_bytes() == files[
-        "model.safetensors"
-    ]
-
-
-def test_ask_without_models_says_how_to_get_them() -> None:
+def test_ask_without_models_says_why_a_stand_in_answered() -> None:
     result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
     assert "No Fermi models are installed" in result.output
-
-
-def test_train_refuses_prose_steps_that_leave_no_task_steps(tmp_path: Path) -> None:
-    prose = tmp_path / "prose.jsonl"
-    prose.write_text('{"source": "s", "title": "t", "text": "Some prose."}\n')
-    result = runner.invoke(
-        cli.app,
-        ["model", "train", "--model", "fermi-luna-1", "--steps", "3000", "--prose", str(prose),
-         "--prose-steps", "3000", "--tokenizer", str(tmp_path / "t.json")],
-    )  # fmt: skip
-    assert result.exit_code == 1
-    assert "never train on the tasks" in result.output and "--steps 6000" in result.output
+    assert "aren't published for this version yet" in _flat(result.output)
 
 
 # --- ask downloads published models it is missing (ADR-012) ---------------------------------
@@ -305,7 +199,8 @@ def test_ask_does_not_download_when_auto_pull_is_off(
     result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
     assert result.exit_code == 0, result.output
     assert opened == [] and not root.exists()
-    assert "askphysics model pull" in _flat(result.output)  # the old hint still says how
+    assert "Automatic downloads are off (ASKPHYSICS_AUTO_PULL=0)" in _flat(result.output)
+    assert "askphysics model" not in result.output  # the hint names no command
 
 
 def test_ask_with_the_fake_provider_never_downloads(
@@ -348,7 +243,7 @@ def test_a_checksum_mismatch_degrades_and_installs_nothing(
     assert "couldn't download the Fermi models" in _flat(result.output)
     assert "doesn't match the manifest" in _flat(result.output)
     assert "next question will try again" in _flat(result.output)
-    assert "askphysics model pull" in _flat(result.output)  # answered by the stand-in, as before
+    assert "download when you ask again" in _flat(result.output)  # the stand-in answered
     assert not (root / "fermi-tellus-1").exists()
     assert [p.name for p in root.iterdir()] == []  # no staging leftovers either
     first = len(opened)
@@ -430,3 +325,482 @@ def test_ask_on_a_terminal_shows_the_pull_display(
     assert "downloading the Fermi models" in _flat(buffer.getvalue())
     assert "downloaded and verified" in _flat(buffer.getvalue())
     assert "downloading" not in result.stdout  # the card prints on the terminal console
+
+
+# --- the user command list (ADR-022) ----------------------------------------------------------
+
+
+def test_help_lists_only_what_a_user_needs() -> None:
+    result = runner.invoke(cli.app, ["--help"])
+    assert result.exit_code == 0
+    # Rich forces color when GITHUB_ACTIONS is set, so drop the styling before reading the panel.
+    listed = re.sub(r"\x1b\[[0-9;]*m", "", result.output).split("Commands")[1]
+    commands = [line.split()[1] for line in listed.splitlines() if line.startswith("│ ")]
+    assert commands == ["ask", "version"]
+    assert not re.search(r"\bmodel\b|train|validate-data|install-models|askphysics-dev", listed)
+
+
+def test_the_registered_commands_are_ask_version_and_one_hidden_hook() -> None:
+    registered = {
+        (c.name or getattr(c.callback, "__name__", "").replace("_", "-")): c.hidden
+        for c in cli.app.registered_commands
+    }
+    assert registered == {"ask": False, "version": False, "install-models": True}
+    assert not cli.app.registered_groups  # no `model` group for users
+
+
+@pytest.mark.parametrize("command", ["validate-data", "model"])
+def test_the_dev_commands_are_not_on_the_user_command(command: str) -> None:
+    result = runner.invoke(cli.app, [command])
+    assert result.exit_code != 0
+    assert "No such command" in result.output
+
+
+# --- install-models: the installers' download, hidden from users ------------------------------
+
+
+def test_install_models_downloads_tellus_and_solem(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1", "fermi-celeste-1"))
+    result = runner.invoke(cli.app, ["install-models"])
+    assert result.exit_code == 0, result.output
+    assert "fermi-tellus-1 downloaded and verified" in _flat(result.output)
+    assert "fermi-solem-1 downloaded and verified" in _flat(result.output)
+    assert _kept(root, "fermi-tellus-1") and _kept(root, "fermi-solem-1")
+    assert not (root / "fermi-celeste-1").exists()  # celeste downloads when a question needs it
+    assert len(opened) == 6
+    again = runner.invoke(cli.app, ["install-models"])
+    assert again.exit_code == 0 and "already installed" in _flat(again.output)
+    assert len(opened) == 6  # nothing more is fetched
+
+
+def test_install_models_succeeds_quietly_when_nothing_is_published(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import socket
+    import urllib.request
+
+    from askphysics.lm import weights
+
+    root = _models_dir(monkeypatch, tmp_path)
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the network was used")
+
+    monkeypatch.setattr(weights, "_open", refuse)
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    result = runner.invoke(cli.app, ["install-models"])  # the shipped manifest is empty
+    assert result.exit_code == 0, result.output
+    assert "aren't published for this version yet" in _flat(result.output)
+    assert not root.exists()
+
+
+def test_install_models_installs_only_what_is_missing_and_keeps_local_models(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    local = root / "fermi-tellus-1"
+    local.mkdir(parents=True)
+    for file in MODEL_FILES:
+        (local / file).write_bytes(b"trained here")
+    opened = _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"))
+    result = runner.invoke(cli.app, ["install-models"])
+    assert result.exit_code == 0, result.output
+    assert all((local / f).read_bytes() == b"trained here" for f in MODEL_FILES)
+    assert not any("fermi-tellus-1" in url for url in opened)
+    assert _kept(root, "fermi-solem-1")
+
+
+def test_install_models_ignores_the_auto_pull_switch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # ASKPHYSICS_AUTO_PULL=0 stops the download on a question; an install asked for it.
+    root = _models_dir(monkeypatch, tmp_path)
+    _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"))
+    monkeypatch.setenv("ASKPHYSICS_AUTO_PULL", "0")
+    result = runner.invoke(cli.app, ["install-models"])
+    assert result.exit_code == 0, result.output
+    assert _kept(root, "fermi-tellus-1") and _kept(root, "fermi-solem-1")
+
+
+def test_install_models_fails_with_a_status_the_installers_can_test(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"), bad="fermi-tellus-1")
+    result = runner.invoke(cli.app, ["install-models"])
+    assert result.exit_code == 1
+    assert "couldn't download the Fermi models" in _flat(result.output)
+    assert "doesn't match the manifest" in _flat(result.output)
+    assert [p.name for p in root.iterdir()] == []  # nothing half-installed, no staging left
+
+
+def test_install_models_fails_when_the_network_is_down(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.lm import weights
+
+    root = _models_dir(monkeypatch, tmp_path)
+    _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"))
+
+    def offline(url: str) -> None:
+        raise OSError("network is unreachable")
+
+    monkeypatch.setattr(weights, "_open", offline)
+    result = runner.invoke(cli.app, ["install-models"])
+    assert result.exit_code == 1
+    assert "network is unreachable" in _flat(result.output)
+    assert not (root / "fermi-tellus-1").exists()
+
+
+def test_install_models_is_hidden_but_answers_help() -> None:
+    result = runner.invoke(cli.app, ["install-models", "--help"])
+    assert result.exit_code == 0  # the installers probe for it this way
+    assert "Download the published tellus and solem models" in _flat(result.output)
+
+
+# --- ASKPHYSICS_MODEL_DIR: where Homebrew keeps the models (ADR-022) ---------------------------
+
+
+def test_ask_and_install_models_share_the_models_directory_the_env_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Homebrew's wrapper sets ASKPHYSICS_MODEL_DIR to <prefix>/var/askphysics/models, which does
+    # not exist until post_install runs the installer hook.
+    root = tmp_path / "prefix" / "var" / "askphysics" / "models"
+    monkeypatch.setenv("ASKPHYSICS_MODEL_DIR", str(root))
+    opened = _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"))
+    installed = runner.invoke(cli.app, ["install-models"])
+    assert installed.exit_code == 0, installed.output
+    assert _kept(root, "fermi-tellus-1") and _kept(root, "fermi-solem-1")
+    assert len(opened) == 6
+    answered = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
+    assert answered.exit_code == 0, answered.output
+    assert "downloading" not in _flat(answered.output)
+    assert len(opened) == 6  # ask found what install-models put there
+
+
+def test_ask_downloads_into_the_directory_the_env_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # post_install failed, or the models were published later: the first question fills the
+    # same directory, and nothing lands under the home directory.
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    root = tmp_path / "brew" / "var" / "askphysics" / "models"
+    monkeypatch.setenv("ASKPHYSICS_MODEL_DIR", str(root))
+    _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"))
+    result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])
+    assert result.exit_code == 0, result.output
+    assert _kept(root, "fermi-tellus-1") and _kept(root, "fermi-solem-1")
+    assert not home.exists()
+
+
+def test_the_models_directory_defaults_to_the_cache_when_the_env_is_unset(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("ASKPHYSICS_MODEL_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"))
+    result = runner.invoke(cli.app, ["install-models"])
+    assert result.exit_code == 0, result.output
+    assert _kept(tmp_path / ".cache" / "askphysics" / "models", "fermi-tellus-1")
+
+
+# --- no message a user can see tells them to run a maintainer command -------------------------
+
+# What would send a user to a command that isn't theirs.
+FORBIDDEN = ("askphysics model", "askphysics-dev", "model pull", "validate-data", "docs/TRAINING")
+
+
+def _no_dev_commands(text: str) -> None:
+    flat = _flat(text)
+    for phrase in FORBIDDEN:
+        assert phrase not in flat, f"{phrase!r} in: {flat}"
+
+
+def test_the_messages_ask_prints_never_name_a_dev_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _models_dir(monkeypatch, tmp_path)
+    seen: list[str] = []
+    # Nothing published: the stand-in answers and says why.
+    seen.append(runner.invoke(cli.app, ["ask", DEMO_QUESTION]).output)
+    seen.append(runner.invoke(cli.app, ["ask", "--llm", "fermi", DEMO_QUESTION]).output)
+    # Published, but downloads are off, or the download fails.
+    _publish(monkeypatch, tmp_path, ("fermi-tellus-1", "fermi-solem-1"), bad="fermi-tellus-1")
+    seen.append(runner.invoke(cli.app, ["ask", DEMO_QUESTION]).output)
+    seen.append(runner.invoke(cli.app, ["ask", "--llm", "fermi", DEMO_QUESTION]).output)
+    seen.append(runner.invoke(cli.app, ["ask", "--model", "fermi-tellus-1", DEMO_QUESTION]).output)
+    monkeypatch.setenv("ASKPHYSICS_AUTO_PULL", "0")
+    seen.append(runner.invoke(cli.app, ["ask", DEMO_QUESTION]).output)
+    seen.append(runner.invoke(cli.app, ["ask", "--llm", "fermi", DEMO_QUESTION]).output)
+    seen.append(runner.invoke(cli.app, ["install-models"]).output)
+    for output in seen:
+        assert output.strip()
+        _no_dev_commands(output)
+
+
+def test_the_help_a_user_can_reach_never_names_a_dev_command() -> None:
+    for args in (["--help"], ["ask", "--help"], ["version"], ["install-models", "--help"]):
+        _no_dev_commands(runner.invoke(cli.app, args).output)
+
+
+def test_the_installers_never_tell_a_user_to_run_a_dev_command() -> None:
+    root = Path(cli.__file__).resolve().parents[2]
+    for name in ("install.sh", "install.ps1"):
+        for line in (root / name).read_text(encoding="utf-8").splitlines():
+            # Comments, and the fallback for a release before v0.4, which runs a command
+            # rather than printing one.
+            if not line.lstrip().startswith(("#", "set --")):
+                _no_dev_commands(line)
+
+
+def test_the_user_modules_name_no_dev_command_in_their_messages() -> None:
+    src = Path(cli.__file__).resolve().parent
+    for relative in ("cli.py", "llm/routing.py", "llm/fermi_client.py", "config.py"):
+        text = (src / relative).read_text(encoding="utf-8")
+        for phrase in ("askphysics model", "askphysics-dev", "askphysics validate-data"):
+            assert phrase not in text, (relative, phrase)
+
+
+USER_PAGES = (
+    "Home",
+    "Getting-Started",
+    "How-It-Works",
+    "Reading-an-Answer",
+    "Asking-Good-Questions",
+    "FAQ",
+    "The-Fermi-Models",
+    "Corpus-and-Licenses",
+)
+
+
+def test_the_user_docs_never_tell_a_user_to_run_a_dev_command() -> None:
+    root = Path(cli.__file__).resolve().parents[2]
+    for page in USER_PAGES:
+        _no_dev_commands((root / "docs" / "pages" / f"{page}.md").read_text(encoding="utf-8"))
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    _no_dev_commands(readme.split("## Quickstart")[0])  # the part written for users
+
+
+# --- celeste asks before it downloads (ADR-022) -----------------------------------------------
+
+CELESTE = "fermi-celeste-1"
+ALL_THREE = ("fermi-tellus-1", "fermi-solem-1", CELESTE)
+
+
+def _asker(
+    monkeypatch: pytest.MonkeyPatch, *, interactive: bool = True, quiet: bool = False, **env: str
+) -> "cli._CelesteDownloads":
+    from askphysics.config import Settings
+
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: interactive and not quiet)
+    return cli._CelesteDownloads(
+        Settings.from_env({f"ASKPHYSICS_{k.upper()}": v for k, v in env.items()}), quiet
+    )
+
+
+def _reply(monkeypatch: pytest.MonkeyPatch, text: str | None) -> list[str]:
+    """Type ``text`` at the next prompt (None: end of input). Returns the prompts seen."""
+    seen: list[str] = []
+
+    def fake_input(*args: object) -> str:
+        seen.append("asked")
+        if text is None:
+            raise EOFError
+        return text
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    return seen
+
+
+def test_the_prompt_names_celeste_and_its_real_size(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _reply(monkeypatch, "y")
+    assert _asker(monkeypatch).confirm(CELESTE, 240_100_000) is True
+    out = _flat(capsys.readouterr().out)
+    assert "This question needs celeste-1 (about 240.1 MB, a one-time download)" in out
+    assert "[a] always" in out and "[never]" in out
+
+
+@pytest.mark.parametrize("reply", ["y", "yes", "Y"])
+def test_yes_downloads_this_time_and_saves_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, reply: str
+) -> None:
+    from askphysics.lm.preferences import preferences_path, read_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, reply)
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is True
+    assert read_celeste_choice() is None and not preferences_path().exists()
+
+
+@pytest.mark.parametrize("reply", ["n", "no", "", "maybe", None])
+def test_anything_but_yes_skips_celeste_and_saves_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, reply: str | None
+) -> None:
+    from askphysics.lm.preferences import preferences_path
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, reply)
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is False
+    assert not preferences_path().exists()
+
+
+def test_always_downloads_and_is_never_asked_again(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from askphysics.lm.preferences import preferences_path, read_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, "a")
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is True
+    assert read_celeste_choice() == "always"
+    out = _flat(capsys.readouterr().out)
+    assert "Saved:" in out and "To change it, delete" in out  # how to reset it
+    assert str(preferences_path()) in "".join(out.split())  # (the line wraps)
+    prompts = _reply(monkeypatch, "n")  # a later ask: no prompt, whatever would be typed
+    later = _asker(monkeypatch)
+    assert later.choice == "always" and later.enabled
+    assert later.confirm(CELESTE, 1) is True and prompts == []
+
+
+def test_always_downloads_even_without_a_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    asker = _asker(monkeypatch, interactive=False, celeste_download="always")
+    assert asker.enabled and asker.confirm(CELESTE, 1) is True
+
+
+def test_never_skips_celeste_and_is_never_asked_again(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.lm.preferences import read_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, "never")
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is False
+    assert read_celeste_choice() == "never"
+    prompts = _reply(monkeypatch, "y")
+    later = _asker(monkeypatch)
+    assert later.choice == "never" and not later.enabled
+    assert later.confirm(CELESTE, 1) is False and prompts == []
+
+
+def test_the_environment_beats_the_saved_choice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.lm.preferences import save_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    save_celeste_choice("never")
+    assert _asker(monkeypatch).choice == "never"
+    assert _asker(monkeypatch, celeste_download="ask").choice == "ask"
+
+
+def test_nothing_is_asked_without_an_interactive_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    prompts = _reply(monkeypatch, "y")
+    no_tty = _asker(monkeypatch, interactive=False)
+    assert not no_tty.enabled and no_tty.confirm(CELESTE, 1) is False
+    as_json = _asker(monkeypatch, quiet=True)  # --json
+    assert not as_json.enabled and as_json.confirm(CELESTE, 1) is False
+    assert prompts == []
+
+
+def test_a_choice_that_cannot_be_saved_still_applies_this_time(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    blocker = tmp_path / "file"
+    blocker.write_text("x")
+    monkeypatch.setenv("ASKPHYSICS_MODEL_DIR", str(blocker / "models"))  # can't be created
+    _reply(monkeypatch, "a")
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is True
+    assert "couldn't save that choice" in _flat(capsys.readouterr().out)
+
+
+def test_ask_json_never_prompts_for_or_downloads_a_forced_celeste(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    prompts = _reply(monkeypatch, "y")
+    result = runner.invoke(cli.app, ["ask", "--json", "--model", CELESTE, DEMO_QUESTION])
+    assert result.exit_code == 0, result.output  # the stand-in answers; nothing was fetched
+    assert not any(CELESTE in url for url in opened) and not (root / CELESTE).exists()
+    assert prompts == []
+
+
+def test_ask_without_a_terminal_does_not_prompt_or_download_celeste(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    prompts = _reply(monkeypatch, "y")
+    result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # CliRunner: stdin is not a tty
+    assert result.exit_code == 0, result.output
+    assert not any(CELESTE in url for url in opened) and not (root / CELESTE).exists()
+    assert _kept(root, "fermi-tellus-1") and _kept(root, "fermi-solem-1")  # those still download
+    assert prompts == []
+
+
+def test_a_forced_celeste_prompts_then_downloads_on_yes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: True)
+    result = runner.invoke(cli.app, ["ask", "--model", CELESTE, DEMO_QUESTION], input="y\n")
+    assert "This question needs celeste-1" in _flat(result.output)
+    assert "fermi-celeste-1 downloaded and verified" in _flat(result.output)
+    assert _kept(root, CELESTE)
+    assert not (root / "fermi-tellus-1").exists()  # only the one that was asked for
+    assert len(opened) == 3
+
+
+def test_a_forced_celeste_prompts_then_skips_on_no(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: True)
+    result = runner.invoke(cli.app, ["ask", "--model", CELESTE, DEMO_QUESTION], input="n\n")
+    assert "This question needs celeste-1" in _flat(result.output)
+    assert not (root / CELESTE).exists() and not any(CELESTE in url for url in opened)
+
+
+def test_a_forced_celeste_downloads_with_the_saved_always(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    _publish(monkeypatch, tmp_path, ALL_THREE)
+    monkeypatch.setenv("ASKPHYSICS_CELESTE_DOWNLOAD", "always")
+    result = runner.invoke(cli.app, ["ask", "--json", "--model", CELESTE, DEMO_QUESTION])
+    assert "This question needs" not in result.output  # no prompt, no terminal
+    assert _kept(root, CELESTE)  # saved choice: download without asking, even with --json
+
+
+def test_the_pipeline_gets_the_callbacks_only_when_celeste_may_be_offered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.pipeline import Pipeline
+
+    _models_dir(monkeypatch, tmp_path)
+    seen: list[Any] = []
+    real = Pipeline.from_settings
+
+    def spy(settings: Any, data: Any = None, **kwargs: Any) -> Any:
+        seen.append(kwargs.get("confirm_download"))
+        return real(settings, data)
+
+    monkeypatch.setattr(Pipeline, "from_settings", staticmethod(spy))
+    runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # no terminal
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: True)
+    runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # a terminal
+    monkeypatch.setenv("ASKPHYSICS_CELESTE_DOWNLOAD", "never")
+    runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # a terminal, but never
+    assert [c is not None for c in seen] == [False, True, False]

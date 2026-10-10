@@ -332,9 +332,13 @@ Write-Result "Check that askphysics starts" "$Version"
 if ($env:ASKPHYSICS_SKIP_MODELS -eq "1") {
     Write-Info "Skipping the Fermi models (ASKPHYSICS_SKIP_MODELS=1)"
 } else {
-    Invoke-Live "Download the Fermi models" $Exe @("model", "pull", "--if-published")
+    # A release before v0.4 has no install-models; there the same download has another name.
+    $ModelArgs = @("install-models")
+    & $Exe install-models --help 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) { $ModelArgs = @("model", "pull", "--if-published") }
+    Invoke-Live "Download the Fermi models" $Exe $ModelArgs
     if ($script:LiveCode -ne 0) {
-        Write-Info "Couldn't download the models just now. Run later: askphysics model pull"
+        Write-Info "Couldn't download the models just now. They will download when you ask your first question."
     }
 }
 
