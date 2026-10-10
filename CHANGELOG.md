@@ -126,6 +126,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   values stated (for example "How fast is a rock moving after falling 20 m from rest?"), and a
   test runs every redirect through the data factory's gold path: a standard label, retrieval
   of the equation, and a plan that Noether solves.
+- Keyword retrieval reads quantities a question names by unit or by a word the equation tags
+  don't use: "100 W", "10 N", "how long", "velocity". Real-question recall at top 5 rises from
+  42 of 49 to 49 of 49 (`retrieval/aliases.py`). Equation data is unchanged.
 - A standard plan can no longer write a value the question never states. When a
   variable such as a mass had no legal number (none stated, nothing to assume), the
   decoder fell back to a loose list that included the structural 1, so the model could
