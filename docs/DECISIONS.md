@@ -398,6 +398,16 @@ them the moment v0.3 wires the models in.
   downloads the weights the first time a question reaches its escalation
   try; a failed download fails that try like any other, so the answer
   degrades instead of crashing.
+- `askphysics ask` pulls tellus and solem itself on the first question when they
+  are published but not installed, so nobody has to run `model pull` (pip or
+  brew installs, a skipped installer step, models published after install).
+  The logic is `_auto_pull` in `cli.py`, which calls the same verified `pull`,
+  shows the same `PullView` after a one-line heads-up, and uses the same
+  `Settings.auto_pull` switch as celeste. It prints to stderr with `--json` or
+  without a terminal, never replaces a complete local model, makes no network
+  request while the manifest is empty, and on any failure leaves `ask`
+  degraded as before; the next `ask` tries again. `Pipeline` and
+  `askphysics.web` never download.
 - The installers run `askphysics model pull --if-published` last, which
   succeeds quietly while nothing is published (`ASKPHYSICS_SKIP_MODELS=1`
   skips it). With no models installed, `ask` says how to get them.

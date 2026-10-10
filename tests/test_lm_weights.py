@@ -127,3 +127,15 @@ def test_a_newer_manifest_format_is_refused(tmp_path: Path) -> None:
     manifest.write_text(json.dumps({"format_version": 99, "models": {}}))
     with pytest.raises(ConfigError, match="upgrade askphysics"):
         read_manifest(manifest)
+
+
+def test_missing_published_lists_only_published_models_that_are_not_installed(
+    tmp_path: Path,
+) -> None:
+    from askphysics.lm.weights import missing_published
+
+    manifest = {m.name: m for m in (_published("fermi-tellus-1"), _published("fermi-solem-1"))}
+    pull(["fermi-tellus-1"], tmp_path, manifest=manifest, opener=Server())
+    names = ["fermi-tellus-1", "fermi-solem-1", "fermi-celeste-1"]
+    assert missing_published(names, tmp_path, manifest=manifest) == ["fermi-solem-1"]
+    assert missing_published(names, tmp_path, manifest={}) == []

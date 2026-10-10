@@ -50,6 +50,7 @@ Speed and real-question results get measured for the v0.4 model cards.
 ## Getting them
 
 `askphysics model pull` downloads them, checked byte for byte against the manifest this
-version pins; the installers run it for you. Each model comes with its model card
+version pins; the installers run it for you, and so does the first `askphysics ask` if they
+are missing (`ASKPHYSICS_AUTO_PULL=0` turns that off). Each model comes with its model card
 (`MODEL_CARD.md`: training, results, speed, credit) in its folder under
 `~/.cache/askphysics/models/`. You can also [train your own](Training-the-Models).

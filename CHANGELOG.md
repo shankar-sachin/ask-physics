@@ -8,6 +8,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `askphysics ask` downloads the published tellus and solem on the first question when they
+  aren't installed (issue #66), so a pip or brew install, a skipped installer step, or models
+  published later need no `model pull`. It is the same checksum-verified pull with the same
+  display, after a one-line heads-up, and `ASKPHYSICS_AUTO_PULL=0` turns it off along with
+  celeste's. With `--json` or no terminal the display goes to stderr, a failed download degrades
+  the answer and retries on the next `ask`, a locally trained model is never replaced, and
+  nothing touches the network while no weights are published.
+
 - Plain questions with no numbers, and their look-alikes, are now trained and checked (issue
   #92; tellus needs retraining to learn them). The data gains one equation
   (`sound_speed_ideal_gas`, 111 in all) and four Fermi assumptions (`car_mass`,
