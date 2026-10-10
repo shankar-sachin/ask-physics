@@ -78,8 +78,12 @@ failures are impossible by construction rather than caught afterwards:
 - **Equation ids:** only ids from the retrieval result can appear in
   `equation_ids`. Hallucinated equations cannot be emitted.
 - **Numbers:** a `value` can only be a number that appears in the question,
-  the constants table, the Fermi assumptions table, or the assumed 0 ("from
-  rest"). The structural 1 is never a value; it is only for prose (the
+  the constants table, the Fermi assumptions table, or the assumed 0. A table
+  constant fills only its own slot (`c` for `c`, `g` for `g`), not every
+  variable with matching units, and the 0 fills only an initial speed when the
+  question says the thing starts at rest ("from rest", "dropped", "released").
+  A stated "from 0 m/s" is a given value, and a momentum, force, mass, or time
+  is never 0. The structural 1 is never a value; it is only for prose (the
   `assumptions` and `strategy` text, for example `1/2 m v^2`). A slot with no
   legal value fails the plan (`PlanValidationError`): the router tries again
   or the answer degrades. The decoder never fills it in.

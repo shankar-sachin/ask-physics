@@ -95,9 +95,40 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   answered right, and where each miss stopped. The book's other 180
   calculation problems become classify examples in `model build-data`, so
   the models learn how real questions are phrased.
+- Training data for real phrasings: speed changes stated "from A to B" (for `kin_v_at` and
+  `impulse_momentum`), average acceleration over a velocity change, and rest cues ("starts
+  at rest", "released from rest", "is dropped"). Pure arithmetic ("What is 48 times 6?", also
+  with digits and as a homework line) is out of scope.
+- Number-free questions the Fermi assumptions and constants tables answer are trained as
+  Fermi questions, with varied phrasings: "How heavy is a freight train?", "How much energy is
+  locked up in the mass of a rubber duck?", "How fast is an adult at takeoff in a standing
+  jump?". Each one solves through Noether at build time. A speed of sound question needs a
+  speed-of-sound entry in the tables first, so none is trained yet.
+- Contrast pairs teach the out-of-scope boundary from both sides: "How fast is sadness?" and
+  "How heavy is justice?" are out of scope, next to "How fast is an adult at takeoff in a
+  standing jump?" and "How heavy is a freight train?", which are Fermi questions.
 
 ### Fixed
 
+- A plan can no longer fill a speed with the speed of light or zero a variable that was
+  stated or asked for (#91). A table constant filled any slot with matching units, so
+  `v = 299792458 m/s` showed up in "an average speed of 23.2 m/s" and "an angular velocity
+  of 5 rad/s"; it now fills only its own slot (`c`, `g`, `G`...), plus `g` for a free
+  acceleration when something falls, `c` for a speed when the question is about light, and
+  `e` for a charge when it names an electron or proton. The assumed 0 filled momenta,
+  accelerations, and times: it now fills only an initial speed with a rest cue ("from
+  rest", "dropped", "released"), or an acceleration for steady motion. "From 0 to 20 m/s"
+  gives a stated 0 and 20, and "from 20 m/s to 60 m/s" is `v0 = 20`, `v = 60` where the
+  equation has one initial and one final value. One stated quantity is no longer written
+  into two variables. These are decoder rules, so they apply to current weights without
+  retraining.
+- Out-of-scope redirects are answerable. Each redirect is now a standard question with its
+  values stated (for example "How fast is a rock moving after falling 20 m from rest?"), and a
+  test runs every redirect through the data factory's gold path: a standard label, retrieval
+  of the equation, and a plan that Noether solves.
+- Keyword retrieval reads quantities a question names by unit or by a word the equation tags
+  don't use: "100 W", "10 N", "how long", "velocity". Real-question recall at top 5 rises from
+  42 of 49 to 49 of 49 (`retrieval/aliases.py`). Equation data is unchanged.
 - A standard plan can no longer write a value the question never states. When a
   variable such as a mass had no legal number (none stated, nothing to assume), the
   decoder fell back to a loose list that included the structural 1, so the model could

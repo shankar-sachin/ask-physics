@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 
 import pytest
 import torch
@@ -171,11 +172,10 @@ def test_refusals_can_only_name_what_the_question_names() -> None:
     assert not any(r.startswith("Category error:") for r in reasons)  # no template matched
     math = "Not a physics question; it is pure math."
     assert redirect_options(question, math) == [
-        "How fast is a dropped rock moving after falling for a while?"
+        "How fast is a rock moving after falling 20 m from rest?",
+        "How fast is a rock moving after falling 12 m from rest?",
     ]
-    assert "How much does the human brain weigh?" in redirect_options(
-        "How much does a dream weigh?"
-    )
+    assert "How much does a 1.4 kg brain weigh?" in redirect_options("How much does a dream weigh?")
 
 
 def test_slots_are_filled_only_from_their_own_position() -> None:
@@ -189,9 +189,10 @@ def test_slots_are_filled_only_from_their_own_position() -> None:
         "out_of_scope", "How long does a dropped ball take to fall from a table"
     )
     assert not any("dropped ball take" in r for r in reasons)
+    # Redirects are fixed, answerable questions (#92): no slot text from the question.
     assert redirect_options(
         "What is the best taco topping?", "Not a physics question; it is a matter of taste."
-    ) == ["How much energy is in a typical slice of taco?"]
+    ) == ["How much kinetic energy does a 0.2 kg ball have at 3 m/s?"]
 
 
 def test_gold_classifications_are_always_options(store: DataStore) -> None:
@@ -221,9 +222,14 @@ def test_explanation_numbers_are_constrained(store: DataStore, tokenizer: Tokeni
 def test_greedy_decoding_is_deterministic(store: DataStore, tokenizer: Tokenizer) -> None:
     eqs = [store.equations["kin_v_squared"], store.equations["kin_x_at"]]
     consts = list(store.constants.values())
-    a = decode_plan(_decoder(tokenizer, 7), QUESTION, "standard", eqs, consts)
-    b = decode_plan(_decoder(tokenizer, 7), QUESTION, "standard", eqs, consts)
-    assert a == b
+
+    def run() -> Plan | str:
+        try:
+            return decode_plan(_decoder(tokenizer, 7), QUESTION, "standard", eqs, consts)
+        except PlanValidationError as exc:  # no time is stated, so a plan may fail (#85, #91)
+            return str(exc)
+
+    assert run() == run()
 
 
 def test_planning_needs_equations(tokenizer: Tokenizer) -> None:
@@ -296,7 +302,7 @@ def test_values_must_fit_their_variable(store: DataStore) -> None:
     assert not any(o.number == "69" for o in p)
     assert ValueOption("69", "m/s", "given") in v
     assert not any(o.number == "4.6" for o in v)
-    assert ValueOption("0", "m/s", "assumption") in v  # "dropped" still means v0 = 0
+    assert not any(o.origin == "assumption" for o in v)  # a velocity here is stated, not 0
 
 
 def test_units_stay_with_their_number(store: DataStore) -> None:
@@ -466,7 +472,9 @@ def test_zero_is_only_assumed_inside_the_typical_range(store: DataStore) -> None
     assert ValueOption("9.80665", "m/s^2", "constant") in g
     assert not any(o.origin == "assumption" for o in g)  # g = 0 is not physics
     kin = {v.symbol: v for v in store.equations["kin_v_at"].variables}
-    assert ValueOption("0", "m/s", "assumption") in known_value_options(kin["v0"], q, consts)
+    assert not any(o.origin == "assumption" for o in known_value_options(kin["v0"], q, consts))
+    rest = known_value_options(kin["v0"], "A ball is dropped from 11 m.", consts)
+    assert ValueOption("0", "m/s", "assumption") in rest  # "dropped" means v0 = 0
 
 
 # The force is the target and no mass is stated: m has no legal value, so the plan must
@@ -629,3 +637,223 @@ def test_a_chain_starts_from_the_equation_with_the_ask(store: DataStore) -> None
            store.equations["newton_second_law"]]  # fmt: skip
     q = "A 3 kg cart starts at 2 m/s and is pushed with 12 N for 4 s. Work out x."
     assert equation_options(eqs, q) == ["kin_x_at"]
+
+
+# ------------------------------------------------------- real phrasing (issue #91)
+
+
+class _EveryChoice(Decoder):
+    """A stand-in decoder that takes one scripted option at each choice, with no model.
+
+    ``plans_every_way`` re-runs ``decode_plan`` over every combination of options, so a test
+    can assert something about every plan any model could write, not just the ones that
+    random weights happen to reach. A listed assumption is never picked (they are prose), and
+    unless ``chain`` is set the plan has one equation and one unknown, the target.
+    """
+
+    def __init__(self, script: list[int], chain: bool) -> None:  # no model: only choices matter
+        self.script = script
+        self.chain = chain
+        self.sizes: list[int] = []
+
+    def start(self, prompt: str) -> None:
+        pass
+
+    def emit(self, fixed: str) -> None:
+        pass
+
+    def choose(self, options: Sequence[str], closer: str = "") -> str:
+        options = list(options)
+        if "]" in options and any(o.startswith('"') for o in options):
+            return "]"  # the assumptions list: take none
+        if "]" in options and not self.chain:
+            return "]"  # no second equation, no second unknown
+        at = len(self.sizes)
+        self.sizes.append(len(options))
+        return options[self.script[at] if at < len(self.script) else 0]
+
+    def free_text(self, allowed_numbers: Sequence[str], **_: object) -> str:
+        return "Solve for the unknown."
+
+
+def plans_every_way(
+    store: DataStore, question: str, equation_ids: Sequence[str], *, chain: bool = False
+) -> tuple[list[Plan], int]:
+    """Every plan the decoder can write for ``question``, and how many ways ended in failure."""
+    eqs = [store.equations[i] for i in equation_ids]
+    consts = relevant_constants(eqs, list(store.constants.values()))
+    plans: list[Plan] = []
+    failed = 0
+    script: list[int] = []
+    for _ in range(200_000):
+        decoder = _EveryChoice(script, chain)
+        try:
+            plans.append(decode_plan(decoder, question, "standard", eqs, consts))
+        except PlanValidationError:
+            failed += 1
+        picks = [script[i] if i < len(script) else 0 for i in range(len(decoder.sizes))]
+        while picks and picks[-1] + 1 >= decoder.sizes[len(picks) - 1]:
+            picks.pop()
+        if not picks:
+            return plans, failed
+        picks[-1] += 1
+        script = picks
+    raise AssertionError("the options never ran out")
+
+
+def _value(plan: Plan, symbol: str) -> float | None:
+    return next((k.value for k in plan.known_values if k.symbol == symbol), None)
+
+
+LIGHT_SPEED = 299792458.0
+
+AVG_SPEED_Q = (
+    "Work out the time interval if the average speed comes out to 23.2 m/s; "
+    "the distance comes out to 98 meters."
+)
+CENTRIPETAL_Q = (
+    "Calculate the centripetal acceleration of an object following a path with a radius of "
+    "a curvature of 0.2 m and at an angular velocity of 5 rad/s."
+)
+
+
+def test_a_speed_is_never_the_speed_of_light(store: DataStore) -> None:
+    # The speed of light fits the units of any speed; only a question about light may use it.
+    for question, ids in (
+        (AVG_SPEED_Q, ["avg_speed", "kin_x_avg_velocity"]),
+        (CENTRIPETAL_Q, ["centripetal_acceleration", "tangential_speed"]),
+    ):
+        plans, _ = plans_every_way(store, question, ids, chain=True)
+        assert plans, question
+        for plan in plans:
+            assert all(k.origin != "constant" for k in plan.known_values), (question, plan)
+            assert LIGHT_SPEED not in {k.value for k in plan.known_values}, (question, plan)
+
+
+def test_the_time_interval_plan_uses_each_stated_value_once(store: DataStore) -> None:
+    plans, failed = plans_every_way(store, AVG_SPEED_Q, ["avg_speed", "kin_x_avg_velocity"])
+    # v = d/t fits the question exactly. v0 and v of the other equation would both need the
+    # one stated speed (or the speed of light), so that way fails instead of being written.
+    assert [(p.equation_ids, p.target, _value(p, "v"), _value(p, "d")) for p in plans] == [
+        (["avg_speed"], "t", 23.2, 98.0)
+    ]
+    assert failed
+
+
+def test_the_centripetal_plan_never_fills_the_speed_with_a_constant(store: DataStore) -> None:
+    plans, _ = plans_every_way(
+        store, CENTRIPETAL_Q, ["centripetal_acceleration", "tangential_speed"], chain=True
+    )
+    # v = omega r gives the speed, so the chained plan takes omega and r as stated.
+    chained = [
+        p for p in plans if p.equation_ids == ["centripetal_acceleration", "tangential_speed"]
+    ]
+    assert any(
+        {k.symbol: k.value for k in p.known_values} == {"omega": 5.0, "r": 0.2} for p in chained
+    )
+    for plan in plans:  # whatever else it writes, a value is a stated number
+        assert {k.value for k in plan.known_values} <= {5.0, 0.2}, plan
+
+
+def test_light_and_electrons_may_use_their_constants(store: DataStore) -> None:
+    q = "A radio signal takes 1.28 s to travel between the Earth and the moon. How far is it?"
+    plans, _ = plans_every_way(store, q, ["avg_speed"])
+    assert any(_value(p, "v") == LIGHT_SPEED for p in plans)
+    q = "What is the force on an electron moving at 1000000 m/s in a 1.0 T field?"
+    plans, _ = plans_every_way(store, q, ["magnetic_force_charge"])
+    assert any(_value(p, "q") == 1.602176634e-19 for p in plans)
+
+
+KE_QUESTIONS = (
+    "A 1200 kg car travels at 25 m/s. What is its kinetic energy?",
+    "A ball of mass 0.145 kg is thrown at 40 m/s. How much kinetic energy does it have?",
+    "How much energy of motion does a 70 kg runner have at 6.0 m/s?",
+)
+
+
+@pytest.mark.parametrize("question", KE_QUESTIONS)
+def test_the_momentum_is_never_the_filler_zero(store: DataStore, question: str) -> None:
+    plans, _ = plans_every_way(
+        store, question, ["kinetic_energy", "kinetic_energy_momentum", "momentum"]
+    )
+    assert plans
+    for plan in plans:
+        assert _value(plan, "p") != 0.0, plan  # m and v are stated: p is never "0 kg*m/s"
+        assert plan.equation_ids[0] == "kinetic_energy", plan  # the one with room for v
+        assert {k.origin for k in plan.known_values} == {"given"}, plan
+
+
+RANGE_Q = "If a velocity increases from 0 to 20 m/s in 10 s, what is the average acceleration?"
+SPORTS_CAR_Q = (
+    "The driver of a sports car traveling at 10.0 m/s steps down hard on the accelerator for "
+    "5.0 s and the velocity increases to 30.0 m/s. What was the average acceleration of the "
+    "car during the 5.0 s time interval?"
+)
+IMPULSE_Q = (
+    "For how long should a force of 130 N be applied to an object of mass 50 kg to change "
+    "its speed from 20 m/s to 60 m/s?"
+)
+
+
+def test_the_asked_acceleration_is_never_set_to_zero(store: DataStore) -> None:
+    ids = ["kin_v_at", "kin_x_at", "kin_v_squared"]
+    for question in (RANGE_Q, SPORTS_CAR_Q):
+        plans, _ = plans_every_way(store, question, ids)
+        assert plans, question
+        for plan in plans:
+            assert plan.target == "a", (question, plan)  # not x or d
+            assert _value(plan, "a") is None, (question, plan)
+            assert all(k.origin == "given" for k in plan.known_values), (question, plan)
+
+
+def test_a_stated_zero_start_is_a_given_value(store: DataStore) -> None:
+    plans, _ = plans_every_way(store, RANGE_Q, ["kin_v_at"])
+    assert plans
+    for plan in plans:
+        v0 = next(k for k in plan.known_values if k.symbol == "v0")
+        assert (v0.value, v0.origin) == (0.0, "given"), plan  # stated, not assumed
+        assert _value(plan, "v") == 20.0 and _value(plan, "t") == 10.0, plan
+
+
+def test_the_sports_car_keeps_its_stated_speeds_and_time(store: DataStore) -> None:
+    plans, _ = plans_every_way(store, SPORTS_CAR_Q, ["kin_v_at"])
+    assert plans
+    for plan in plans:
+        assert {k.symbol: k.value for k in plan.known_values}.get("t") == 5.0, plan
+        assert sorted(k.value for k in plan.known_values) == [5.0, 10.0, 30.0], plan
+
+
+def test_from_a_to_b_is_initial_then_final(store: DataStore) -> None:
+    plans, _ = plans_every_way(store, IMPULSE_Q, ["impulse_momentum"])
+    assert plans
+    for plan in plans:
+        assert plan.target == "t", plan
+        assert (_value(plan, "v0"), _value(plan, "v")) == (20.0, 60.0), plan
+        assert (_value(plan, "F"), _value(plan, "m")) == (130.0, 50.0), plan
+
+
+def test_a_zero_start_needs_a_rest_cue(store: DataStore) -> None:
+    moving = "A car accelerates at 3 m/s^2 for 4 s. What is its final speed?"
+    plans, failed = plans_every_way(store, moving, ["kin_v_at"])
+    assert not plans and failed  # no speed to start from: the plan fails, v0 is not guessed
+    for cue in ("starts from rest", "is released from rest", "starts at rest"):
+        q = f"A car that {cue} accelerates at 3 m/s^2 for 4 s. What is its final speed?"
+        plans, _ = plans_every_way(store, q, ["kin_v_at"])
+        assert plans and all(_value(p, "v0") == 0.0 for p in plans), q
+        assert all(
+            next(k for k in p.known_values if k.symbol == "v0").origin == "assumption"
+            for p in plans
+        ), q
+
+
+@pytest.mark.parametrize("symbol", ["p", "F", "m", "t", "a"])
+def test_the_filler_zero_never_lands_on_other_variables(store: DataStore, symbol: str) -> None:
+    # Even from rest, only a starting speed is assumed 0.
+    q = "A cart is released from rest."
+    consts = list(store.constants.values())
+    for eq in store.equations.values():
+        for v in eq.variables:
+            if v.symbol == symbol and not v.name.startswith(("initial", "launch")):
+                assert not any(
+                    o.origin == "assumption" for o in known_value_options(v, q, consts)
+                ), (eq.id, v.name)

@@ -500,15 +500,36 @@ writes:
   eval (71.5% valid plans), whose misses wrote one speed into both v and v0
   or wrote v = 0 with "34 mph" sitting unused.
 
-- The only assumed filler is 0 ("from rest"), and only for a variable whose
-  `typical_range` includes 0: a speed can start at rest, g and a mass can't
-  be zero (the fifth eval wrote g = 0). If no value is legal for a slot, the
-  plan fails (`PlanValidationError`) and the router tries again or the answer
-  degrades; the decoder never fills the slot in with a loose value.
-  The data factory never assumes anything else. And a variable a table constant can fill (g) is
-  only the target when no open variable lacks such a fallback. Added after
-  the fourth eval, where "lifting it 11 m took 11000 J, what is its mass?"
-  was solved for g with an invented m = 1 kg.
+- The only assumed filler is 0, and only for an initial or launch speed (or
+  one of two collision speeds) when the question has a rest cue ("from rest",
+  "dropped", "released", "sitting still"), or for an acceleration when the
+  motion is steady ("cruises at a steady 30 m/s"); 0 must also be inside the
+  variable's `typical_range`. A stated "from 0 to 20 m/s" is two given values,
+  not an assumption. 0 never fills a final speed, momentum, force, mass, or
+  time, and never the target (the fifth eval wrote g = 0; the solem eval wrote
+  p = 0 for kinetic energy and a = 0 for the acceleration the question asked
+  for, #91). If no value is legal for a slot, the plan fails
+  (`PlanValidationError`) and the router tries again or the answer degrades;
+  the decoder never fills the slot in with a loose value, and never writes
+  one stated quantity into two variables.
+  The data factory never assumes anything else.
+- A table constant fills only a slot that is that constant: a variable named
+  "... constant" with its units (`G`, `k`, `R`, and `c` in the relativity
+  equations) or one with its own symbol (`g`). Matching units are not enough:
+  v = c is a speed of 299792458 m/s, and the solem eval wrote it into "an
+  average speed of 23.2 m/s" and "an angular velocity of 5 rad/s" (#91).
+  Three constants also fill the plain variable they are the value of, only
+  when the question says so: g for an acceleration when something falls or is
+  thrown, c for a speed when the question is about light or radiation, and e
+  for a charge when it names an electron or proton. A variable a table
+  constant can fill (g) is only the target when no open variable lacks such a
+  fallback. Added after the fourth eval, where "lifting it 11 m took 11000 J,
+  what is its mass?" was solved for g with an invented m = 1 kg.
+- "From A to B" (a number, a unit, then a second number and unit) names the
+  initial and the final value, in that order, when the equation has exactly one
+  initial and one final variable that fit: "change its speed from 20 m/s to
+  60 m/s" is v0 = 20 and v = 60 (solem had them backwards). It is read by a
+  rule (`transition_locks`) like a label, so a label that disagrees wins.
 
 - A number with no unit after it is a dimensionless quantity, so it can
   fill a friction coefficient, an efficiency, or a count; a number with a

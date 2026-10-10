@@ -13,6 +13,7 @@ from askphysics.lm.formats import (
     plan_numbers,
     plan_prompt,
     plan_units,
+    quantity_ranges,
     question_quantities,
     relevant_constants,
     serialize_classification,
@@ -146,3 +147,18 @@ def test_e_notation_is_never_split_into_a_number_and_the_unit_e() -> None:
         ("7.5e+19", "molecules")
     ]
     assert stated_quantities("6.3e+20, then 2 C") == [("2", "C"), ("6.3e+20", "dimensionless")]
+
+
+def test_a_range_gives_the_first_number_the_unit_of_the_second() -> None:
+    text = "If a velocity increases from 0 to 20 m/s in 10 s, what is the acceleration?"
+    assert quantity_ranges(text) == [(("0", "m/s"), ("20", "m/s"))]
+    assert question_quantities(text) == [("0", "m/s"), ("20", "m/s"), ("10", "s")]
+    assert stated_quantities(text) == [("0", "m/s"), ("20", "m/s"), ("10", "s")]  # none bare
+    assert quantity_ranges("from 5 km/h up to 9 km/h") == [(("5", "km/h"), ("9", "km/h"))]
+    assert quantity_ranges("from 20 m/s to 60 m/s") == [(("20", "m/s"), ("60", "m/s"))]
+
+
+def test_a_range_needs_a_unit_after_the_second_number() -> None:
+    assert quantity_ranges("goes from 12 to 3 in 4 s") == []  # "in" is a word here
+    assert quantity_ranges("from the first to the second, 4 m/s") == []
+    assert question_quantities("from 12 to 3 in 4 s") == [("3", "in"), ("4", "s")]

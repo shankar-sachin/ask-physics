@@ -5,13 +5,20 @@ from askphysics.lm.reading import (
     ask_spans,
     asked_symbols,
     asked_variables,
+    can_start_at_zero,
     contradicted,
+    gravity_cue,
     labelled_quantities,
+    light_cue,
     mentions,
     name_labels,
     own_tags,
+    particle_cue,
+    rest_cue,
     stated_givens,
+    steady_cue,
     symbol_locks,
+    transition_locks,
     twins,
 )
 
@@ -219,3 +226,80 @@ def test_asking_how_it_started_means_the_initial_speed(
     store: DataStore, text: str, asked: set[str]
 ) -> None:
     assert asked_symbols(text, store.equations["kin_v_at"].variables) == asked
+
+
+def test_from_a_to_b_is_the_initial_then_the_final_value(store: DataStore) -> None:
+    q = "For how long should a force act to change its speed from 20 m/s to 60 m/s?"
+    impulse = store.equations["impulse_momentum"].variables
+    assert transition_locks(q, impulse) == {"v0": ("20", "m/s"), "v": ("60", "m/s")}
+    work = store.equations["work_energy_theorem"].variables
+    assert transition_locks(q, work) == {"v0": ("20", "m/s"), "v": ("60", "m/s")}
+    # Only when there is one start and one end to name.
+    assert transition_locks(q, store.equations["kinetic_energy"].variables) == {}
+    assert transition_locks(q, store.equations["momentum"].variables) == {}
+    assert transition_locks(q, store.equations["inelastic_collision"].variables) == {}
+    # And one "from A to B" that fits them, in the units they have.
+    two = "from 20 m/s to 60 m/s, then from 5 m/s to 9 m/s"
+    assert transition_locks(two, impulse) == {}
+    assert transition_locks("from 2 s to 5 s", impulse) == {}
+
+
+def test_a_stated_zero_in_a_range_is_a_given_start(store: DataStore) -> None:
+    q = "If a velocity increases from 0 to 20 m/s in 10 s, what is the average acceleration?"
+    kin = store.equations["kin_v_at"].variables
+    assert transition_locks(q, kin) == {"v0": ("0", "m/s"), "v": ("20", "m/s")}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "A car starts from rest and speeds up.",
+        "A ball is dropped from a tower.",
+        "The cart starts at rest.",
+        "She is released at the top.",
+        "One cart is sitting still.",
+        "An object falls 20 m.",
+    ],
+)
+def test_rest_cues(text: str) -> None:
+    assert rest_cue(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "If a velocity increases from 0 to 20 m/s in 10 s, what is the average acceleration?",
+        "A car moves at 0 m/s and speeds up.",
+        "The driver of a sports car traveling at 10.0 m/s steps down hard on the accelerator.",
+        "Her restaurant is two blocks away.",
+    ],
+)
+def test_no_rest_cue(text: str) -> None:
+    assert not rest_cue(text)
+
+
+def test_only_a_starting_speed_can_start_at_zero(store: DataStore) -> None:
+    by_name = {(e.id, v.symbol): v for e in store.equations.values() for v in e.variables}
+    assert can_start_at_zero(by_name["kin_v_at", "v0"])
+    assert can_start_at_zero(by_name["vertical_launch_height", "v0"])
+    assert can_start_at_zero(by_name["inelastic_collision", "v2"])
+    for key in [
+        ("kin_v_at", "v"),
+        ("kin_v_at", "a"),
+        ("kin_v_at", "t"),
+        ("kinetic_energy_momentum", "p"),
+        ("newton_second_law", "F"),
+        ("newton_second_law", "m"),
+        ("momentum", "v"),
+    ]:
+        assert not can_start_at_zero(by_name[key]), key
+
+
+def test_steady_gravity_light_and_particle_cues() -> None:
+    assert steady_cue("A truck cruises at a steady 30 m/s for 5 s.")
+    assert not steady_cue("The sports car speeds up to 30 m/s.")
+    assert gravity_cue("A rock falls from a cliff.") and not gravity_cue("A car speeds up.")
+    assert light_cue("The signal is electromagnetic radiation.")
+    assert light_cue("What is the wavelength of red light?")
+    assert not light_cue("A light truck moves at 9 m/s.")
+    assert particle_cue("The force on an electron") and not particle_cue("The force on a ball")
