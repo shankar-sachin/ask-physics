@@ -72,7 +72,7 @@ from askphysics.models import (
     Variable,
 )
 from askphysics.prose import GENERIC_REASONS, content_words
-from askphysics.solver.units import check_dimensions, quantity
+from askphysics.solver.units import Quantity, check_dimensions, quantity
 
 CATEGORIES = ("standard", "fermi", "out_of_scope")
 DOMAINS = (
@@ -237,6 +237,10 @@ class Decoder:
     def text(self) -> str:
         return self._state.text
 
+    def room(self) -> int:
+        """Tokens the context window still has after the text written so far."""
+        return self.model.config.context_length - len(self._state.ids)
+
     def _feed(self, past: KVCache | None, tokens: Sequence[int]) -> tuple[KVCache, Tensor]:
         if not tokens:
             raise ValueError("nothing to feed")
@@ -375,12 +379,19 @@ class Decoder:
         until_end_token: bool = False,
         temperature: float = 0.0,
         generator: torch.Generator | None = None,
+        max_tokens: int | None = None,
     ) -> str:
-        """Generate text for a JSON string (stops before a quote) or for prose (stops at END)."""
+        """Generate text for a JSON string (stops before a quote) or for prose (stops at END).
+
+        Prose must end with the end token within ``max_tokens`` (default ``max_slot_tokens``);
+        otherwise it was cut off, and this raises ``LLMError`` rather than return a fragment.
+        """
+        limit = self.max_slot_tokens if max_tokens is None else max_tokens
         written = ""
         history: list[int] = []
+        ended = False
         allowed = self._prose_safe if until_end_token else self._string_safe
-        for _ in range(self.max_slot_tokens):
+        for _ in range(limit):
             logits = self._state.logits
             assert logits is not None
             masked = logits.float().masked_fill(~allowed, float("-inf"))
@@ -396,6 +407,7 @@ class Decoder:
             if choice is None or (
                 not number_open and written and stop_score >= float(masked[choice])
             ):
+                ended = choice is not None  # the stop above is the end token, not a dead end
                 break
             piece = self._text[choice]
             written += piece
@@ -405,6 +417,8 @@ class Decoder:
             self._state.text += piece
         # Re-encode so the cache matches the canonical tokenization of the text.
         self._sync(self._state.text)
+        if until_end_token and not ended:
+            raise LLMError(f"prose did not reach its end token within {limit} tokens")
         return written
 
     def _pick(
@@ -1070,8 +1084,7 @@ def _choose_assumptions(decoder: Decoder, options: Sequence[str]) -> list[str]:
 def decode_explanation(
     decoder: Decoder,
     question: str,
-    value: float,
-    unit: str,
+    result: Quantity,
     equations: Sequence[Equation],
     assumptions: Sequence[str],
     issues: Sequence[str] = (),
@@ -1079,12 +1092,20 @@ def decode_explanation(
     temperature: float = 0.0,
     seed: int = 0,
 ) -> str:
-    """Write prose about a computed result; digits can only spell numbers from the input."""
-    decoder.start(explain_prompt(question, value, unit, equations, assumptions, issues))
+    """Write prose about a computed result; digits can only spell numbers from the input.
+
+    The explanation may use the whole context window left after its prompt. If it does not
+    end within that, this raises ``LLMError`` so the pipeline degrades to the template.
+    """
+    decoder.start(explain_prompt(question, result, equations, assumptions, issues))
     generator = torch.Generator(device="cpu").manual_seed(seed)
-    numbers = explain_numbers(question, value, assumptions)
+    numbers = explain_numbers(question, result, assumptions)
     return decoder.free_text(
-        numbers, until_end_token=True, temperature=temperature, generator=generator
+        numbers,
+        until_end_token=True,
+        temperature=temperature,
+        generator=generator,
+        max_tokens=decoder.room(),
     ).strip()
 
 

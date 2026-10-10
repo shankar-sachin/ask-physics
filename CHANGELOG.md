@@ -158,6 +158,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   directory (the backup step used to look for `models.sh` after changing into the repo root) (#81).
 - `make check` runs `validate-data` as well as lint, typecheck and tests, so it matches the
   commit gate in `CLAUDE.md` and `scripts/check.sh` (#73).
+- An explanation is no longer cut off after 48 tokens. The Fermi model may use the whole context
+  window left after its prompt, so the assumptions clause at the end survives. An explanation that
+  still does not finish degrades to the template answer instead of showing a fragment (#83).
 - Numbers in a question are read whole (#97). "4.00 x 10^14 Hz", "1.0*10^6", "6.30x10^5",
   and "3.56e-13 J" were split into pieces ("4" and "10") or read as the wrong number, and
   "1,530 kHz" was read as 530, so the decoder never offered the right value and the plan could

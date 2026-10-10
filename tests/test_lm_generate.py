@@ -13,6 +13,7 @@ from askphysics.lm.factory import DataFactory, Example
 from askphysics.lm.formats import (
     classify_prompt,
     explain_numbers,
+    explain_prompt,
     extract_numbers,
     format_number,
     plan_numbers,
@@ -264,14 +265,68 @@ def test_gold_classifications_are_always_options(store: DataStore) -> None:
     assert checked > 300
 
 
-def test_explanation_numbers_are_constrained(store: DataStore, tokenizer: Tokenizer) -> None:
+def _end_bias(
+    decoder: Decoder, monkeypatch: pytest.MonkeyPatch, *, after: int, bias: float
+) -> None:
+    """Shift the end token's score by ``bias`` once ``after`` tokens have been written."""
+    original = decoder.model.step
+    written = 0
+
+    def biased(ids: torch.Tensor, past: object = None) -> tuple[torch.Tensor, object]:
+        nonlocal written
+        if past is not None:  # one call per generated token, after the prompt
+            written += 1
+        logits, new_past = original(ids, past)  # type: ignore[arg-type]
+        if written >= after:
+            logits[..., decoder.tokenizer.end_id] += bias
+        return logits, new_past
+
+    monkeypatch.setattr(decoder.model, "step", biased)
+
+
+def test_explanation_numbers_are_constrained(
+    store: DataStore, tokenizer: Tokenizer, monkeypatch: pytest.MonkeyPatch
+) -> None:
     decoder = _decoder(tokenizer, 1)
+    _end_bias(decoder, monkeypatch, after=20, bias=1000.0)
     eqs = [store.equations["kin_v_squared"]]
     text = decode_explanation(
-        decoder, QUESTION, 19.8057, "m/s", eqs, ["No drag"], temperature=1.0, seed=3
+        decoder, QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"], temperature=1.0, seed=3
     )
-    allowed = set(explain_numbers(QUESTION, 19.8057, ["No drag"]))
+    allowed = set(explain_numbers(QUESTION, quantity(19.8057, "m/s"), ["No drag"]))
     assert set(extract_numbers(text)) <= allowed
+
+
+def test_explanations_are_not_cut_at_the_slot_cap(
+    store: DataStore, tokenizer: Tokenizer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    torch.manual_seed(4)
+    decoder = Decoder(FermiLM(LUNA), tokenizer)  # the default 48-token slot cap
+    _end_bias(decoder, monkeypatch, after=100, bias=1000.0)
+    eqs = [store.equations["kin_v_squared"]]
+    text = decode_explanation(decoder, QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"])
+    assert len(tokenizer.encode(text)) > 48
+
+
+def test_explanation_without_an_end_token_is_an_llm_error(
+    store: DataStore, tokenizer: Tokenizer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    eqs = [store.equations["kin_v_squared"]]
+    prompt = explain_prompt(QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"])
+    room = 30  # tokens left after the prompt; the model never writes its end token
+    tiny = ModelConfig(
+        name="tiny",
+        vocab_size=LUNA.vocab_size,
+        d_model=32,
+        n_layers=1,
+        n_heads=2,
+        context_length=len(encode_task(tokenizer, prompt)) + room,
+    )
+    torch.manual_seed(0)
+    decoder = Decoder(FermiLM(tiny), tokenizer)
+    _end_bias(decoder, monkeypatch, after=0, bias=-1e9)
+    with pytest.raises(LLMError, match="end token"):
+        decode_explanation(decoder, QUESTION, quantity(19.8057, "m/s"), eqs, ["No drag"])
 
 
 def test_greedy_decoding_is_deterministic(store: DataStore, tokenizer: Tokenizer) -> None:

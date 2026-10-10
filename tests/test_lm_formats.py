@@ -23,6 +23,7 @@ from askphysics.lm.formats import (
 )
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, KnownValue, Plan
+from askphysics.solver.units import quantity, unit_string
 
 
 @pytest.mark.parametrize(
@@ -92,8 +93,20 @@ def test_prompts_start_with_task_tokens(store: DataStore) -> None:
     fermi = plan_prompt("q", "fermi", eqs, consts, list(store.fermi))
     assert standard.startswith(PLAN) and "fermi_assumptions" not in standard
     assert "rubber_duck_mass" in fermi
-    assert explain_prompt("q", 19.8057, "m/s", eqs, ["a"]).startswith(EXPLAIN)
-    assert '"value": 19.8057' in explain_prompt("q", 19.8057, "m/s", eqs, ["a"])
+    prompt = explain_prompt("q", quantity(19.8057, "m/s"), eqs, ["a"])
+    assert prompt.startswith(EXPLAIN)
+    assert '"value": 19.8057' in prompt
+    assert '"unit": "meter / second"' in prompt  # spelled as the training data spells units
+
+
+def test_unit_spelling_survives_the_explain_boundary(store: DataStore) -> None:
+    # The pipeline and the training data spell a unit with unit_string, and FermiClient rebuilds
+    # the Quantity from that spelling. It must spell the same way again, or the prompt drifts.
+    units = {v.unit for eq in store.equations.values() for v in eq.variables}
+    units |= {c.unit for c in store.constants.values()}
+    for unit in sorted(units):
+        spelled = unit_string(quantity(1.0, unit).units)
+        assert unit_string(quantity(1.0, spelled).units) == spelled, unit
 
 
 def test_allowed_numbers_and_units(store: DataStore) -> None:
@@ -113,7 +126,8 @@ def test_values_never_come_from_the_structural_one(store: DataStore) -> None:
     assert "1" in value_numbers("A 1 kg cart is pushed.", consts)  # stated, so legal
     units = plan_units("dropped from 20 ft", [store.equations["kin_v_squared"]], consts)
     assert units[0] == "ft" and "m/s^2" in units
-    assert explain_numbers("from 20 m", 19.8057, ["about 25 g"])[:3] == ["19.8057", "20", "25"]
+    result = quantity(19.8057, "m/s")
+    assert explain_numbers("from 20 m", result, ["about 25 g"])[:3] == ["19.8057", "20", "25"]
 
 
 def test_relevant_constants_match_by_dimension(store: DataStore) -> None:

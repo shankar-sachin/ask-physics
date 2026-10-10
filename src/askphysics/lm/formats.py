@@ -16,7 +16,13 @@ from typing import Any
 
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Constant, Equation, FermiAssumption, Plan
-from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
+from askphysics.solver.units import (
+    Quantity,
+    check_dimensions,
+    is_valid_unit,
+    quantity,
+    unit_string,
+)
 
 # The one number a standard plan may assume without it being stated: "from rest" means v0 = 0.
 # The data factory never assumes anything else. A 1 here let the model invent m = 1 kg (#85).
@@ -346,15 +352,18 @@ def _dumps_raw(value: Any) -> str:
 
 def explain_prompt(
     question: str,
-    value: float,
-    unit: str,
+    result: Quantity,
     equations: Sequence[Equation],
     assumptions: Sequence[str],
     issues: Sequence[str] = (),
 ) -> str:
+    """The explanation prompt for a computed ``result``, with its unit spelled as in training."""
     payload = {
         "question": question,
-        "result": {"value": _RawNumber(format_number(value)), "unit": unit},
+        "result": {
+            "value": _RawNumber(format_number(float(result.magnitude))),
+            "unit": unit_string(result.units),
+        },
         "equations": [{"id": eq.id, "name": eq.name} for eq in equations],
         "assumptions": list(assumptions),
         "issues": list(issues),
@@ -362,11 +371,11 @@ def explain_prompt(
     return EXPLAIN + _dumps_raw(payload)
 
 
-def explain_numbers(question: str, value: float, assumptions: Sequence[str]) -> list[str]:
+def explain_numbers(question: str, result: Quantity, assumptions: Sequence[str]) -> list[str]:
     """Numbers an explanation may mention: the result and anything in the question or plan."""
     return _unique(
         [
-            format_number(value),
+            format_number(float(result.magnitude)),
             *extract_numbers(question),
             *(n for a in assumptions for n in extract_numbers(a)),
         ]
