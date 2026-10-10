@@ -8,6 +8,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A 404 page for the website and the docs (`web/404.html`, served by Vercel for any missing path).
+  It has a physics joke headline, links home, to the docs and to the ask box, and a small original
+  mascot, Pip, drawn in inline SVG and animated in CSS: a dance on a 2.4 s loop with an electron
+  orbiting it. It holds still under `prefers-reduced-motion`, has no JavaScript, fits a phone
+  without sideways scroll, and follows light and dark system settings.
 - A fluid, continuous display for every shell script (`docs/SCRIPTS.md`, ADR-020). Each script
   opens with a header and closes with a summary (total time, what to run next); each step is a
   spinner that settles into a tick and the time it took, with a long command's output folded into
