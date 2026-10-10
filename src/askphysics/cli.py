@@ -6,7 +6,7 @@ import json
 import sys
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 from rich.table import Table
@@ -439,23 +439,6 @@ def backend_cmd(
         raise typer.Exit(code=1) from exc
 
 
-@model_app.command("phase", context_settings={"ignore_unknown_options": True})
-def phase_cmd(
-    command: Annotated[list[str], typer.Argument(help="The command to run, after --.")],
-    title: Annotated[str, typer.Option(help="What the phase is called.")],
-    inherit: Annotated[
-        bool,
-        typer.Option(help="Let the command draw its own live display (no spinner, no capture)."),
-    ] = False,
-) -> None:
-    """Run a command as a named phase: spinner, then a tick and the time it took (for scripts)."""
-    from askphysics.train_ui import run_phase
-
-    code = run_phase(console, title, command, inherit=inherit)
-    if code:
-        raise typer.Exit(code=code)
-
-
 @model_app.command("bench")
 def bench_cmd(
     model: Annotated[str, typer.Option(help="Model preset, e.g. fermi-solem-1.")] = "fermi-solem-1",
@@ -577,11 +560,18 @@ def eval_cmd(
     how often the answer `ask` would give is wrong while passing every check. Then ask the
     real textbook questions through the whole pipeline, the model doing every stage.
     With --rescue-with, a bigger model also plans the misses, as ask's escalation does."""
-    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+    from collections import Counter
 
+    from askphysics.eval_view import (
+        EvalMonitor,
+        print_results,
+        report_sections,
+        working,
+    )
     from askphysics.lm.checkpoints import default_model_dir, load_model
     from askphysics.lm.device import select_device
     from askphysics.lm.evaluate import (
+        EvalTick,
         evaluate_real,
         evaluate_tasks,
         read_real_questions,
@@ -592,7 +582,8 @@ def eval_cmd(
 
     model_dir = directory or default_model_dir() / model
     try:
-        loaded, tokenizer = load_model(model_dir, select_device(device))
+        with working(console, f"loading {model}"):
+            loaded, tokenizer = load_model(model_dir, select_device(device))
     except AskPhysicsError as exc:
         raise _fail(str(exc)) from exc
     picked = sample_examples(read_examples(data / "val"), examples, seed)
@@ -605,25 +596,22 @@ def eval_cmd(
     if rescue_with is not None:
         rescue_dir = rescue_directory or default_model_dir() / rescue_with
         try:
-            rescuer, rescue_tokenizer = load_model(rescue_dir, select_device(device))
+            with working(console, f"loading {rescue_with}"):
+                rescuer, rescue_tokenizer = load_model(rescue_dir, select_device(device))
         except AskPhysicsError as exc:
             raise _fail(str(exc)) from exc
         rescue = Decoder(rescuer, rescue_tokenizer)
     store = load_all()
-    with Progress(
-        TextColumn(f"[brand]scoring {model}"),
-        BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
-        MofNCompleteColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("eval", total=len(picked))
+    with EvalMonitor(
+        console, model, Counter(e.task for e in picked), rescue_with=rescue_with
+    ) as monitor:
         report = evaluate_tasks(
             decoder,
             picked,
             store,
             attempts=attempts,
             rescue=rescue,
-            on_progress=lambda n: progress.update(task, completed=n),
+            on_tick=monitor.on_tick,
         )
     real_report = None
     if real.exists():
@@ -640,54 +628,27 @@ def eval_cmd(
             settings=Settings(),
             roster=Roster(classify=client, plan=(client,) * attempts, explain=client),
         )
-        with Progress(
-            TextColumn(f"[brand]asking {model} real questions"),
-            BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
-            MofNCompleteColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("real", total=len(questions))
+        total = len(questions)
+        with EvalMonitor(
+            console,
+            model,
+            {"question": total},
+            label="asking",
+            noun="real textbook questions",
+            stats=False,
+        ) as asking:
             real_report = evaluate_real(
                 pipeline.solve,
                 questions,
                 store,
-                on_progress=lambda n: progress.update(task, completed=n),
+                on_progress=lambda n: asking.on_tick(EvalTick("score", n, total, "question")),
             )
         report.real = asdict(real_report)
     (model_dir / "eval.json").write_text(report.to_json(), encoding="utf-8")
 
-    table = Table(
-        title=Text(f"{model} on held-out questions", style="brand"),
-        title_justify="left",
-        border_style="muted",
-        header_style="label",
-    )
-    table.add_column("check")
-    table.add_column("score", justify="right")
-    rows = [
-        (f"right category ({report.classify_examples} classify)", report.category_accuracy),
-        (f"right equation ({report.plan_examples} plan)", report.equation_accuracy),
-        ("right target", report.target_accuracy),
-        ("right numbers and units", report.knowns_accuracy),
-        ("[accent]valid plan (right answer)[/]", report.valid_plan_rate),
-    ]
-    for label, score in rows:
-        table.add_row(label, f"{score:.1%}")
-    table.add_section()
-    tries = f"up to {attempts} tries, {report.mean_tries:.2f} on average"
-    table.add_row(
-        f"[accent]right answer as ask gives it[/] ({tries})", f"{report.routed_right_rate:.1%}"
-    )
-    table.add_row("wrong, but flagged or refused", f"{report.flagged_wrong_rate:.1%}")
-    table.add_row("[bad]confidently wrong[/]", f"{report.confidently_wrong_rate:.1%}")
-    if rescue_with is not None:
-        table.add_section()
-        table.add_row(f"{safe(rescue_with)} tried on {report.rescue_tried} misses", "")
-        table.add_row("rescued", f"{report.rescue_rate:.1%}")
-        table.add_row("right after escalation", f"{report.routed_with_rescue_rate:.1%}")
-        table.add_row("[bad]confidently wrong rescues[/]", str(report.rescue_confidently_wrong))
-        table.add_row("[muted]v0.4 target: rescues at least a third of the misses[/]", "")
-    console.print(table)
+    console.print()
+    sections, footer = report_sections(report, attempts=attempts, rescue_with=rescue_with)
+    print_results(console, f"{model} on held-out questions", sections, footer)
     for f in report.confidently_wrong[:5]:
         console.print(f"  [bad]confidently wrong:[/] {safe(f['question'])}")
         console.print(f"    [muted]expected[/] {safe(str(f['expected']))}")
@@ -702,20 +663,12 @@ def eval_cmd(
 
 
 def _show_real(model: str, report: RealReport, path: Path) -> None:
-    table = Table(
-        title=Text(f"{model} on {report.questions} real textbook questions", style="brand"),
-        title_justify="left",
-        border_style="muted",
-        header_style="label",
+    from askphysics.eval_view import print_results, real_sections
+
+    console.print()
+    print_results(
+        console, f"{model} on {report.questions} real textbook questions", real_sections(report)
     )
-    table.add_column("check")
-    table.add_column("score", justify="right")
-    table.add_row("classified standard", f"{report.standard_rate:.1%}")
-    table.add_row("right equations retrieved", f"{report.retrieved_rate:.1%}")
-    table.add_row("[accent]right answer as ask gives it[/]", f"{report.right_rate:.1%}")
-    table.add_row("no answer, or wrong but flagged", f"{report.flagged_wrong_rate:.1%}")
-    table.add_row("[bad]confidently wrong[/]", f"{report.confidently_wrong_rate:.1%}")
-    console.print(table)
     for miss in report.misses[:5]:
         console.print(f"  [muted]{safe(miss['stage'])}:[/] {safe(miss['question'])}")
         console.print(f"    [muted]expected[/] {safe(miss['expected'])}")
@@ -744,8 +697,7 @@ def pull_cmd(
     ] = False,
 ) -> None:
     """Download the published Fermi models, checked against the pinned manifest (ADR-012)."""
-    from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn
-
+    from askphysics.files_view import PullView
     from askphysics.llm.routing import CELESTE, SOLEM, TELLUS
     from askphysics.lm.paths import default_model_dir
     from askphysics.lm.weights import pull as pull_models
@@ -768,32 +720,19 @@ def pull_cmd(
     names = list(model) if model else [n for n in (TELLUS, SOLEM) if n in manifest]
     if all_models and CELESTE not in names:
         names.append(CELESTE)
-    with Progress(
-        TextColumn("[brand]{task.description}"),
-        BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
-        DownloadColumn(),
-        console=console,
-    ) as progress:
-        tasks: dict[str, Any] = {}
-
-        def update(name: str, done: int, total: int) -> None:
-            if name not in tasks:
-                tasks[name] = progress.add_task(name, total=total)
-            progress.update(tasks[name], completed=done)
-
-        results: dict[str, bool] = {}
+    with PullView(console) as view:
         for name in names:
-            tasks.clear()
-            progress.console.print(f"[label]{name}[/]")
+            if name in manifest:
+                files = [(f.name, f.size) for f in manifest[name].files]
+                view.start_model(name, files)
             try:
-                results |= pull_models(
-                    [name], root, manifest=manifest, force=force, progress=update
+                downloaded = pull_models(
+                    [name], root, manifest=manifest, force=force, progress=view.update
                 )
             except AskPhysicsError as exc:
                 raise _fail(str(exc)) from exc
-    for name, downloaded in results.items():
-        state = "downloaded and verified" if downloaded else "already up to date"
-        console.print(f"[ok]✓[/] {name} {state} in {safe(str(root / name))}")
+            pinned = [(f.name, f.size, f.sha256) for f in manifest[name].files]
+            view.finish_model(name, pinned, downloaded[name], root / name)
 
 
 @model_app.command("package")
