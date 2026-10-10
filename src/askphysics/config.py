@@ -36,8 +36,9 @@ class Settings:
         plan_attempts: Plans tried with the main planner before escalating (ADR-010).
         escalations: Extra plan attempts by celeste after those, when it is installed.
         device: Torch device for the Fermi models (mps, cuda, cpu); None picks the best.
-        auto_pull: Download celeste's published weights the first time a question needs
-            its escalation try (ADR-012). Off means celeste is used only when installed.
+        auto_pull: Download published weights that aren't installed: tellus and solem on the
+            first ``ask``, celeste the first time a question needs its escalation try
+            (ADR-012). Off means only installed models are used.
     """
 
     llm_provider: Provider = "auto"

@@ -42,8 +42,9 @@ Quotes are optional. Useful options:
 
 ## Get the models
 
-The installers download the Fermi models for you. To get them yourself, or after
-installing another way:
+You don't have to do anything: the first `askphysics ask` downloads tellus and solem if they
+aren't installed yet (about 66 MB, once, with a progress display), and the installers do it
+up front. To get them yourself, or after installing another way:
 
 ```bash
 askphysics model pull          # tellus and solem, about 66 MB
@@ -52,7 +53,8 @@ askphysics model pull --all    # celeste too, about 240 MB more
 
 Every file is checked against the sizes and hashes this version of Ask Physics pins, and
 anything that doesn't match is refused. celeste downloads by itself the first time a
-question needs it; set `ASKPHYSICS_AUTO_PULL=0` to stop that. Without models, `ask` uses a
+question needs it. Set `ASKPHYSICS_AUTO_PULL=0` to stop both downloads. If a download fails,
+`ask` still answers (with a stand-in) and says why, and the next `ask` tries again. Without models, `ask` uses a
 stand-in that only knows "dropped from a height" questions, and says so.
 
 ## Other commands
