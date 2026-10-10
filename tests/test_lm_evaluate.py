@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 from askphysics import cli
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
+from askphysics.errors import PlanValidationError
 from askphysics.llm.base import Roster
 from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import LUNA
@@ -111,6 +112,22 @@ def test_sample_is_fixed_and_per_task(dataset: Path) -> None:
     assert a == b
     assert {e.task for e in a} == {"classify", "plan"}
     assert all(sum(e.task == t for e in a) <= 4 for t in ("classify", "plan"))
+
+
+def test_a_plan_that_cannot_be_written_is_a_miss_not_a_crash(
+    store: DataStore, dataset: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_legal_value(*args: object, **kwargs: object) -> Plan:
+        raise PlanValidationError("no legal value for m")
+
+    monkeypatch.setattr("askphysics.lm.evaluate.decode_plan", no_legal_value)
+    torch.manual_seed(0)
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    decoder = Decoder(FermiLM(LUNA).eval(), tokenizer, max_slot_tokens=8)
+    picked = sample_examples(read_examples(dataset / "val"), per_task=2)
+    report = evaluate_tasks(decoder, picked, store)
+    assert report.plan_examples == 2
+    assert report.equation_accuracy == 0.0 and report.valid_plan_rate == 0.0
 
 
 def test_evaluate_runs_an_untrained_model(store: DataStore, dataset: Path) -> None:

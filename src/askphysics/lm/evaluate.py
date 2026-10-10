@@ -264,10 +264,18 @@ def evaluate_tasks(
             gold_p = Plan.model_validate_json(_gold(e.target))
             equations = [store.equations[eq["id"]] for eq in payload["equations"]]
             constants = [store.constants[c["name"]] for c in payload["constants"]]
-            predicted_p = decode_plan(
-                decoder, payload["question"], payload["category"], equations, constants
+            predicted_p: Plan | None
+            try:
+                predicted_p = decode_plan(
+                    decoder, payload["question"], payload["category"], equations, constants
+                )
+            except AskPhysicsError:
+                predicted_p = None  # a plan that can't be written is a miss, not a crash
+            score = (
+                score_plan(predicted_p, gold_p, store)
+                if predicted_p is not None
+                else PlanScore(equation=False, target=False, knowns=False, answer=False)
             )
-            score = score_plan(predicted_p, gold_p, store)
             report.plan_examples += 1
             for key in plan_hits:
                 plan_hits[key] += int(getattr(score, key))
@@ -304,7 +312,7 @@ def evaluate_tasks(
                         "template": e.template,
                         "question": payload["question"],
                         "expected": _summary(gold_p),
-                        "got": _summary(predicted_p),
+                        "got": _summary(predicted_p) if predicted_p is not None else "-",
                     }
                 )
         if on_progress:

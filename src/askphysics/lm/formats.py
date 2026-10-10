@@ -18,7 +18,11 @@ from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Constant, Equation, FermiAssumption, Plan
 from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
 
-# Always-allowed numbers: "dropped" means v0 = 0, "a single" object means 1.
+# The one number a standard plan may assume without it being stated: "from rest" means v0 = 0.
+# The data factory never assumes anything else. A 1 here let the model invent m = 1 kg (#85).
+FILLER_NUMBERS = ("0",)
+# Numbers only the prose of a plan (assumptions and strategy) may use: the 0 and 1 in
+# "v = 0" or "1/2 m v^2". A structural number is never a known value.
 STRUCTURAL_NUMBERS = ("0", "1")
 
 # Not preceded by identifier characters or an exponent: the 2 in m/s^2, the 1 in m^-1, or
@@ -174,18 +178,25 @@ def plan_prompt(
     return PLAN + dumps(payload)
 
 
-def plan_numbers(
+def value_numbers(
     question: str, constants: Sequence[Constant], fermi: Sequence[FermiAssumption] = ()
 ) -> list[str]:
-    """Every number a plan may contain: from the question, the tables, or structural defaults."""
+    """Every number a known value of a plan may be: from the question, the tables, or the filler."""
     return _unique(
         [
             *extract_numbers(question),
             *(format_number(c.value) for c in constants),
             *(format_number(a.default_value) for a in fermi),
-            *STRUCTURAL_NUMBERS,
+            *FILLER_NUMBERS,
         ]
     )
+
+
+def plan_numbers(
+    question: str, constants: Sequence[Constant], fermi: Sequence[FermiAssumption] = ()
+) -> list[str]:
+    """Every number a plan may write: its known values, and the structural numbers in its prose."""
+    return _unique([*value_numbers(question, constants, fermi), *STRUCTURAL_NUMBERS])
 
 
 def plan_units(

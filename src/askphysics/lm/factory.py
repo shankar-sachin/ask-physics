@@ -31,13 +31,13 @@ from askphysics.lm.formats import (
     classify_prompt,
     explain_prompt,
     format_number,
-    plan_numbers,
     plan_prompt,
     plan_units,
     question_quantities,
     relevant_constants,
     serialize_classification,
     serialize_plan,
+    value_numbers,
 )
 from askphysics.lm.reading import mentions, own_tags, twins
 from askphysics.lm.tokenizer import END
@@ -395,7 +395,7 @@ class DataFactory:
             assumptions=assumptions,
             strategy=self.rng.choice(tpl.CHAIN_STRATEGIES).format(**names),
         )
-        allowed_numbers = set(plan_numbers(question, constants))
+        allowed_numbers = set(value_numbers(question, constants))
         allowed_units = set(plan_units(question, retrieved, constants))
         if any(
             format_number(k.value) not in allowed_numbers or k.unit not in allowed_units
@@ -499,7 +499,7 @@ class DataFactory:
             ),
         )
         # Training targets must be outputs the constrained decoder could produce.
-        allowed_numbers = set(plan_numbers(question, constants))
+        allowed_numbers = set(value_numbers(question, constants))
         allowed_units = set(plan_units(question, retrieved, constants))
         if any(
             format_number(k.value) not in allowed_numbers or k.unit not in allowed_units
