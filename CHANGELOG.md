@@ -98,6 +98,19 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A plan can no longer fill a speed with the speed of light or zero a variable that was
+  stated or asked for (#91). A table constant filled any slot with matching units, so
+  `v = 299792458 m/s` showed up in "an average speed of 23.2 m/s" and "an angular velocity
+  of 5 rad/s"; it now fills only its own slot (`c`, `g`, `G`...), plus `g` for a free
+  acceleration when something falls, `c` for a speed when the question is about light, and
+  `e` for a charge when it names an electron or proton. The assumed 0 filled momenta,
+  accelerations, and times: it now fills only an initial speed with a rest cue ("from
+  rest", "dropped", "released"), or an acceleration for steady motion. "From 0 to 20 m/s"
+  gives a stated 0 and 20, and "from 20 m/s to 60 m/s" is `v0 = 20`, `v = 60` where the
+  equation has one initial and one final value. One stated quantity is no longer written
+  into two variables. These are decoder rules, so they apply to current weights without
+  retraining.
+
 - A standard plan can no longer write a value the question never states. When a
   variable such as a mass had no legal number (none stated, nothing to assume), the
   decoder fell back to a loose list that included the structural 1, so the model could
