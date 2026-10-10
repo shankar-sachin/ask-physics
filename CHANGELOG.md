@@ -8,6 +8,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Two install pages on the website: `/installers` (every way to install, each with a copy button:
+  curl, irm, Homebrew, WinGet, pip, the Windows installer, the raw scripts) and `/more-installers` (for
+  developers: the `sh` and `wget` variants, pinning with `ASKPHYSICS_REF`, source installs,
+  uninstalling, verifying a download, and a table of every release with its installers, fetched
+  from the GitHub API in the browser).
+
 - `askphysics ask` downloads the published tellus and solem on the first question when they
   aren't installed (issue #66), so a pip or brew install, a skipped installer step, or models
   published later need no `model pull`. It is the same checksum-verified pull with the same
@@ -167,6 +173,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Shorter installer URLs: `curl -fsSL https://askphysics.vercel.app/install.sh | bash` and
+  `irm https://askphysics.vercel.app/install.ps1 | iex`. The old `/installers/install.sh` and
+  `/installers/install.ps1` paths still serve the same files. `install.sh` runs the same under
+  `bash` and `sh`.
 - The rescue pass of `model eval --rescue-with` runs after scoring, over just the misses (it
   used to run inside the scoring loop), so it has a known length and its own progress. Results
   are the same.

@@ -1,0 +1,145 @@
+/* The install pages (/installers and /more-installers). Loads after styles.css, so it uses the
+   same tokens, fonts, header and footer, and adds only what those pages need. */
+
+.page-head { padding: 56px 0 8px; }
+.page-head h1 { font-size: clamp(34px, 6vw, 56px); }
+.page-head .lede { margin: 12px 0 0; max-width: 680px; font-size: 17px; color: #c8cbe0; }
+.crumb { font: 13px var(--mono); color: var(--muted); margin: 0 0 14px; }
+.crumb a { color: var(--label); }
+
+.install-page section { padding: 36px 0 8px; }
+.install-page h2 { font-size: clamp(22px, 3.4vw, 30px); }
+.install-page h3 { font: 600 17px var(--display); margin: 0 0 4px; letter-spacing: -0.01em; }
+.install-page p { margin: 0 0 12px; }
+.install-page .sub { margin-bottom: 16px; }
+.install-page .note { color: var(--muted); font-size: 14px; }
+.install-page code.inline, .install-page p code, .install-page li code, .install-page td code {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px;
+  overflow-wrap: anywhere;
+}
+
+/* option cards */
+.opts { display: grid; gap: 14px; }
+.opt {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+  min-width: 0;
+}
+.opt-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.opt-head h3 { margin: 0; }
+.tag {
+  display: inline-block; padding: 1px 9px; border-radius: 999px; font: 600 12px var(--mono);
+  border: 1px solid var(--line); color: var(--label); white-space: nowrap;
+}
+.tag.os { color: var(--cyan); border-color: rgba(139, 233, 253, 0.35); }
+.tag.soon { color: var(--warn); border-color: rgba(241, 250, 140, 0.35); }
+.tag.latest { color: #07120b; background: var(--ok); border-color: transparent; }
+.tag.models { color: var(--violet); border-color: rgba(189, 147, 249, 0.45); }
+.tag.pre { color: var(--warn); border-color: rgba(241, 250, 140, 0.35); }
+
+/* a command and its Copy button (the shared script copies the element before the button) */
+.install-page .cmd {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; margin: 8px 0 0;
+}
+.install-page .cmd code, .install-page .cmd pre {
+  margin: 0; min-width: 0; overflow-x: auto; white-space: pre; color: var(--text);
+  font: 14px/1.55 var(--mono); background: none; border: 0; padding: 0;
+}
+.install-page .cmd pre code { font: inherit; }
+.install-page .cmd .prompt { color: var(--muted); user-select: none; }
+.install-page .cmd.wrap code, .install-page .cmd.wrap pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.install-page .copy { align-self: start; }
+.install-page .cmd:not(.multi) .copy { align-self: center; }
+
+.dl-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.btn.small { padding: 8px 14px; font-size: 14px; }
+.btn svg { vertical-align: -3px; margin-right: 6px; }
+
+.callout {
+  margin-top: 16px; padding: 12px 16px; border-left: 3px solid var(--cyan);
+  background: rgba(139, 233, 253, 0.06); border-radius: 0 8px 8px 0; color: #c8cbe0; font-size: 15px;
+}
+.callout p:last-child { margin-bottom: 0; }
+
+/* developer page: denser, monospace-heavy */
+.dev { font-size: 15px; }
+.dev .page-head .lede { font-family: var(--mono); font-size: 14px; color: var(--label); }
+.dev h2 { font-family: var(--mono); font-weight: 600; letter-spacing: -0.01em; font-size: clamp(18px, 3vw, 22px); }
+.dev h2::before { content: "# "; color: var(--violet); }
+.dev section { padding-top: 28px; }
+.dev .cmd { margin-top: 6px; }
+.dev .cmd code, .dev .cmd pre { font-size: 13px; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 13px var(--mono); margin: 16px 0 0; padding: 0; list-style: none; }
+.toc a { color: var(--label); }
+.toc a:hover { color: var(--cyan); }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pair > div { min-width: 0; }
+.lbl { font: 600 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 18px 0 0 !important; }
+.pair > div > .lbl:first-child { margin-top: 0 !important; }
+.pair { row-gap: 4px; }
+#versions h3 { margin-top: 28px; }
+
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+table.vars, table.rels { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.vars th, table.vars td, table.rels th, table.rels td {
+  text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line);
+}
+table.vars tr:last-child td, table.rels tr:last-child td { border-bottom: 0; }
+table.vars th, table.rels th {
+  font: 600 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.02);
+}
+table.vars { min-width: 560px; }
+table.vars td:first-child { white-space: nowrap; font-family: var(--mono); color: var(--eq); }
+table.vars td code { background: none; border: 0; padding: 0; color: var(--text); }
+
+/* releases */
+.rels .ver { font: 600 15px var(--mono); white-space: nowrap; }
+.rels .ver a { color: var(--text); }
+.rels .ver .tag { margin-left: 6px; }
+.rels .date, .rels .size { font: 13px var(--mono); color: var(--muted); white-space: nowrap; }
+.rels ul.assets { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rels ul.assets li { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.rels ul.assets .size { margin-left: 0; }
+.rels .kind { color: var(--muted); font: 12px var(--mono); }
+.rels details summary { cursor: pointer; color: var(--label); font: 13px var(--mono); }
+.rels details[open] summary { margin-bottom: 4px; }
+.rels details .cmd { margin-top: 6px; }
+.rels tr.latest-row td { background: rgba(80, 250, 123, 0.04); }
+.state {
+  padding: 18px 20px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted);
+  font: 14px var(--mono);
+}
+.state.error { border-color: rgba(255, 110, 110, 0.5); color: var(--text); }
+.state.error b { color: var(--bad); }
+.spin {
+  display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px;
+  border: 2px solid var(--line); border-top-color: var(--cyan); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+  .page-head { padding-top: 36px; }
+  .opt { padding: 14px; }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+  .install-page .cmd { padding: 8px 10px; gap: 8px; }
+  .install-page .cmd.wrap-mobile code, .install-page .cmd.wrap-mobile pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* the releases table becomes a stack of cards */
+  .tbl-wrap.stack { border: 0; background: none; overflow: visible; }
+  table.rels, table.rels tbody, table.rels tr, table.rels td { display: block; width: 100%; }
+  table.rels thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.rels tr {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; margin-bottom: 10px;
+  }
+  table.rels td { border: 0; padding: 4px 0; }
+  table.rels td[data-label]::before {
+    content: attr(data-label); display: block; font: 600 11px var(--mono); color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px;
+  }
+  table.rels td.ver-cell::before, table.rels td.date-cell::before { display: none; }
+  table.rels tr.latest-row td { background: none; }
+  table.rels tr.latest-row { border-color: rgba(80, 250, 123, 0.5); }
+}
