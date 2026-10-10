@@ -333,7 +333,8 @@ def test_ask_on_a_terminal_shows_the_pull_display(
 def test_help_lists_only_what_a_user_needs() -> None:
     result = runner.invoke(cli.app, ["--help"])
     assert result.exit_code == 0
-    listed = result.output.split("Commands")[1]
+    # Rich forces color when GITHUB_ACTIONS is set, so drop the styling before reading the panel.
+    listed = re.sub(r"\x1b\[[0-9;]*m", "", result.output).split("Commands")[1]
     commands = [line.split()[1] for line in listed.splitlines() if line.startswith("│ ")]
     assert commands == ["ask", "version"]
     assert not re.search(r"\bmodel\b|train|validate-data|install-models|askphysics-dev", listed)
