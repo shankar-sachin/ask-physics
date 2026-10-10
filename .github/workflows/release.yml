@@ -232,13 +232,19 @@ jobs:
           echo "SHA256=$sha" >> "$GITHUB_ENV"
           (cd dist && sha256sum -c "AskPhysicsSetup-${VERSION}.exe.sha256")
 
+          # An unversioned copy, so a stable link always serves the newest installer:
+          # releases/latest/download/AskPhysicsSetup.exe. The WinGet manifests keep
+          # pointing at the versioned file.
+          cp "$exe" dist/AskPhysicsSetup.exe
+          printf '%s  AskPhysicsSetup.exe\n' "$sha" > dist/AskPhysicsSetup.exe.sha256
+
           # The release notes are this version's section of CHANGELOG.md.
           python3 scripts/release_notes.py "$VERSION" > notes.md
           {
             echo
             echo "---"
             echo
-            echo "Windows installer: \`AskPhysicsSetup-${VERSION}.exe\`, SHA-256 \`$sha\`."
+            echo "Windows installer: \`AskPhysicsSetup-${VERSION}.exe\` (also published as \`AskPhysicsSetup.exe\`), SHA-256 \`$sha\`."
           } >> notes.md
 
           # The WinGet manifests for this release, ready to copy into a winget-pkgs branch.
@@ -249,7 +255,7 @@ jobs:
       - name: Create or update the release
         run: |
           set -eu
-          files="dist/AskPhysicsSetup-${VERSION}.exe dist/AskPhysicsSetup-${VERSION}.exe.sha256 dist/shankars.askphysics-${VERSION}-winget-manifests.zip"
+          files="dist/AskPhysicsSetup-${VERSION}.exe dist/AskPhysicsSetup-${VERSION}.exe.sha256 dist/AskPhysicsSetup.exe dist/AskPhysicsSetup.exe.sha256 dist/shankars.askphysics-${VERSION}-winget-manifests.zip"
           if gh release view "$TAG" > /dev/null 2>&1; then
             echo "Release $TAG exists (a re-run); updating its notes and files"
             gh release edit "$TAG" --title "$TAG" --notes-file notes.md
