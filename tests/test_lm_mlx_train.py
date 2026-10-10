@@ -219,14 +219,15 @@ def test_mlx_training_lowers_loss_and_writes_the_torch_metric_keys(
     assert sum(losses[-2:]) / 2 < losses[0] * 0.95
     evals = [m for m in metrics if "val_loss" in m]
     assert evals and {"val_loss_classify", "val_loss_plan", "val_loss_explain"} <= evals[-1].keys()
-    # Every key the torch trainer logs, plus gpu_gb.
+    # The same metric keys as the torch trainer.
     torch_keys = {"step", "loss", "lr", "target_tokens_per_s", "mem_gb"}
     logged = [m for m in metrics if "loss" in m]
-    assert all(torch_keys | {"gpu_gb"} == set(m) for m in logged)
+    assert all(torch_keys == set(m) for m in logged)
     lines = [json.loads(x) for x in (out / "metrics.jsonl").read_text().splitlines()]
     assert lines == metrics
     summary = json.loads((out / "training_summary.json").read_text())
     assert summary["backend"] == "mlx" and summary["config"] == "fermi-luna-1"
+    assert summary["device"] == "cpu"  # torch names the Metal GPU "mps"; MLX on CPU is "cpu"
     assert json.loads((out / STATE_FILE).read_text())["backend"] == "mlx"
 
 

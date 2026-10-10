@@ -408,8 +408,7 @@ def _run(
             window_tokens, window_t0 = tokens_seen, now
             log({"step": done, "loss": round(float(loss), 4), "lr": lr,
                  "target_tokens_per_s": round(rate, 1),
-                 "mem_gb": _peak_memory_gb(),
-                 "gpu_gb": round(mx.get_peak_memory() / 1e9, 1)})  # fmt: skip
+                 "mem_gb": _peak_memory_gb()})  # fmt: skip
         if data.val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
             scores = task_scores(
                 data.val_samples,
@@ -433,6 +432,5 @@ def _run(
             mx.clear_cache()
 
     checkpoint(cfg.steps)
-    device_name = mx.default_device().type.name  # "gpu" on a Mac, "cpu" otherwise
-    write_summary(out_dir, config, data, cfg, device=device_name, backend="mlx")
+    write_summary(out_dir, config, data, cfg, device="mps" if _on_gpu() else "cpu", backend="mlx")
     return metrics
