@@ -280,7 +280,7 @@ class _WidthFlush:
         self._width: int | None = None
 
     def before_step(self, width: int) -> None:
-        """Note the width of the step about to run, flushing first if it changed."""
+        """Record the width of the step about to run, flushing first if it changed."""
         if self._width is not None and width != self._width:
             _release_cached_memory(self._device)
         self._width = width

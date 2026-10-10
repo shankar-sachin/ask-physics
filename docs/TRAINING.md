@@ -287,6 +287,22 @@ askphysics model eval --model fermi-tellus-1 --examples 200   # task accuracy, a
   they feed the model cards and the v0.4 exit criteria (90% valid plans on
   unseen templates, 0.1% or less confidently wrong).
 
+## Troubleshooting
+
+### Out of memory on MPS
+
+If a run stops with `MPS backend out of memory`, either halve `--batch-size` and double
+`--grad-accum`, or pass `--checkpoint-blocks`.
+
+- Halving and doubling keeps the same number of sequences per optimizer step, and each step
+  now runs as twice as many micro-batches. `--resume` continues on the same task rows in the
+  same order, because the data position is step times batch size times grad-accum. With
+  `--prose` the prose micro-batches are drawn per micro-batch, so the prose mix of a resumed
+  run can differ a little.
+- `--checkpoint-blocks` keeps the batch and recomputes activations in the backward pass. It
+  costs extra compute.
+- Check `mem_gb` in `metrics.jsonl` to see whether the change helped.
+
 ## 7. Results so far
 
 ### fermi-tellus-1 on the original templates (v0.2 factory)
