@@ -95,6 +95,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The training progress bar shows its time remaining. Its speed was averaged over 30 s,
+  shorter than the 45 s between log lines, so the ETA always read `-:--:--`.
+
 - On a Mac, torch's MPS backend frees cached GPU buffers once they reach 70% of the
   GPU's working set, and stops at 50%, unless `PYTORCH_MPS_HIGH_WATERMARK_RATIO` or
   `PYTORCH_MPS_LOW_WATERMARK_RATIO` is set in your environment, which always wins. The
