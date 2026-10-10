@@ -262,7 +262,7 @@ class NumpyFermiLM(Engine):
 
 
 def load_numpy_model(directory: Path) -> tuple[NumpyFermiLM, Tokenizer]:
-    """Load a model saved by ``save_model`` (or the MLX trainer, or ``model pull``) into numpy.
+    """Load a model saved by ``save_model`` (or the MLX trainer, or a download) into numpy.
 
     Raises:
         ConfigError: files are missing, malformed, or don't agree (the same checks as

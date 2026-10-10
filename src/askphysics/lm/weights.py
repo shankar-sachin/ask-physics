@@ -6,7 +6,8 @@ doesn't match byte for byte is refused. Each model installs into its own directo
 ``default_model_dir()``, and only once every one of its files has arrived and checked out,
 so a broken download never leaves a half-installed model behind.
 
-No torch here: ``model pull`` and the installers run this before any model is loaded.
+No torch here: the first question, the installers' hook, and ``askphysics-dev model pull`` all run
+this before any model is loaded.
 """
 
 from __future__ import annotations
