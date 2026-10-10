@@ -874,8 +874,10 @@ the backward pass.
   default), and `--checkpoint-blocks` to recompute each block's activations in the backward
   pass (`mx.checkpoint`). The loss upcasts the logits to fp32 once and does not materialize a
   log-softmax copy. The optimizer step runs under `mx.compile`, which is on by default.
-- Precision: parameters are always fp32. `bf16` (and `auto`) run the forward pass in bfloat16
-  with fp32 master weights and an fp32 loss, as torch autocast does on MPS.
+- Precision: parameters are always fp32. `bf16` runs the forward pass in bfloat16 with fp32
+  master weights and an fp32 loss, as torch autocast does on MPS. `auto` does that on the GPU
+  and runs fp32 on the CPU, as torch's `auto` does. Validation runs in fp32 on both backends,
+  since torch's autocast covers only the training step.
 
 **Consequences.** Two training loops must stay in step: a change to the batch, schedule, or
 logging code lands in `lm/train.py` and is shared where possible, but the model and optimizer
@@ -883,6 +885,6 @@ steps exist twice, and `tests/test_lm_mlx_train.py` checks one step of each agai
 The MLX trainer is new code on a young framework, so the torch trainer remains the reference
 and the fallback. Weights are unchanged, so a model trained either way is installed, evaluated,
 and packaged the same way. MLX is MIT licensed, so it adds no license obligation beyond the
-attribution in `THIRD_PARTY_LICENSES.md`. Linux and Windows users see no change: the
-`[mlx]` extra is Mac-only, and `auto` resolves to torch there. CI tests the MLX code on CPU
-through `mlx[cpu]`.
+attribution in `THIRD_PARTY_LICENSES.md`. Linux and Windows users see no change at run time: the
+`[mlx]` extra is Mac-only, and `auto` resolves to torch there. The `dev` extra adds `mlx[cpu]`
+on Linux, so CI runs the MLX tests on CPU; without it those tests skip.
