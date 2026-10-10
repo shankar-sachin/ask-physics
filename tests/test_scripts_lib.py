@@ -164,8 +164,9 @@ ui_end "Fine"
         assert any(frame in raw for frame in "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"), mode
         text = _text(raw)
         assert "◉ Ask Physics  ·  Demo" in text
-        assert re.search(r"✓ 1/2 Slow\s+1s", text), (mode, text)
-        assert re.search(r"✓ 2/2 Slow again\s+1s", text)
+        # Each step sleeps 1 s; a busy runner can take longer, so any whole seconds count.
+        assert re.search(r"✓ 1/2 Slow\s+[1-9]\d*s", text), (mode, text)
+        assert re.search(r"✓ 2/2 Slow again\s+[1-9]\d*s", text), (mode, text)
         assert "✓ Fine" in text and "all 2 steps" in text
 
 
