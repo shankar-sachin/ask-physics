@@ -111,14 +111,14 @@ case $backend in
 esac
 
 to_repo_root
-need_askphysics
+need_askphysics_dev
 
 # Which framework trains: the CLI decides, so this script and model train always agree.
 # The CLI's own error message goes to stderr, so it still shows if the choice is refused.
 if [ -n "$device" ]; then
-  resolved=$(askphysics model backend --backend "$backend" --device "$device")
+  resolved=$(askphysics-dev model backend --backend "$backend" --device "$device")
 else
-  resolved=$(askphysics model backend --backend "$backend")
+  resolved=$(askphysics-dev model backend --backend "$backend")
 fi
 
 corpus=build/corpus/prose.jsonl
@@ -155,32 +155,32 @@ else
   fi
   if [ "$fresh_data" = 1 ] || [ ! -f "$data/manifest.json" ]; then
     run rm -rf "${data:?}"
-    phase "Building $examples training examples in $data" askphysics model build-data \
+    phase "Building $examples training examples in $data" askphysics-dev model build-data \
       --out "$data" --examples "$examples" --workers "$workers"
   fi
   if [ "$fresh_tokenizer" = 1 ] || [ ! -f "$tokenizer" ]; then
     if [ -f "$corpus" ]; then
-      phase "Training the tokenizer" askphysics model train-tokenizer --data "$data" \
+      phase "Training the tokenizer" askphysics-dev model train-tokenizer --data "$data" \
         --out "$tokenizer" --vocab-size 8192 --prose "$corpus"
     else
-      phase "Training the tokenizer" askphysics model train-tokenizer --data "$data" \
+      phase "Training the tokenizer" askphysics-dev model train-tokenizer --data "$data" \
         --out "$tokenizer" --vocab-size 8192
     fi
   fi
   if [ "$evaluate" = 1 ] && [ -n "$baseline" ]; then
-    phase "Scoring the previous $model for a baseline" askphysics model eval --model "$model" \
+    phase "Scoring the previous $model for a baseline" askphysics-dev model eval --model "$model" \
       --directory "$baseline" --data "$data" --examples "$eval_examples"
   fi
 fi
 
 if [ "$bench" = 1 ] && [ "$resolved" = torch ]; then
-  phase "Checking training speed (about a minute)" askphysics model bench --model "$model" \
+  phase "Checking training speed (about a minute)" askphysics-dev model bench --model "$model" \
     --batch-size "$batch" --plan-steps "$steps"
 elif [ "$bench" = 1 ]; then
   info "Skipping the torch speed check: this run trains with $resolved"
 fi
 
-set -- askphysics model train --model "$model" --data "$data" --tokenizer "$tokenizer" \
+set -- askphysics-dev model train --model "$model" --data "$data" --tokenizer "$tokenizer" \
   --steps "$steps" --batch-size "$batch" --backend "$resolved"
 if [ "$wants_prose" = 1 ]; then
   set -- "$@" --prose "$prose" --prose-steps "$prose_steps" --prose-share "$prose_share"
@@ -193,7 +193,7 @@ set -- "$@" --precision "$precision"
 phase_live "Training $model ($steps steps) with $resolved" "$@"
 
 if [ "$evaluate" = 1 ]; then
-  phase "Scoring the new $model" askphysics model eval --model "$model" --data "$data" \
+  phase "Scoring the new $model" askphysics-dev model eval --model "$model" --data "$data" \
     --examples "$eval_examples"
   if [ -n "$baseline" ]; then
     phase_live "Comparing with the previous $model" python3 "$here/compare_evals.py" \

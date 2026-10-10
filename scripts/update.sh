@@ -16,7 +16,7 @@ case ${1:-} in
   *) usage 1 ;;
 esac
 to_repo_root
-need_askphysics
+need_askphysics_dev
 
 if [ "${DRY_RUN:-}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   fail "you have uncommitted changes; commit or stash them first"

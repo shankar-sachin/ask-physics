@@ -57,3 +57,17 @@ def test_auto_pull_reads_from_env(value: str, expected: bool) -> None:
 def test_auto_pull_rejects_nonsense() -> None:
     with pytest.raises(ConfigError, match="AUTO_PULL"):
         Settings.from_env({"ASKPHYSICS_AUTO_PULL": "maybe"})
+
+
+@pytest.mark.parametrize("value", ["ask", "always", "never"])
+def test_celeste_download_reads_from_env(value: str) -> None:
+    assert Settings.from_env({"ASKPHYSICS_CELESTE_DOWNLOAD": value}).celeste_download == value
+
+
+def test_celeste_download_defaults_to_the_saved_choice() -> None:
+    assert Settings.from_env({}).celeste_download is None  # None: use the saved choice, else ask
+
+
+def test_celeste_download_rejects_nonsense() -> None:
+    with pytest.raises(ConfigError, match="celeste_download"):
+        Settings.from_env({"ASKPHYSICS_CELESTE_DOWNLOAD": "sometimes"})

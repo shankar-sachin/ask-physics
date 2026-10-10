@@ -1,6 +1,6 @@
 """Package a trained Fermi model for release: bf16 weights, a model card, and pinned assets.
 
-    askphysics model package --model fermi-solem-1 --release models-v0.4.0 \\
+    askphysics-dev model package --model fermi-solem-1 --release models-v0.4.0 \\
         --attribution build/corpus/ATTRIBUTION.md
 
 Writes, under ``out``:
@@ -208,7 +208,7 @@ def model_card(
         attempts = report.get("attempts", 1)
         lines += [
             "Held-out questions from templates the model never trained on "
-            f"(`askphysics model eval`, {report['classify_examples']:,} classification and "
+            f"(the project's evaluation, {report['classify_examples']:,} classification and "
             f"{report['plan_examples']:,} planning questions):",
             "",
             "| Check | Score |",
@@ -227,7 +227,7 @@ def model_card(
             "",
         ]
     else:
-        lines += ["Not evaluated yet: run `askphysics model eval` before packaging.", ""]
+        lines += ["Not evaluated yet: run `askphysics-dev model eval` before packaging.", ""]
     if throughput:
         lines += [
             f"Answering speed on {throughput.device}: {throughput.median_s} s per question "

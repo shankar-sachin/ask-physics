@@ -34,7 +34,7 @@ stage_bundle() {
   lm_shipped="__init__.py config.py formats.py paths.py reading.py templates.py tokenizer.py"
   tar -cf "$out/py/askphysics.tar" -C src \
     --exclude='__pycache__' --exclude='*.pyc' \
-    --exclude='askphysics/lm' --exclude='askphysics/cli.py' \
+    --exclude='askphysics/lm' --exclude='askphysics/cli.py' --exclude='askphysics/devcli.py' \
     --exclude='askphysics/ui.py' --exclude='askphysics/__main__.py' \
     --exclude='askphysics/train_ui.py' --exclude='askphysics/train_view.py' \
     --exclude='askphysics/shell_ui.py' --exclude='askphysics/eval_view.py' \

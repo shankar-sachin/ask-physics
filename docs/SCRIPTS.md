@@ -74,7 +74,7 @@ ok: All clear (6 of 6 steps, 1m 52s)
   colours, without the folded output lines and bars. `install.sh` embeds the same renderer, since
   it is piped from `curl` and cannot source `lib.sh`; `tests/test_scripts_lib.py` keeps the two
   copies identical. `install.ps1` has the matching look in PowerShell.
-- `askphysics model eval` and `askphysics model pull` draw their own views (the eval bar, the
+- `askphysics-dev model eval` and `askphysics-dev model pull` draw their own views (the eval bar, the
   download bars), so they look the same whether a script or a person runs them.
 
 ## Adding a script

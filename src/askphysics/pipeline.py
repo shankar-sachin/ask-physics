@@ -26,6 +26,7 @@ from askphysics.config import Settings
 from askphysics.data.loader import CONSTANT_SYMBOL_ALIASES, DataStore, load_all
 from askphysics.errors import (
     AskPhysicsError,
+    DownloadDeclinedError,
     EmptyQuestionError,
     PlanValidationError,
     RetrievalEmptyError,
@@ -683,13 +684,24 @@ class Pipeline:
         return self.roster or Roster.single(self.llm)
 
     @classmethod
-    def from_settings(cls, settings: Settings, data: DataStore | None = None) -> Pipeline:
+    def from_settings(
+        cls,
+        settings: Settings,
+        data: DataStore | None = None,
+        *,
+        confirm_download: Callable[[str, int], bool] | None = None,
+        download: Callable[[str], object] | None = None,
+    ) -> Pipeline:
         """Build a pipeline with the configured LLM provider and the keyword retriever.
 
         ``auto`` uses the Fermi models when the router has one to use (tellus, solem,
         celeste, or the forced ``settings.model``) and the fake client otherwise. Torch is
         only imported when the Fermi models are used, so the website (Pyodide) never needs
         it.
+
+        ``confirm_download`` and ``download`` are the CLI's hooks for celeste, which never
+        downloads without being asked (see ``build_roster``). Without them nothing is ever
+        downloaded here, as on the website.
 
         Raises:
             ConfigError: ``fermi`` was asked for and no usable model is installed.
@@ -704,7 +716,7 @@ class Pipeline:
             return cls(llm=FakeLLMClient(), retriever=retriever, data=store, settings=settings)
         from askphysics.llm.fermi_client import build_roster
 
-        roster = build_roster(settings, store)
+        roster = build_roster(settings, store, confirm_download=confirm_download, download=download)
         return cls(
             llm=roster.classify, retriever=retriever, data=store, settings=settings, roster=roster
         )
@@ -839,6 +851,8 @@ class Pipeline:
                     data=self.data,
                     attempt=attempt,
                 )
+            except DownloadDeclinedError:
+                continue  # a model the user didn't download: as if it weren't on the roster
             except AskPhysicsError as exc:
                 failure = _Failure("plan", exc, attempt + 1)
                 continue

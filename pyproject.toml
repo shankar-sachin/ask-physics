@@ -51,6 +51,8 @@ dev = [
 
 [project.scripts]
 askphysics = "askphysics.cli:app"
+# Maintainers only (ADR-022): refuses to run outside a source checkout.
+askphysics-dev = "askphysics.devcli:main"
 
 [project.urls]
 Homepage = "https://github.com/shankar-sachin/ask-physics"
