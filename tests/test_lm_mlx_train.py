@@ -16,7 +16,9 @@ from askphysics.lm.config import LUNA, ModelConfig
 from askphysics.lm.factory import build_dataset
 from askphysics.lm.mlx_model import FermiLM, export_params, import_params
 from askphysics.lm.mlx_train import (
+    EVAL_DTYPE,
     AdamW,
+    _evaluate,
     _make_step,
     mean_gradients,
     mlx_dtype,
@@ -29,6 +31,7 @@ from askphysics.lm.model import FermiLM as TorchFermiLM
 from askphysics.lm.tokenizer import Tokenizer
 from askphysics.lm.train import (
     STATE_FILE,
+    TokenizedSet,
     TrainConfig,
     _optimizer_step,
     make_batch,
@@ -157,6 +160,23 @@ def test_block_checkpointing_gives_the_same_step() -> None:
     )
     assert float(loss_plain) == pytest.approx(float(loss_ckpt), abs=1e-6)
     assert _params_close(plain, checkpointed, atol=1e-6)
+
+
+def test_evaluation_matches_the_torch_trainers_loss() -> None:
+    # The torch trainer scores validation in fp32 (its autocast covers training steps only).
+    torch.manual_seed(0)
+    torch_model = TorchFermiLM(TINY)
+    mlx_model = _mlx_copy_of(torch_model)
+    gen = np.random.default_rng(4)
+    data = TokenizedSet()
+    for _ in range(6):
+        data.add(gen.integers(0, TINY.vocab_size, 20).tolist(), 6, "t")
+    cfg = TrainConfig(batch_size=4, eval_batches=2)
+    expected = torch_train.evaluate(torch_model, data, cfg, 0, torch.device("cpu"))
+    # Within 1e-5: bf16 evaluation misses by about 4e-5 on this data, so this would catch it.
+    assert _evaluate(mlx_model, data, cfg, 0, TINY.context_length, EVAL_DTYPE) == pytest.approx(
+        expected, abs=1e-5
+    )
 
 
 def test_compiled_step_matches_the_eager_step() -> None:

@@ -65,6 +65,8 @@ from askphysics.lm.train import (
 ADAM_BETAS = (0.9, 0.95)  # the same as the torch trainer
 ADAM_EPS = 1e-8  # torch's default
 DEFAULT_CACHE_LIMIT_GB = 4.0
+# The torch trainer evaluates in fp32: its autocast covers the training step only.
+EVAL_DTYPE = mx.float32
 
 # A step function for mx.compile: (learning rate, micro-batches) -> mean loss.
 StepFn = Callable[[mx.array, list[tuple[mx.array, mx.array]]], mx.array]
@@ -402,11 +404,13 @@ def _run(
         if data.val_samples and (done % cfg.eval_every == 0 or done == cfg.steps):
             scores = task_scores(
                 data.val_samples,
-                lambda s: _evaluate(model, s, cfg, tokenizer.pad_id, config.context_length, dtype),
+                lambda s: _evaluate(
+                    model, s, cfg, tokenizer.pad_id, config.context_length, EVAL_DTYPE
+                ),
             )
             if data.prose_val.rows:
                 prose_loss = _evaluate(
-                    model, data.prose_val, cfg, tokenizer.pad_id, config.context_length, dtype
+                    model, data.prose_val, cfg, tokenizer.pad_id, config.context_length, EVAL_DTYPE
                 )
                 scores["val_loss_prose"] = round(prose_loss, 4)
             log({"step": done, **scores})
