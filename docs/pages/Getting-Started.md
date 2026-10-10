@@ -42,28 +42,24 @@ Quotes are optional. Useful options:
 
 ## Get the models
 
-You don't have to do anything: the first `askphysics ask` downloads tellus and solem if they
-aren't installed yet (about 66 MB, once, with a progress display), and the installers do it
-up front. To get them yourself, or after installing another way:
-
-```bash
-askphysics model pull          # tellus and solem, about 66 MB
-askphysics model pull --all    # celeste too, about 240 MB more
-```
+You don't have to do anything. The installers and Homebrew download tellus and solem when they
+install (about 66 MB, once), and any install, pip included, downloads whichever of them is
+missing on your first `askphysics ask`, with a progress display. They are kept in
+`~/.cache/askphysics/models/` (or the folder `ASKPHYSICS_MODEL_DIR` names; Homebrew keeps them
+in its own `var` folder), so it happens once.
 
 Every file is checked against the sizes and hashes this version of Ask Physics pins, and
 anything that doesn't match is refused. celeste downloads by itself the first time a
-question needs it. Set `ASKPHYSICS_AUTO_PULL=0` to stop both downloads. If a download fails,
-`ask` still answers (with a stand-in) and says why, and the next `ask` tries again. Without models, `ask` uses a
-stand-in that only knows "dropped from a height" questions, and says so.
+question needs it. Set `ASKPHYSICS_AUTO_PULL=0` to stop the downloads that happen while you ask.
+If a download fails, `ask` still answers (with a stand-in) and says why, and the next `ask`
+tries again. Without models, `ask` uses a stand-in that only knows "dropped from a height"
+questions, and says so.
 
 ## Other commands
 
 | Command | What it does |
 |---|---|
 | `askphysics version` | The installed version. |
-| `askphysics validate-data` | Check every equation, constant, and assumption in the database. |
-| `askphysics model info` | List the Fermi models installed, with sizes and validation loss. |
-| `askphysics model eval` | Score a model on held-out questions. |
+| `askphysics --help` | Every command and option. |
 
 Next: [Reading an answer](Reading-an-Answer).

@@ -52,10 +52,10 @@ honest, and the math is never theirs to get wrong.
 
 ## Where are the trained models?
 
-The first `askphysics ask` downloads them if they are missing, and `askphysics model pull`
-does it on demand (the installers run it too). They live in
-`~/.cache/askphysics/models/` (or `$ASKPHYSICS_MODEL_DIR`). To build them yourself, see
-[Training the models](Training-the-Models).
+The installers and Homebrew download them when they install, and the first `askphysics ask`
+downloads them if they are still missing (a pip install, say, or a download that failed). They
+live in `~/.cache/askphysics/models/` (or `$ASKPHYSICS_MODEL_DIR`; Homebrew keeps them in its
+`var` folder). To build them yourself, see [Training the models](Training-the-Models).
 
 ## Something's wrong. Where do I report it?
 

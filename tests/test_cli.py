@@ -566,3 +566,23 @@ def test_the_user_modules_name_no_dev_command_in_their_messages() -> None:
         text = (src / relative).read_text(encoding="utf-8")
         for phrase in ("askphysics model", "askphysics-dev", "askphysics validate-data"):
             assert phrase not in text, (relative, phrase)
+
+
+USER_PAGES = (
+    "Home",
+    "Getting-Started",
+    "How-It-Works",
+    "Reading-an-Answer",
+    "Asking-Good-Questions",
+    "FAQ",
+    "The-Fermi-Models",
+    "Corpus-and-Licenses",
+)
+
+
+def test_the_user_docs_never_tell_a_user_to_run_a_dev_command() -> None:
+    root = Path(cli.__file__).resolve().parents[2]
+    for page in USER_PAGES:
+        _no_dev_commands((root / "docs" / "pages" / f"{page}.md").read_text(encoding="utf-8"))
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    _no_dev_commands(readme.split("## Quickstart")[0])  # the part written for users
