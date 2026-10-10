@@ -1,13 +1,20 @@
 import io
+from datetime import datetime
 
+import pytest
 from rich.console import Console
+from rich.progress import Progress
 
 from askphysics.data.loader import DataStore
 from askphysics.models import Answer, Confidence, EquationRef, KnownValue
 from askphysics.ui import (
     THEME,
+    EtaTracker,
     answer_card,
     confidence_meter,
+    format_duration,
+    format_finish,
+    make_console,
     tolerate_narrow_encodings,
     training_progress,
 )
@@ -128,3 +135,87 @@ def test_training_progress_estimates_speed_over_a_window_longer_than_its_updates
     progress = training_progress(Console(record=True, file=io.StringIO()))
     assert progress.speed_estimate_period == 600
     assert progress.speed_estimate_period > 45
+
+
+class FakeClock:
+    """A clock the test winds by hand, so ETA tests take no real time."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _render_wide(progress: Progress) -> str:
+    console = make_console(file=io.StringIO(), width=200, force_terminal=False)
+    console.print(progress.get_renderable())
+    return console.file.getvalue()  # type: ignore[attr-defined]
+
+
+def _drive(clock: FakeClock, start: int, total: int, updates: int, every: int) -> Progress:
+    """A run at one step per second from ``start``, reported every ``every`` steps."""
+    progress = training_progress(
+        make_console(file=io.StringIO(), width=200),
+        clock=clock,
+        now=lambda: datetime(2026, 1, 5, 23, 0, 0),
+    )
+    task = progress.add_task("m", total=total, loss="...", val="...", speed="")
+    progress.reset(task, completed=start)
+    progress.tracker.start(start)
+    step = start
+    for _ in range(updates):
+        clock.now += every
+        step += every
+        progress.tracker.record(step)
+        progress.update(task, completed=step)
+    return progress
+
+
+def test_eta_shows_after_a_few_updates_with_a_clock_time() -> None:
+    progress = _drive(FakeClock(), start=0, total=1000, updates=3, every=50)
+    # 150 of 1000 steps done at 1 step/s: 850 s left from 23:00:00 is 23:14:10 on the clock.
+    assert "eta 0:14:10 · done ~23:14" in _render_wide(progress)
+
+
+def test_eta_after_a_resume_does_not_count_the_jump_as_speed() -> None:
+    # Resumed at 4000 of 5000, 1 step/s: 850 s left, not the near-zero a 0-to-4050 jump gives.
+    progress = _drive(FakeClock(), start=4000, total=5000, updates=3, every=50)
+    assert "eta 0:14:10" in _render_wide(progress)
+
+
+def test_finish_time_names_the_day_when_it_is_not_today() -> None:
+    assert format_finish(5 * 3600, datetime(2026, 1, 5, 23, 0)) == "~Tue 04:00"
+    assert format_finish(600, datetime(2026, 1, 5, 12, 0)) == "~12:10"
+    assert format_duration(3723) == "1:02:03"
+
+
+def test_own_estimate_fills_in_when_rich_has_none() -> None:
+    clock = FakeClock()
+    tracker = EtaTracker(clock)
+    assert tracker.seconds_left(0, 100) is None  # nothing seen yet
+    tracker.start(100)
+    assert tracker.seconds_left(100, 1100) is None  # one sample is not a rate
+    clock.now += 10
+    tracker.record(120)  # 2 steps/s
+    assert tracker.seconds_left(120, 1120) == 500
+    # A task Rich has no samples for (it was set to 120 directly) uses the tracker's number.
+    progress = training_progress(make_console(file=io.StringIO(), width=200), clock=clock)
+    task = progress.add_task("m", total=1120, completed=120, loss="", val="", speed="")
+    progress.tracker.start(100)
+    clock.now += 10
+    progress.tracker.record(120)
+    assert progress.tasks[task].time_remaining is None
+    assert "eta 0:08:20" in _render_wide(progress)
+
+
+def test_own_estimate_forgets_samples_older_than_its_window() -> None:
+    clock = FakeClock()
+    tracker = EtaTracker(clock, window=60)
+    tracker.start(0)
+    clock.now += 600
+    tracker.record(60)  # a slow start: 0.1 steps/s
+    for step in (160, 260):
+        clock.now += 10
+        tracker.record(step)  # now 10 steps/s
+    assert tracker.steps_per_second() == pytest.approx(10.0)

@@ -254,6 +254,25 @@ def test_resume_continues_from_the_checkpoint(
     assert min(logged) <= 10 < max(logged)  # resuming keeps the earlier log
 
 
+def test_on_step_starts_at_the_resumed_step(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    # The display starts its bar there, so a resume never counts the jump as speed.
+    out = tmp_path / "luna"
+    train(LUNA, tokenizer, dataset, out, TrainConfig(**{**FAST.__dict__, "steps": 10}))
+    seen: list[int] = []
+    train(
+        LUNA,
+        tokenizer,
+        dataset,
+        out,
+        TrainConfig(**{**FAST.__dict__, "steps": 12}),
+        resume=True,
+        on_step=seen.append,
+    )
+    assert seen[0] == 10
+
+
 def test_grad_accum_must_be_positive(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:
     cfg = TrainConfig(**{**FAST.__dict__, "grad_accum": 0})
     with pytest.raises(ValueError, match="grad_accum"):

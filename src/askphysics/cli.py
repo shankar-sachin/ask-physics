@@ -365,11 +365,18 @@ def train_cmd(
     with training_progress(console) as progress:
         task = progress.add_task(config.name, total=steps, loss="…", val="…", speed="")
 
+        def begin(done: int) -> None:
+            # The run starts at the resumed step, so the jump from 0 to the checkpoint is not
+            # counted as speed and the first ETA is not wildly optimistic.
+            progress.reset(task, completed=done)
+            progress.tracker.start(done)
+
         def show(entry: dict[str, Any]) -> None:
             if "val_loss" in entry:
                 last_val.update(entry)
                 progress.update(task, val=f"{entry['val_loss']:.3f}")
             else:
+                progress.tracker.record(entry["step"])
                 progress.update(
                     task,
                     completed=entry["step"],
@@ -389,6 +396,7 @@ def train_cmd(
                     cfg,
                     resume=resume,
                     on_log=show,
+                    on_step=begin,
                     prose=texts,
                     cache_limit_gb=mlx_cache_gb,
                     memory_limit_gb=mlx_memory_gb,
@@ -402,6 +410,7 @@ def train_cmd(
                     cfg,
                     resume=resume,
                     on_log=show,
+                    on_step=begin,
                     prose=texts,
                 )
         except ConfigError as exc:  # a refused resume, or a device the backend can't use

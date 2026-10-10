@@ -262,6 +262,17 @@ def test_resume_continues_from_the_checkpoint(
     assert json.loads((out / STATE_FILE).read_text())["step"] == 12
 
 
+def test_on_step_starts_at_the_resumed_step(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    out = tmp_path / "luna"
+    train_mlx(LUNA, tokenizer, dataset, out, TrainConfig(**{**FAST.__dict__, "steps": 6}))
+    seen: list[int] = []
+    more = TrainConfig(**{**FAST.__dict__, "steps": 8})
+    train_mlx(LUNA, tokenizer, dataset, out, more, resume=True, on_step=seen.append)
+    assert seen[0] == 6
+
+
 def test_resume_refuses_a_torch_checkpoint(
     dataset: Path, tokenizer: Tokenizer, tmp_path: Path
 ) -> None:
