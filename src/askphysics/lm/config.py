@@ -7,7 +7,13 @@ cheaply. Parameter counts are computed analytically and pinned by tests;
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from askphysics.errors import ConfigError
+from askphysics.lm.paths import CONFIG_FILE, TOKENIZER_FILE, WEIGHTS_FILE
 
 # Bumped whenever a task format changes; recorded in traces and eval reports (Q13).
 FORMAT_VERSION = 1
@@ -85,6 +91,41 @@ CELESTE = ModelConfig(
 LUNA = ModelConfig(
     name="fermi-luna-1", vocab_size=512, d_model=64, n_layers=2, n_heads=4, context_length=1024,
 )  # fmt: skip
+
+
+def config_json(config: ModelConfig) -> str:
+    """The canonical JSON of a config: ``config.json``, and the weights' metadata."""
+    return json.dumps(asdict(config), sort_keys=True)
+
+
+def require_model_files(directory: Path) -> None:
+    """Raise ``ConfigError`` unless ``directory`` has the weights, config, and tokenizer."""
+    paths = [directory / name for name in (WEIGHTS_FILE, CONFIG_FILE, TOKENIZER_FILE)]
+    if missing := [p.name for p in paths if not p.exists()]:
+        raise ConfigError(f"model directory {directory} is missing {', '.join(missing)}")
+
+
+def saved_config(directory: Path, metadata: Mapping[str, str]) -> ModelConfig:
+    """The ``config.json`` in ``directory``, checked against the weights' ``metadata``.
+
+    Both loaders (torch in ``lm/checkpoints.py``, numpy in ``lm/numpy_model.py``) read the
+    config through this, so they refuse the same files.
+
+    Raises:
+        ConfigError: the config doesn't match the weights' metadata, or the task format
+            version is different.
+    """
+    config_text = (directory / CONFIG_FILE).read_text(encoding="utf-8")
+    config = ModelConfig(**json.loads(config_text))
+    if metadata.get("config") != config_json(config):
+        raise ConfigError(f"{CONFIG_FILE} does not match the weights in {directory}")
+    if metadata.get("format_version") != str(FORMAT_VERSION):
+        raise ConfigError(
+            f"model was trained on task format {metadata.get('format_version')}, "
+            f"this askphysics uses {FORMAT_VERSION}; retrain or upgrade"
+        )
+    return config
+
 
 PRESETS: dict[str, ModelConfig] = {c.name: c for c in (TELLUS, SOLEM, CELESTE, LUNA)}
 

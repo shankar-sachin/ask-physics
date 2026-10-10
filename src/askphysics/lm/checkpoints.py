@@ -16,15 +16,19 @@ helpers below, so a model trained on a Mac loads here unchanged.
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict
 from pathlib import Path
 
 import torch
 from safetensors.torch import load_file, save_file
 
 from askphysics.errors import ConfigError
-from askphysics.lm.config import FORMAT_VERSION, ModelConfig
+from askphysics.lm.config import (
+    FORMAT_VERSION,
+    ModelConfig,
+    config_json,
+    require_model_files,
+    saved_config,
+)
 from askphysics.lm.model import FermiLM
 from askphysics.lm.paths import CONFIG_FILE, TOKENIZER_FILE, WEIGHTS_FILE, default_model_dir
 from askphysics.lm.tokenizer import Tokenizer
@@ -43,13 +47,9 @@ __all__ = [
 ]
 
 
-def _config_json(config: ModelConfig) -> str:
-    return json.dumps(asdict(config), sort_keys=True)
-
-
 def model_metadata(config: ModelConfig) -> dict[str, str]:
     """The string metadata stored in ``model.safetensors`` with the weights."""
-    return {"config": _config_json(config), "format_version": str(FORMAT_VERSION)}
+    return {"config": config_json(config), "format_version": str(FORMAT_VERSION)}
 
 
 def check_tokenizer_fits(config: ModelConfig, tokenizer: Tokenizer) -> None:
@@ -63,7 +63,7 @@ def check_tokenizer_fits(config: ModelConfig, tokenizer: Tokenizer) -> None:
 def write_config_and_tokenizer(directory: Path, config: ModelConfig, tokenizer: Tokenizer) -> None:
     """Write ``config.json`` and ``tokenizer.json`` (the weights are written by the caller)."""
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / CONFIG_FILE).write_text(_config_json(config), encoding="utf-8")
+    (directory / CONFIG_FILE).write_text(config_json(config), encoding="utf-8")
     tokenizer.save(directory / TOKENIZER_FILE)
 
 
@@ -83,24 +83,13 @@ def read_config(directory: Path) -> ModelConfig:
         ConfigError: files are missing, the config doesn't match the weights'
             metadata, or the task format version is different.
     """
-    paths = [directory / name for name in (WEIGHTS_FILE, CONFIG_FILE, TOKENIZER_FILE)]
-    if missing := [p.name for p in paths if not p.exists()]:
-        raise ConfigError(f"model directory {directory} is missing {', '.join(missing)}")
+    require_model_files(directory)
 
     from safetensors import safe_open
 
     with safe_open(str(directory / WEIGHTS_FILE), framework="np") as f:
         metadata = f.metadata() or {}
-    config_text = (directory / CONFIG_FILE).read_text(encoding="utf-8")
-    config = ModelConfig(**json.loads(config_text))
-    if metadata.get("config") != _config_json(config):
-        raise ConfigError(f"{CONFIG_FILE} does not match the weights in {directory}")
-    if metadata.get("format_version") != str(FORMAT_VERSION):
-        raise ConfigError(
-            f"model was trained on task format {metadata.get('format_version')}, "
-            f"this askphysics uses {FORMAT_VERSION}; retrain or upgrade"
-        )
-    return config
+    return saved_config(directory, metadata)
 
 
 def load_model(directory: Path, device: torch.device | None = None) -> tuple[FermiLM, Tokenizer]:
