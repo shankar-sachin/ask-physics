@@ -1,11 +1,14 @@
 """Facts a question states outright, read with rules instead of the model.
 
-Two things a small model gets wrong even when the question spells them out:
+Things a small model gets wrong even when the question spells them out:
 
 - **Labels.** "the source frequency fs is 758 Hz" says 758 Hz is ``fs``. tellus
   still swapped it with the heard frequency, because both are frequencies.
 - **The ask.** "Lifting a book took 207 J. What is its mass?" says the unknown
   is a mass. tellus solved for a force instead.
+- **Transitions and cues.** "from 20 m/s to 60 m/s" says 20 is the initial speed and 60 the
+  final one; solem wrote them backwards. "dropped" and "from rest" are the only reasons to
+  assume a starting speed of 0 (``transition_locks``, ``rest_cue``).
 
 ``labelled_quantities`` and ``asked_names`` read those facts, and the plan
 decoder narrows its options to agree with them (ADR-015). These rules only
@@ -19,10 +22,11 @@ import math
 import re
 from collections.abc import Iterable, Sequence
 
-from askphysics.lm.formats import format_number, question_quantities
+from askphysics.errors import AskPhysicsError
+from askphysics.lm.formats import format_number, quantity_ranges, question_quantities
 from askphysics.lm.templates import VAR_SYNONYMS
 from askphysics.models import Equation, Variable
-from askphysics.solver.units import is_valid_unit, quantity
+from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
 
 _NUMBER = r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
 _UNIT = r"[A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?"
@@ -375,3 +379,116 @@ def stated_givens(question: str, equations: Iterable[Equation]) -> list[tuple[st
             if u == "dimensionless" and s in unitless
         }
     return [*question_quantities(question), *((n, "dimensionless") for n in sorted(bare))]
+
+
+# --------------------------------------------------------------------------- start and end
+
+
+# Variables that hold a quantity at the start of the process, and the end of it.
+_START_WORDS = {"initial", "starting", "launch"}
+_END_WORDS = {"final"}
+
+
+def starts_process(variable: Variable) -> bool:
+    """Whether ``variable`` is an initial value by its database name: "initial velocity",
+    "launch speed". Other names are never read as a start, whatever their unit."""
+    return bool(set(variable.name.lower().split()) & _START_WORDS)
+
+
+def can_start_at_zero(variable: Variable) -> bool:
+    """Whether ``variable`` is a value that can be 0 because the process starts at rest.
+
+    An initial or launch speed or position, and the indexed speeds before a collision
+    ("velocity 1", "velocity 2": one cart is parked). A final speed, an acceleration, a
+    force, a mass, a momentum, or a time is never one, even when 0 is inside its typical range.
+    """
+    name = variable.name.lower()
+    return starts_process(variable) or re.fullmatch(r"velocity [12]", name) is not None
+
+
+def _fits(unit: str, variable: Variable) -> bool:
+    try:
+        return check_dimensions(quantity(1.0, unit), variable.unit)
+    except AskPhysicsError:
+        return False
+
+
+def transition_locks(text: str, variables: Sequence[Variable]) -> dict[str, tuple[str, str]]:
+    """Symbol -> (number, unit) for a "from A to B" that names an initial and a final value.
+
+    "change its speed from 20 m/s to 60 m/s" gives the initial speed 20 and the final speed
+    60, the order they are written. It only applies when exactly one variable is an initial
+    value ("initial velocity") and exactly one a final value ("final velocity") whose units
+    fit A and B, and when exactly one "from A to B" in the text fits them; anything less
+    clear gives nothing.
+    """
+    starts = [v for v in variables if starts_process(v)]
+    ends = [v for v in variables if set(v.name.lower().split()) & _END_WORDS]
+    if len(starts) != 1 or len(ends) != 1:
+        return {}
+    start, end = starts[0], ends[0]
+    fitting = [(a, b) for a, b in quantity_ranges(text) if _fits(a[1], start) and _fits(b[1], end)]
+    if len(fitting) != 1:
+        return {}
+    a, b = fitting[0]
+    return {start.symbol: a, end.symbol: b}
+
+
+# What the question says that makes a starting value 0 an assumption the reader can see.
+_REST_CUE = re.compile(
+    r"\b(?:(?:from|at) rest|dropped|drops|released?|lets? go|stationary|motionless|"
+    r"(?:sitting|standing|sits|stands) still|parked|(?:from )?a standstill|standing start|"
+    r"starts? (?:a |the )?race|falls?|falling|fell|free[- ]fall)\b",
+    re.IGNORECASE,
+)
+# ... and steady motion, the only reason to take an acceleration as 0.
+_STEADY_CUE = re.compile(
+    r"\b(?:steady|constant (?:speed|velocity)|cruis(?:es|ed|ing)|uniform (?:speed|velocity)|"
+    r"(?:without|not) accelerating|no acceleration|zero acceleration)\b",
+    re.IGNORECASE,
+)
+
+
+def rest_cue(text: str) -> bool:
+    """Whether ``text`` says something starts at rest ("from rest", "dropped", "released")."""
+    return _REST_CUE.search(text) is not None
+
+
+def steady_cue(text: str) -> bool:
+    """Whether ``text`` says the motion is steady ("cruises at a steady 30 m/s")."""
+    return _STEADY_CUE.search(text) is not None
+
+
+# ... and things falling, the only reason to read a free acceleration as standard gravity.
+_GRAVITY_CUE = re.compile(
+    r"\b(?:dropped|drops?|falls?|fell|falling|free[- ]fall(?:ing)?|gravity|gravitational|"
+    r"thrown|throws?|tossed|released?|lets? go|knocked|projectile|plummet\w*|"
+    r"(?:off|from) (?:a|an|the) (?:\w+ ){0,2}(?:ledge|cliff|balcony|roof|tower|bridge|building))\b",
+    re.IGNORECASE,
+)
+
+
+def gravity_cue(text: str) -> bool:
+    """Whether ``text`` has something falling or thrown, so an acceleration may be g."""
+    return _GRAVITY_CUE.search(text) is not None
+
+
+# ... and light or radiation, the only reason to read a speed as the speed of light ...
+_LIGHT_CUE = re.compile(
+    r"\b(?:speed of light|electromagnetic|radio (?:waves?|signals?)|microwaves?|x-?rays?|"
+    r"photons?|lasers?|radar|light (?:waves?|rays?|beams?|signals?|pulses?|years?)|"
+    r"(?:red|orange|yellow|green|blue|violet|visible|ultraviolet|infrared|white) light)\b",
+    re.IGNORECASE,
+)
+# ... and an electron or proton, the only reason to read a charge as the elementary charge.
+_PARTICLE_CUE = re.compile(r"\b(?:electrons?|protons?|positrons?)\b", re.IGNORECASE)
+
+
+def light_cue(text: str) -> bool:
+    """Whether ``text`` is about light or other radiation, so a speed may be ``c``."""
+    return _LIGHT_CUE.search(text) is not None
+
+
+def particle_cue(text: str) -> bool:
+    """Whether ``text`` names an electron or proton, so a charge may be ``e``."""
+    return _PARTICLE_CUE.search(text) is not None

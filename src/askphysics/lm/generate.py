@@ -48,11 +48,19 @@ from askphysics.lm.model import FermiLM, KVCache
 from askphysics.lm.reading import (
     asked_symbols,
     asked_variables,
+    can_start_at_zero,
     contradicted,
+    gravity_cue,
+    light_cue,
     mentions,
     names_for,
+    particle_cue,
+    rest_cue,
+    starts_process,
     stated_givens,
+    steady_cue,
     symbol_locks,
+    transition_locks,
 )
 from askphysics.lm.tokenizer import SPECIAL_TOKENS, Tokenizer, pretokenize
 from askphysics.models import (
@@ -556,6 +564,50 @@ def _table_constant(variable: Variable, constants: Sequence[Constant]) -> Consta
     return next((c for c in constants if _fits(c.unit, variable)), None)
 
 
+def constant_fills(constant: Constant, variable: Variable, question: str) -> bool:
+    """Whether a table constant may fill ``variable``: only a slot that is that constant.
+
+    That is a variable named "... constant" with the constant's units (``G``, ``k``, ``R``,
+    ``c`` in the relativity equations) or one with the constant's own symbol. Matching units
+    are never enough: ``v = c`` is a speed of 299792458 m/s, which is how "an average speed of
+    23.2 m/s" once became a light-speed plan (#91). Three constants also fill the plain
+    variable they are the value of when the question says so: standard gravity for an
+    acceleration when something falls, the speed of light for a speed when the question is
+    about light, and the elementary charge for a charge when it names an electron or proton.
+    """
+    if not _fits(constant.unit, variable):
+        return False
+    if "constant" in variable.name or variable.symbol == constant.symbol:
+        return True
+    if starts_process(variable) or variable.name.lower().startswith("final"):
+        return False  # a start or an end is a stated value, never a constant
+    if constant.name == "standard_gravity":
+        return variable.name == "acceleration" and gravity_cue(question)
+    if constant.name == "speed_of_light":
+        return light_cue(question)
+    if constant.name == "elementary_charge":
+        return particle_cue(question)
+    return False
+
+
+def zero_allowed(variable: Variable, question: str) -> bool:
+    """Whether a plan may assume ``variable`` is 0 for this question.
+
+    Only a starting speed or position, and only when the question says the thing starts at
+    rest ("from rest", "dropped", "released"); a stated "from 0 m/s" is a given value, not an
+    assumption. Never a momentum, force, mass, or time, and a final speed or an asked-for
+    quantity is never one (the target is not a known value at all). The one other zero is an
+    acceleration when the motion is steady ("cruises at a steady 30 m/s"). 0 must also be
+    inside the variable's typical range.
+    """
+    low, high = variable.typical_range or (1.0, 0.0)  # no range: assume nothing
+    if not low <= 0.0 <= high:
+        return False
+    if can_start_at_zero(variable):
+        return rest_cue(question)
+    return variable.name == "acceleration" and steady_cue(question)
+
+
 @dataclass(frozen=True)
 class ValueOption:
     """A legal (number, unit, origin) for one known value in a plan."""
@@ -571,10 +623,10 @@ def known_value_options(
     """What a standard plan may write for ``variable``.
 
     A quantity written in the question with matching dimensions (its number and unit stay
-    together), a table constant with matching dimensions, or an assumed 0 in the variable's
-    own unit ("dropped" means v0 = 0), only where 0 is inside the variable's typical range:
-    a speed can start at rest, but g and a mass can't be zero. A mass can never be filled
-    with a speed, and "570 pounds" can't turn into 570 kilograms. Noether still checks
+    together), the table constant that is this variable (``constant_fills``), or an assumed 0
+    in the variable's own unit where the question says it starts at rest (``zero_allowed``:
+    "dropped" means v0 = 0, but a momentum, mass, or time is never 0). A mass can never be
+    filled with a speed, and "570 pounds" can't turn into 570 kilograms. Noether still checks
     units later; this only stops the model from writing values that could never be right.
     """
     options: list[ValueOption] = []
@@ -587,11 +639,10 @@ def known_value_options(
         if _fits(unit, variable):
             add(ValueOption(number, unit, "given"))
     for c in constants:
-        if _fits(c.unit, variable):
+        if constant_fills(c, variable, question):
             add(ValueOption(format_number(c.value), c.unit, "constant"))
-    low, high = variable.typical_range or (1.0, 0.0)  # no range: assume nothing
-    for number in FILLER_NUMBERS:
-        if low <= float(number) <= high:
+    if zero_allowed(variable, question):
+        for number in FILLER_NUMBERS:
             add(ValueOption(number, variable.unit, "assumption"))
     return options
 
@@ -644,7 +695,9 @@ def target_options(
     # A variable a table constant can fill (g by standard gravity) is only the unknown if no
     # open variable lacks such a fallback: "lifting it 11 m took 11000 J, what is its mass?"
     # asks for m, and g comes from the table.
-    without_fallback = [v for v in out if not any(_fits(c.unit, v) for c in constants)]
+    without_fallback = [
+        v for v in out if not any(constant_fills(c, v, question) for c in constants)
+    ]
     picked = without_fallback or out
     # A symbol the question labels with a value ("fs is 758 Hz") is given, not wanted, and
     # a variable the ask names ("what is its mass?") is the one wanted. Either rule only
@@ -662,9 +715,22 @@ def quantity_locks_bare(question: str, eq: Equation) -> list[str]:
 
 
 def quantity_locks(question: str, variables: Sequence[Variable]) -> dict[str, tuple[str, str]]:
-    """Symbol -> the (number, unit) the question labels it with, when the units fit."""
+    """Symbol -> the (number, unit) the question labels it with, when the units fit.
+
+    Includes the initial and final value of a "from A to B" (``transition_locks``)."""
     by_symbol = {v.symbol: v for v in variables}
-    return {s: q for s, q in symbol_locks(question, variables).items() if _fits(q[1], by_symbol[s])}
+    locks = {
+        s: q for s, q in symbol_locks(question, variables).items() if _fits(q[1], by_symbol[s])
+    }
+    # "from 20 m/s to 60 m/s" is the initial and then the final value, unless a label differs.
+    moved = transition_locks(question, variables)
+    if (
+        moved
+        and not any(s in locks for s in moved)
+        and not set(moved.values()) & set(locks.values())
+    ):
+        locks.update(moved)
+    return locks
 
 
 def _partner(symbol: str) -> str | None:

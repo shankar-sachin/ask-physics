@@ -75,18 +75,67 @@ def extract_units(text: str) -> list[str]:
     return out
 
 
-def question_quantities(text: str) -> list[tuple[str, str]]:
-    """Every number written with a unit in ``text``: (canonical number, unit as written).
+# "from 0 to 20 m/s", "from 5 km/h up to 9 km/h": the unit after the second number is also
+# the first one's when the first has none. The first number may carry a unit of its own.
+_UNIT = r"[A-Za-z](?:[A-Za-z0-9/*]|\^-?)*(?:\((?:[A-Za-z0-9/*]|\^-?)+\))?"
+_PLAIN_NUMBER = r"-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?"
+_RANGE = re.compile(
+    r"\bfrom\s+(?P<a>(?>" + _PLAIN_NUMBER + r"))(?:\s*(?P<ua>" + _UNIT + r"))?"
+    r"\s+(?:up\s+)?to\s+(?P<b>(?>" + _PLAIN_NUMBER + r"))\s*(?P<ub>" + _UNIT + r")",
+    re.IGNORECASE,
+)
 
-    In order of appearance, repeats kept, so "5 kg and 5 kg" counts two masses.
+
+def _spelled(number: str, unit: str | None) -> tuple[str, str] | None:
+    """A (canonical number, unit) pair, or None if the number overflows or the unit is not one."""
+    if unit is None or not is_valid_unit(unit) or not math.isfinite(float(number)):
+        return None
+    return format_number(float(number)), unit
+
+
+def quantity_ranges(text: str) -> list[tuple[tuple[str, str], tuple[str, str]]]:
+    """Each "from A to B unit" in ``text``: ((A, unit), (B, unit)), in order of appearance.
+
+    "from 0 to 20 m/s" gives (("0", "m/s"), ("20", "m/s")): the first number takes the
+    second's unit when it has none of its own. A start and an end are all this says; which
+    variables they fill is for the reading module ("from A to B" is the initial and then the
+    final value).
     """
-    out: list[tuple[str, str]] = []
+    out: list[tuple[tuple[str, str], tuple[str, str]]] = []
+    for m in _RANGE.finditer(text):
+        end = _spelled(m.group("b"), m.group("ub"))
+        if end is None:
+            continue
+        start = _spelled(m.group("a"), m.group("ua")) or _spelled(m.group("a"), end[1])
+        if start is not None:
+            out.append((start, end))
+    return out
+
+
+def _unit_quantities(text: str) -> list[tuple[int, str, str]]:
+    """(position, canonical number, unit as written) for every number with a unit."""
+    found: dict[int, tuple[str, str]] = {}
     for match in _UNIT_AFTER_NUMBER.finditer(text):
         unit = match.group(1)
         number = match.group()[: match.start(1) - match.start()].strip()
         if is_valid_unit(unit) and math.isfinite(float(number)):
-            out.append((format_number(float(number)), unit))
-    return out
+            found[match.start()] = (format_number(float(number)), unit)
+    for m in _RANGE.finditer(text):
+        # A bare first number ("from 0 to 20 m/s") is a quantity in the second's unit.
+        if m.start("a") not in found and _spelled(m.group("a"), m.group("ua")) is None:
+            end = _spelled(m.group("b"), m.group("ub"))
+            if end is not None:
+                found[m.start("a")] = (format_number(float(m.group("a"))), end[1])
+    return [(pos, n, u) for pos, (n, u) in sorted(found.items())]
+
+
+def question_quantities(text: str) -> list[tuple[str, str]]:
+    """Every number written with a unit in ``text``: (canonical number, unit as written).
+
+    In order of appearance, repeats kept, so "5 kg and 5 kg" counts two masses. The first
+    number of "from 0 to 20 m/s" takes the unit of the second.
+    """
+    return [(n, u) for _, n, u in _unit_quantities(text)]
 
 
 def stated_quantities(text: str) -> list[tuple[str, str]]:
@@ -96,7 +145,7 @@ def stated_quantities(text: str) -> list[tuple[str, str]]:
     0.3"), so a number with no unit after it can fill a dimensionless variable. Numbers
     that carry a unit are never offered as dimensionless.
     """
-    with_unit = {m.start() for m in _UNIT_AFTER_NUMBER.finditer(text) if is_valid_unit(m.group(1))}
+    with_unit = {pos for pos, _, _ in _unit_quantities(text)}
     bare = [
         (format_number(float(m.group())), "dimensionless")
         for m in _NUMBER.finditer(text)

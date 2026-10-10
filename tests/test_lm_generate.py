@@ -221,9 +221,14 @@ def test_explanation_numbers_are_constrained(store: DataStore, tokenizer: Tokeni
 def test_greedy_decoding_is_deterministic(store: DataStore, tokenizer: Tokenizer) -> None:
     eqs = [store.equations["kin_v_squared"], store.equations["kin_x_at"]]
     consts = list(store.constants.values())
-    a = decode_plan(_decoder(tokenizer, 7), QUESTION, "standard", eqs, consts)
-    b = decode_plan(_decoder(tokenizer, 7), QUESTION, "standard", eqs, consts)
-    assert a == b
+
+    def run() -> Plan | str:
+        try:
+            return decode_plan(_decoder(tokenizer, 7), QUESTION, "standard", eqs, consts)
+        except PlanValidationError as exc:  # no time is stated, so a plan may fail (#85, #91)
+            return str(exc)
+
+    assert run() == run()
 
 
 def test_planning_needs_equations(tokenizer: Tokenizer) -> None:
@@ -296,7 +301,7 @@ def test_values_must_fit_their_variable(store: DataStore) -> None:
     assert not any(o.number == "69" for o in p)
     assert ValueOption("69", "m/s", "given") in v
     assert not any(o.number == "4.6" for o in v)
-    assert ValueOption("0", "m/s", "assumption") in v  # "dropped" still means v0 = 0
+    assert not any(o.origin == "assumption" for o in v)  # a velocity here is stated, not 0
 
 
 def test_units_stay_with_their_number(store: DataStore) -> None:
@@ -466,7 +471,9 @@ def test_zero_is_only_assumed_inside_the_typical_range(store: DataStore) -> None
     assert ValueOption("9.80665", "m/s^2", "constant") in g
     assert not any(o.origin == "assumption" for o in g)  # g = 0 is not physics
     kin = {v.symbol: v for v in store.equations["kin_v_at"].variables}
-    assert ValueOption("0", "m/s", "assumption") in known_value_options(kin["v0"], q, consts)
+    assert not any(o.origin == "assumption" for o in known_value_options(kin["v0"], q, consts))
+    rest = known_value_options(kin["v0"], "A ball is dropped from 11 m.", consts)
+    assert ValueOption("0", "m/s", "assumption") in rest  # "dropped" means v0 = 0
 
 
 # The force is the target and no mass is stated: m has no legal value, so the plan must
