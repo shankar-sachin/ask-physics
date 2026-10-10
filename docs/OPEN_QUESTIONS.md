@@ -120,8 +120,11 @@ Homebrew **formula** (for CLI tools) later? A Homebrew **cask** is for GUI
 `.app` bundles and does not fit a CLI.
 
 **Update (v0.2):** install channels are decided in ADR-011: curl and irm
-installers plus a Homebrew tap, no WinGet. Still open: publishing to PyPI
-before v1.0.
+installers plus a Homebrew tap. **Update (2026-10-10):** the maintainer decided to
+ship on WinGet after all (ADR-023), with a per-user Inno Setup installer; the open
+installer questions (WinGet, installers) are settled. Still open: publishing to PyPI
+before v1.0, and whether Windows on ARM is supported (the WinGet package lists x64 only;
+`install.ps1` has not been tried on ARM64, where torch wheels may be missing).
 
 **Default for now:** installers and the tap install from GitHub releases;
 PyPI at v1.0. Releases are tagged only with the maintainer's approval.

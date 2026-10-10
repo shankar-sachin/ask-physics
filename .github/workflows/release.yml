@@ -1,0 +1,312 @@
+name: Release
+
+# Pushing a tag vX.Y.Z builds the Windows installer, smoke-tests it, creates the GitHub
+# Release for that tag, and publishes the package to PyPI (ADR-023, docs/RELEASING.md).
+# Pull requests that touch the installer, and manual runs, build and smoke-test the installer
+# only; they release nothing.
+on:
+  push:
+    tags: ["v*.*.*"]
+  pull_request:
+    paths:
+      - "packaging/**"
+      - "install.ps1"
+      - "scripts/winget.sh"
+      - "scripts/release_notes.py"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to build and smoke-test (empty: the selected branch). Nothing is released."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # The registry key Inno Setup writes: AppId in packaging/windows/askphysics.iss plus "_is1".
+  UNINSTALL_KEY: 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{007795BD-A0E0-46D3-8C03-CE338CD7B57D}_is1'
+
+jobs:
+  installer:
+    name: Windows installer
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $pyproject = Get-Content pyproject.toml -Raw
+          $m = [regex]::Match($pyproject, '(?m)^version\s*=\s*"([^"]+)"')
+          if (-not $m.Success) { throw "no version in pyproject.toml" }
+          $version = $m.Groups[1].Value
+          $init = Get-Content src/askphysics/__init__.py -Raw
+          $m = [regex]::Match($init, '(?m)^__version__\s*=\s*"([^"]+)"')
+          if (-not $m.Success -or $m.Groups[1].Value -ne $version) {
+            throw "pyproject.toml says $version but src/askphysics/__init__.py says $($m.Groups[1].Value)"
+          }
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            $tag = $env:GITHUB_REF_NAME
+            $t = [regex]::Match($tag, '^v(\d+\.\d+\.\d+)$')
+            if (-not $t.Success) { throw "tag '$tag' is not of the form vX.Y.Z" }
+            if ($t.Groups[1].Value -ne $version) {
+              throw "tag $tag does not match version $version in pyproject.toml; bump the version first"
+            }
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "version '$version' is not X.Y.Z" }
+          Write-Host "Building Ask Physics $version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Find or install Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          function Find-Iscc {
+            $found = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($found) { return $found.Source }
+            foreach ($dir in ${env:ProgramFiles(x86)}, $env:ProgramFiles, "$env:LOCALAPPDATA\Programs") {
+              $candidate = Join-Path $dir "Inno Setup 6\ISCC.exe"
+              if (Test-Path $candidate) { return $candidate }
+            }
+            return $null
+          }
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            Write-Host "Inno Setup is not on this runner; installing it with Chocolatey"
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed" }
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          Write-Host "Using $iscc"
+          "iscc=$iscc" >> $env:GITHUB_OUTPUT
+
+      - name: Build the installer
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ISCC: ${{ steps.inno.outputs.iscc }}
+        run: |
+          & $env:ISCC "/DAppVersion=$env:VERSION" "/Odist" packaging\windows\askphysics.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          $exe = "dist\AskPhysicsSetup-$env:VERSION.exe"
+          if (-not (Test-Path $exe)) { throw "$exe was not produced" }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLower()
+          [System.IO.File]::WriteAllText((Join-Path $PWD "$exe.sha256"), "$hash  AskPhysicsSetup-$env:VERSION.exe`n")
+          Write-Host "$hash  $exe"
+
+      # ASKPHYSICS_SOURCE points install.ps1 at this checkout, so the test does not depend on
+      # the release existing yet. The installer still runs exactly as it would for a user.
+      - name: Install silently
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ASKPHYSICS_SOURCE: ${{ github.workspace }}
+        run: |
+          $exe = (Resolve-Path "dist\AskPhysicsSetup-$env:VERSION.exe").Path
+          $log = Join-Path $env:RUNNER_TEMP "inno-install.log"
+          $p = Start-Process -FilePath $exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$log`"" -Wait -PassThru
+          Write-Host "Setup exited with code $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Show the installer logs
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($f in (Join-Path $env:RUNNER_TEMP "inno-install.log"), (Join-Path $env:TEMP "AskPhysics-setup.log")) {
+            Write-Host "::group::$f"
+            if (Test-Path $f) { Get-Content $f } else { Write-Host "(not written)" }
+            Write-Host "::endgroup::"
+          }
+
+      - name: Check what was installed
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          $appDir = Join-Path $env:LOCALAPPDATA "Programs\Ask Physics"
+          foreach ($f in "install.ps1", "askphysics-setup.ps1", "unins000.exe") {
+            if (-not (Test-Path (Join-Path $appDir $f))) { throw "$f is missing from $appDir" }
+          }
+          $entry = Get-ItemProperty -LiteralPath $env:UNINSTALL_KEY
+          if ($entry.DisplayVersion -ne $env:VERSION) { throw "Apps and features says $($entry.DisplayVersion), expected $env:VERSION" }
+          Write-Host "Apps and features: $($entry.DisplayName) $($entry.DisplayVersion) by $($entry.Publisher)"
+
+          # What a new terminal would see: the machine and user PATH as stored.
+          $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+          if (-not (Get-Command askphysics -ErrorAction SilentlyContinue)) {
+            Write-Host "::warning::askphysics is not on the stored user PATH after setup; falling back to the uv tool folder"
+            $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
+          }
+          Set-Location $env:RUNNER_TEMP
+          $out = askphysics version | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "askphysics version failed" }
+          Write-Host $out
+          if ($out -notmatch [regex]::Escape($env:VERSION)) { throw "askphysics version does not say $env:VERSION" }
+          askphysics ask "A ball is dropped from 20 m. How fast does it land?"
+          if ($LASTEXITCODE -ne 0) { throw "askphysics ask failed" }
+
+      - name: Uninstall silently
+        shell: pwsh
+        run: |
+          $appDir = Join-Path $env:LOCALAPPDATA "Programs\Ask Physics"
+          $un = Join-Path $appDir "unins000.exe"
+          Start-Process -FilePath $un -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          # The uninstaller copies itself to TEMP and the original returns at once, so wait
+          # for the folder to go.
+          $deadline = (Get-Date).AddMinutes(3)
+          while ((Test-Path -LiteralPath $appDir) -and ((Get-Date) -lt $deadline)) { Start-Sleep -Seconds 2 }
+          if (Test-Path -LiteralPath $appDir) { throw "$appDir is still there after the uninstaller ran" }
+          if (Test-Path -LiteralPath $env:UNINSTALL_KEY) { throw "the uninstall registry entry is still there" }
+          $exe = Join-Path $env:USERPROFILE ".local\bin\askphysics.exe"
+          if (Test-Path -LiteralPath $exe) { throw "$exe is still there: uv tool uninstall did not run" }
+          $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+          if (Get-Command askphysics -ErrorAction SilentlyContinue) { throw "askphysics is still on PATH after uninstalling" }
+          Write-Host "askphysics is gone"
+
+      # A failing install must fail Setup (WinGet judges success by the exit code) and must not
+      # leave the program registered.
+      - name: A failed install fails Setup
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ASKPHYSICS_SOURCE: ${{ runner.temp }}\no-such-source
+        run: |
+          $exe = (Resolve-Path "dist\AskPhysicsSetup-$env:VERSION.exe").Path
+          $p = Start-Process -FilePath $exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          Write-Host "Setup exited with code $($p.ExitCode)"
+          if ($p.ExitCode -eq 0) { throw "Setup reported success although install.ps1 failed" }
+          Write-Host "--- AskPhysics-setup.log"
+          Get-Content (Join-Path $env:TEMP "AskPhysics-setup.log")
+          if (Test-Path -LiteralPath $env:UNINSTALL_KEY) {
+            throw "the failed install left an Apps and features entry behind"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AskPhysicsSetup
+          path: |
+            dist/AskPhysicsSetup-*.exe
+            dist/AskPhysicsSetup-*.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: GitHub Release
+    if: github.event_name == 'push'
+    needs: installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.installer.outputs.version }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: AskPhysicsSetup
+          path: dist
+
+      - name: Collect the release files
+        run: |
+          set -eu
+          exe="dist/AskPhysicsSetup-${VERSION}.exe"
+          test -f "$exe"
+          test -f "$exe.sha256"
+          sha=$(cut -d' ' -f1 "$exe.sha256")
+          echo "SHA256=$sha" >> "$GITHUB_ENV"
+          (cd dist && sha256sum -c "AskPhysicsSetup-${VERSION}.exe.sha256")
+
+          # An unversioned copy, so a stable link always serves the newest installer:
+          # releases/latest/download/AskPhysicsSetup.exe. The WinGet manifests keep
+          # pointing at the versioned file.
+          cp "$exe" dist/AskPhysicsSetup.exe
+          printf '%s  AskPhysicsSetup.exe\n' "$sha" > dist/AskPhysicsSetup.exe.sha256
+
+          # The release notes are this version's section of CHANGELOG.md.
+          python3 scripts/release_notes.py "$VERSION" > notes.md
+          {
+            echo
+            echo "---"
+            echo
+            echo "Windows installer: \`AskPhysicsSetup-${VERSION}.exe\` (also published as \`AskPhysicsSetup.exe\`), SHA-256 \`$sha\`."
+          } >> notes.md
+
+          # The WinGet manifests for this release, ready to copy into a winget-pkgs branch.
+          sh scripts/winget.sh "$VERSION" "$sha" build/winget
+          (cd build/winget && zip -qr "../../dist/shankars.askphysics-${VERSION}-winget-manifests.zip" manifests)
+          unzip -l "dist/shankars.askphysics-${VERSION}-winget-manifests.zip"
+
+      - name: Create or update the release
+        run: |
+          set -eu
+          files="dist/AskPhysicsSetup-${VERSION}.exe dist/AskPhysicsSetup-${VERSION}.exe.sha256 dist/AskPhysicsSetup.exe dist/AskPhysicsSetup.exe.sha256 dist/shankars.askphysics-${VERSION}-winget-manifests.zip"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG exists (a re-run); updating its notes and files"
+            gh release edit "$TAG" --title "$TAG" --notes-file notes.md
+            # shellcheck disable=SC2086
+            gh release upload "$TAG" $files --clobber
+          else
+            # shellcheck disable=SC2086
+            gh release create "$TAG" $files --verify-tag --title "$TAG" --notes-file notes.md
+          fi
+          {
+            echo "### Released $TAG"
+            echo
+            echo "- Installer SHA-256: \`$SHA256\`"
+            echo "- WinGet manifests: \`shankars.askphysics-${VERSION}-winget-manifests.zip\` (see docs/RELEASING.md)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  pypi:
+    # `pip install askphysics`. Trusted publishing (OIDC): PyPI trusts this workflow and the
+    # `pypi` environment of this repository, so no token is stored. Independent of the GitHub
+    # Release and the installer, so a PyPI problem never blocks those.
+    name: PyPI
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/askphysics/
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the tag matches the package version
+        run: |
+          set -eu
+          version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match pyproject.toml version $version"
+            exit 1
+          fi
+
+      - name: Build the sdist and wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check --strict dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
