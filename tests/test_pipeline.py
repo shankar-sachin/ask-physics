@@ -6,7 +6,7 @@ from tests.conftest import DEMO_QUESTION
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import LLMError, PlanValidationError, SolverError
+from askphysics.errors import EmptyQuestionError, LLMError, PlanValidationError, SolverError
 from askphysics.llm.fake import FakeLLMClient
 from askphysics.models import (
     Classification,
@@ -73,6 +73,20 @@ def test_out_of_scope_is_refused_with_redirect(pipeline: Pipeline) -> None:
     assert answer.final_value is None
     assert "Category error" in answer.explanation
     assert "close question" in answer.explanation
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\n\t"])
+def test_a_blank_question_is_refused_with_a_reason(pipeline: Pipeline, text: str) -> None:
+    answer = pipeline.run(text)
+    assert answer.status == "refused"
+    assert answer.final_value is None
+    assert answer.question == ""
+    assert "question is empty" in answer.explanation
+
+
+def test_solve_rejects_a_blank_question_before_building_one(pipeline: Pipeline) -> None:
+    with pytest.raises(EmptyQuestionError):
+        pipeline.solve("  ")
 
 
 def test_fermi_without_planner_degrades_honestly(pipeline: Pipeline) -> None:

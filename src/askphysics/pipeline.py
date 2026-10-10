@@ -25,6 +25,7 @@ from askphysics.config import Settings
 from askphysics.data.loader import DataStore, load_all
 from askphysics.errors import (
     AskPhysicsError,
+    EmptyQuestionError,
     PlanValidationError,
     RetrievalEmptyError,
     SolverError,
@@ -566,6 +567,18 @@ def refuse(question: Question, classification: Classification) -> Answer:
     )
 
 
+def blank_question(text: str) -> Answer:
+    """Answer an empty or whitespace-only question: there is nothing to classify or solve."""
+    return Answer(
+        question=text.strip(),
+        status="refused",
+        category="out_of_scope",
+        confidence=Confidence(label="low", score=0.0),
+        explanation="This can't be answered as asked. The question is empty: type a physics "
+        "question, such as how fast a ball dropped from 20 m is moving when it lands.",
+    )
+
+
 _STAGE_HINTS = {
     "retrieve": "The equation database does not cover this yet.",
     "plan": "The planner could not build a valid plan from the retrieved equations.",
@@ -648,9 +661,13 @@ class Pipeline:
         """Answer one question. Expected failures become degraded answers, never exceptions.
 
         The question is normalized first ("2,000-kg", "m/s²", powers of ten become forms the
-        decoder reads), so every stage, and the answer card, see the same text.
+        decoder reads), so every stage, and the answer card, see the same text. A blank
+        question is refused with a reason, not an exception.
         """
-        solved = self.solve(text)
+        try:
+            solved = self.solve(text)
+        except EmptyQuestionError:
+            return blank_question(text)
         question, classification = solved.question, solved.classification
 
         def finish(answer: Answer, attempts: int = 0) -> Answer:
@@ -699,8 +716,14 @@ class Pipeline:
         """Stages 1 to 5 for one question: everything ``run`` does except the explanation.
 
         The real-question eval scores this, so it measures exactly what ``ask`` answers.
+
+        Raises:
+            EmptyQuestionError: the question is blank after normalization.
         """
-        question = Question(text=normalize_question(text))
+        question_text = normalize_question(text)
+        if not question_text:
+            raise EmptyQuestionError("the question is empty; type a physics question")
+        question = Question(text=question_text)
         stages = self.stages
         solved = Solved(question=question)
         try:

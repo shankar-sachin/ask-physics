@@ -215,6 +215,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "how strongly do they attract?" asks for a force, not an energy, and a
   question that never mentions an emissivity no longer gets one borrowed
   from another number (and a borrowed unitless value is flagged).
+- `askphysics ask ""` (and a whitespace-only question) prints a refusal that says the question
+  is empty, instead of a pydantic traceback. `Pipeline.run` returns a refused answer for a
+  blank question, and `Pipeline.solve` raises `EmptyQuestionError` for one (#76).
 
 ## [0.3.0] - 2026-10-06
 

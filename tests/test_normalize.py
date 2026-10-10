@@ -64,6 +64,11 @@ def test_factory_questions_keep_every_quantity(store: DataStore) -> None:
     assert checked > 300
 
 
+def test_surrounding_whitespace_goes() -> None:
+    assert normalize_question("  9.8 m/s² \n") == "9.8 m/s^2"
+    assert normalize_question(" \t ") == ""
+
+
 def test_normalizing_twice_changes_nothing() -> None:
     once = normalize_question("A 2,000-kg car at 3.0 × 10⁸ m/s² and 220 Ω")
     assert normalize_question(once) == once

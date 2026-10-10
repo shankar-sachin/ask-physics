@@ -59,6 +59,24 @@ def test_ask_refusal_renders() -> None:
     assert "try instead" in result.output
 
 
+@pytest.mark.parametrize("question", ["", "   "])
+def test_ask_a_blank_question_gives_a_reason_not_a_traceback(question: str) -> None:
+    result = runner.invoke(cli.app, ["ask", question])
+    assert result.exit_code == 0
+    assert "ValidationError" not in result.output
+    assert "Traceback" not in result.output
+    assert "CAN'T ANSWER" in result.output
+    assert "question is empty" in result.output
+
+
+def test_ask_json_for_a_blank_question_is_a_refused_answer() -> None:
+    result = runner.invoke(cli.app, ["ask", "--json", " "])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["status"] == "refused"
+    assert data["final_value"] is None
+
+
 def test_bad_config_exits_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ASKPHYSICS_TOP_K", "lots")
     result = runner.invoke(cli.app, ["ask", "anything"])
