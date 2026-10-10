@@ -60,6 +60,11 @@ Changelog = "https://github.com/shankar-sachin/ask-physics/blob/main/CHANGELOG.m
 [tool.hatch.build.targets.wheel]
 packages = ["src/askphysics"]
 
+# The source distribution on PyPI: the package, its tests, data and licences, without the
+# website's video and images, which only the site and the README need.
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/images", "web/images", "build", "dist", ".claude"]
+
 # ---------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]

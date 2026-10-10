@@ -126,6 +126,22 @@ installer is not code-signed. The WinGet manifest lists `astral-sh.uv` as a
 dependency, but `install.ps1` installs uv itself when it is not on `PATH`, so
 setup works either way.
 
+### PyPI
+
+The same tag publishes `askphysics` to PyPI (`pip install askphysics`), in the
+release workflow's `pypi` job. It uses trusted publishing: PyPI trusts this
+repository's `release.yml` in the `pypi` environment, so no token is stored. The
+job checks that the tag matches `pyproject.toml`, builds the sdist and wheel,
+runs `twine check --strict`, and uploads both. It runs on its own, so a PyPI
+problem never holds up the GitHub Release or the installer; if it fails, fix
+the cause and re-run just that job. A version can be uploaded to PyPI only once,
+so a broken upload needs a new version, not a re-tag.
+
+The publisher was registered as a pending publisher for the project name
+`askphysics` (owner `shankar-sachin`, repository `ask-physics`, workflow
+`release.yml`, environment `pypi`); the first successful upload creates the
+project.
+
 ## Publishing model weights (ADR-012)
 
 Weights are published separately from code, under their own release tag
