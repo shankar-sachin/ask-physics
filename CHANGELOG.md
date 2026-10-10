@@ -29,9 +29,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `askphysics model pull` shows the same bars and verdicts. `corpus.sh` and `build_site.sh` show
   their stages with counts. Without a terminal, or with `NO_COLOR`, everything prints plain
   lines with no escape codes; `DRY_RUN=1` output is unchanged.
-- A demo video on the website, under the hero: a question typed into the CLI, the six stages,
-  Noether's working with units, the answer card, a refused question, and the four Fermi models.
-  It plays muted on a loop, and holds on its poster for visitors who prefer reduced motion.
+- A demo video on the website, under the hero (1:59, with an original soundtrack): a question
+  typed into the CLI, the six stages, Noether's working with units, the answer card, a refused
+  question, a training run, the website answering in the browser, the equation database, the
+  four Fermi models, and how to install it, free in the browser or the terminal. It plays muted
+  on a loop with controls to unmute, and holds on its poster for visitors who prefer reduced
+  motion.
 - A livelier training view for `model train` and `scripts/train.sh`. The bar advances every
   optimizer step and the ETA works (from recent steps per second, with a clock time to finish,
   and correct after `--resume`). A live panel under the bar shows the phase (prose warm-up, then
