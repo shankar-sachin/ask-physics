@@ -8,6 +8,22 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A fluid, continuous display for every shell script (`docs/SCRIPTS.md`, ADR-020). Each script
+  opens with a header and closes with a summary (total time, what to run next); each step is a
+  spinner that settles into a tick and the time it took, with a long command's output folded into
+  three dimmed lines, the full log saved, and a failure showing the command, the end of its
+  output, and the log path. `check.sh` is one live line per gate (ruff, format, mypy,
+  shellcheck, validate-data, pytest with live counts), carries on past a failed gate, and
+  names what failed. `eval.sh` (and `askphysics model eval`) draws a bar with an ETA from the
+  first example, a clock time to finish, the valid-plan rate and confidently-wrong count as they
+  settle, a bar and ETA of its own for the `--rescue-with` pass, and a results panel.
+  `setup.sh`, `update.sh`, `install.sh` and `install.ps1` show a step list and end on a panel of
+  commands to try; `install.sh` and `lib.sh` fall back to a pure-sh renderer before anything is
+  installed. `models.sh` and `release_weights.sh` list every file with its size and sha256
+  verdict, backups copy under a bar with speed and ETA and are verified against their source, and
+  `askphysics model pull` shows the same bars and verdicts. `corpus.sh` and `build_site.sh` show
+  their stages with counts. Without a terminal, or with `NO_COLOR`, everything prints plain
+  lines with no escape codes; `DRY_RUN=1` output is unchanged.
 - A demo video on the website, under the hero: a question typed into the CLI, the six stages,
   Noether's working with units, the answer card, a refused question, and the four Fermi models.
   It plays muted on a loop, and holds on its poster for visitors who prefer reduced motion.
@@ -115,6 +131,18 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Contrast pairs teach the out-of-scope boundary from both sides: "How fast is sadness?" and
   "How heavy is justice?" are out of scope, next to "How fast is an adult at takeoff in a
   standing jump?" and "How heavy is a freight train?", which are Fermi questions.
+
+### Changed
+
+- The rescue pass of `model eval --rescue-with` runs after scoring, over just the misses (it
+  used to run inside the scoring loop), so it has a known length and its own progress. Results
+  are the same.
+- `scripts/check.sh` also runs shellcheck (when installed) and no longer stops at the first failed
+  gate. `scripts/lib.sh`'s `info`, `warn` and `fail` use the project theme, and print `error:` and
+  `warning:` lines without a terminal.
+- `askphysics.ui` no longer imports sympy and Pint at load (0.06 s instead of 0.67 s).
+- Removed the `askphysics model phase` command added with the training view; scripts call
+  `python -m askphysics.shell_ui`.
 
 ### Fixed
 
