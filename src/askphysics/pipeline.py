@@ -22,9 +22,10 @@ from typing import Any, NamedTuple
 import pint
 
 from askphysics.config import Settings
-from askphysics.data.loader import DataStore, load_all
+from askphysics.data.loader import CONSTANT_SYMBOL_ALIASES, DataStore, load_all
 from askphysics.errors import (
     AskPhysicsError,
+    EmptyQuestionError,
     PlanValidationError,
     RetrievalEmptyError,
     SolverError,
@@ -44,6 +45,7 @@ from askphysics.models import (
     Confidence,
     Equation,
     EquationRef,
+    KnownValue,
     Plan,
     Question,
     RetrievalResult,
@@ -214,6 +216,35 @@ def validate_plan(p: Plan, retrieval: RetrievalResult) -> None:
         raise PlanValidationError(f"plan uses invalid units: {bad}")
 
 
+def resolve_constant_symbols(p: Plan, data: DataStore) -> Plan:
+    """Rename a known value from its constants-table symbol to the equation variable it fills.
+
+    The planner is shown the constants table, so it copies ``k_B``; the equations name the
+    same constant ``kB`` (``CONSTANT_SYMBOL_ALIASES``, issue #74). A rename happens only when
+    the plan's equations have that variable with the constant's dimension, so the Coulomb
+    constant never stands in for a spring constant with the same letter.
+    """
+    variables = [
+        v for eid in p.equation_ids if eid in data.equations for v in data.equations[eid].variables
+    ]
+    names = {v.symbol for v in variables}
+    known: list[KnownValue] = []
+    for k in p.known_values:
+        alias = CONSTANT_SYMBOL_ALIASES.get(k.symbol)
+        if (
+            alias is not None
+            and k.symbol not in names
+            and is_valid_unit(k.unit)
+            and any(
+                v.symbol == alias and check_dimensions(quantity(1.0, k.unit), v.unit)
+                for v in variables
+            )
+        ):
+            k = k.model_copy(update={"symbol": alias})
+        known.append(k)
+    return p.model_copy(update={"known_values": known})
+
+
 # --------------------------------------------------------------------------- 4. compute
 
 
@@ -230,6 +261,7 @@ def compute(p: Plan, *, data: DataStore) -> ComputeResult:
             different quantities, or an equation can't be solved.
         UnitError: units don't combine.
     """
+    p = resolve_constant_symbols(p, data)
     equations = [data.equations[eid] for eid in p.equation_ids]
     _check_shared_symbols(equations)
     variables = {v.symbol: v for eq in equations for v in eq.variables}
@@ -330,6 +362,7 @@ def sanity_check(
 
     Failures here never block the answer; they lower confidence and add caveats.
     """
+    p = resolve_constant_symbols(p, data)
     equations = [data.equations[eid] for eid in p.equation_ids]
     # The equation that produced the answer: the last one solved in a chain.
     final_id = result.steps[-1].equation_id if result.steps else p.equation_ids[0]
@@ -566,6 +599,18 @@ def refuse(question: Question, classification: Classification) -> Answer:
     )
 
 
+def blank_question(text: str) -> Answer:
+    """Answer an empty or whitespace-only question: there is nothing to classify or solve."""
+    return Answer(
+        question=text.strip(),
+        status="refused",
+        category="out_of_scope",
+        confidence=Confidence(label="low", score=0.0),
+        explanation="This can't be answered as asked. The question is empty: type a physics "
+        "question, such as how fast a ball dropped from 20 m is moving when it lands.",
+    )
+
+
 _STAGE_HINTS = {
     "retrieve": "The equation database does not cover this yet.",
     "plan": "The planner could not build a valid plan from the retrieved equations.",
@@ -648,9 +693,13 @@ class Pipeline:
         """Answer one question. Expected failures become degraded answers, never exceptions.
 
         The question is normalized first ("2,000-kg", "m/s²", powers of ten become forms the
-        decoder reads), so every stage, and the answer card, see the same text.
+        decoder reads), so every stage, and the answer card, see the same text. A blank
+        question is refused with a reason, not an exception.
         """
-        solved = self.solve(text)
+        try:
+            solved = self.solve(text)
+        except EmptyQuestionError:
+            return blank_question(text)
         question, classification = solved.question, solved.classification
 
         def finish(answer: Answer, attempts: int = 0) -> Answer:
@@ -699,8 +748,14 @@ class Pipeline:
         """Stages 1 to 5 for one question: everything ``run`` does except the explanation.
 
         The real-question eval scores this, so it measures exactly what ``ask`` answers.
+
+        Raises:
+            EmptyQuestionError: the question is blank after normalization.
         """
-        question = Question(text=normalize_question(text))
+        question_text = normalize_question(text)
+        if not question_text:
+            raise EmptyQuestionError("the question is empty; type a physics question")
+        question = Question(text=question_text)
         stages = self.stages
         solved = Solved(question=question)
         try:

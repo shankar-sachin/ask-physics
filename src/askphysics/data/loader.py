@@ -20,18 +20,27 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from askphysics.errors import DataValidationError, SolverError
-from askphysics.models import Constant, Equation, FermiAssumption, WorkedExample
+from askphysics.errors import AskPhysicsError, DataValidationError, SolverError
+from askphysics.models import Constant, Equation, FermiAssumption, Plan, WorkedExample
 from askphysics.solver.fermi import AssumptionTable
 from askphysics.solver.symbolic import check_dimensional_consistency, free_symbol_names
-from askphysics.solver.units import is_valid_unit
+from askphysics.solver.units import check_dimensions, is_valid_unit, quantity
 
 ALLOWED_LICENSES = frozenset({"MIT", "CC0-1.0", "CC-BY-4.0", "public-domain"})
+# A worked example re-solves when Noether's answer is within this relative tolerance of
+# its final_answer (DATA_SCHEMA.md, WorkedExample validation rules).
+EXAMPLE_TOLERANCE = 1e-3
 
 EQUATIONS_FILE = "equations.json"
 EXAMPLES_FILE = "examples.json"
 CONSTANTS_FILE = "constants.json"
 FERMI_FILE = "fermi_assumptions.json"
+
+# Constants whose table symbol is not the name the equations use (issue #74). The planner is
+# shown the table and copies its symbol, so plans reach compute as k_B, and the equations say
+# kB. pipeline.resolve_constant_symbols renames them. Keys are constants.json symbols; values
+# are equations.json variables. validate_store checks that both sides exist.
+CONSTANT_SYMBOL_ALIASES: dict[str, str] = {"k_B": "kB", "k_e": "k", "mu_0": "mu0"}
 
 M = TypeVar("M", bound=BaseModel)
 
@@ -121,14 +130,74 @@ def validate_equation(eq: Equation) -> list[str]:
     return problems
 
 
-def validate_store(store: DataStore) -> list[str]:
-    """Cross-entry semantic checks. Returns a list of problems (empty if valid)."""
+def _check_example_answer(ex: WorkedExample, store: DataStore) -> list[str]:
+    """Check a worked example's final_answer against the solver.
+
+    The unit must have the dimension of the unknown in the equation that defines it, and the
+    re-solve, which is the pipeline's ``compute`` on the example's own values, must land
+    within ``EXAMPLE_TOLERANCE`` of the stated answer. ``askphysics.pipeline`` imports this
+    module, so the import of ``compute`` is local.
+    """
+    from askphysics.pipeline import compute
+
+    label = f"example {ex.id}"
+    target = ex.unknowns[0]
+    defining = next(
+        (
+            v
+            for eid in ex.equations_used
+            for v in store.equations[eid].variables
+            if v.symbol == target
+        ),
+        None,
+    )
+    if defining is None:
+        return []  # an unknown outside its equations is already reported by validate_store
+    answer = ex.final_answer
+    if not check_dimensions(quantity(1.0, answer.unit), defining.unit):
+        return [
+            f"{label}: final_answer unit {answer.unit!r} does not match the dimension of "
+            f"{target!r} ({defining.unit!r})"
+        ]
+    plan = Plan(
+        target=target,
+        unknowns=ex.unknowns,
+        known_values=ex.known_values,
+        equation_ids=ex.equations_used,
+        assumptions=[],
+        strategy="validate-data re-solve",
+    )
+    try:
+        result = compute(plan, data=store)
+    except AskPhysicsError as exc:
+        return [f"{label}: re-solve failed: {exc}"]
+    got = float(quantity(result.value, result.unit).to(answer.unit).magnitude)
+    if abs(got - answer.value) > EXAMPLE_TOLERANCE * abs(answer.value):
+        return [
+            f"{label}: re-solve gives {got:.6g} {answer.unit}, "
+            f"final_answer is {answer.value:.6g} {answer.unit}"
+        ]
+    return []
+
+
+def validate_store(store: DataStore, *, solve_examples: bool = False) -> list[str]:
+    """Cross-entry semantic checks. Returns a list of problems (empty if valid).
+
+    ``solve_examples`` also re-solves every worked example through Noether. ``validate-data``
+    turns it on; loading the store for a question leaves it off, since it costs a SymPy solve
+    per example on every start, which is slow in the browser.
+    """
     problems: list[str] = []
+    broken: set[str] = set()
     for eq in store.equations.values():
-        problems.extend(validate_equation(eq))
+        eq_problems = validate_equation(eq)
+        if eq_problems:
+            broken.add(eq.id)
+        problems.extend(eq_problems)
 
     for ex in store.examples.values():
         label = f"example {ex.id}"
+        before = len(problems)
         if ex.license not in ALLOWED_LICENSES:
             problems.append(f"{label}: license {ex.license!r} is not allowed")
         unknown_ids = [eid for eid in ex.equations_used if eid not in store.equations]
@@ -143,16 +212,38 @@ def validate_store(store: DataStore) -> list[str]:
             problems.append(f"{label}: symbols not in referenced equations: {sorted(stray)}")
         _check_units(label, [k.unit for k in ex.known_values], problems)
         _check_units(label, [ex.final_answer.unit], problems)
+        # The solver check needs well-formed inputs: it runs only when neither this example
+        # nor an equation it uses has a problem already reported above.
+        if (
+            solve_examples
+            and len(problems) == before
+            and not broken.intersection(ex.equations_used)
+        ):
+            problems.extend(_check_example_answer(ex, store))
 
     for c in store.constants.values():
         _check_units(f"constant {c.name}", [c.unit], problems)
     for a in store.fermi:
         _check_units(f"fermi assumption {a.quantity}", [a.unit], problems)
+
+    table_symbols = {c.symbol for c in store.constants.values()}
+    variable_names = {v.symbol for eq in store.equations.values() for v in eq.variables}
+    for table_symbol, variable in CONSTANT_SYMBOL_ALIASES.items():
+        if table_symbol not in table_symbols:
+            problems.append(f"constant alias {table_symbol!r}: no constant has that symbol")
+        if variable not in variable_names:
+            problems.append(
+                f"constant alias {table_symbol!r}: no equation has variable {variable!r}"
+            )
     return problems
 
 
-def load_all(data_dir: Path | None = None, *, validate: bool = True) -> DataStore:
+def load_all(
+    data_dir: Path | None = None, *, validate: bool = True, solve_examples: bool = False
+) -> DataStore:
     """Load every seed data file into a ``DataStore``.
+
+    ``solve_examples`` is passed to ``validate_store``; ``validate-data`` sets it.
 
     Raises:
         DataValidationError: any structural or (if ``validate``) semantic problem.
@@ -168,7 +259,7 @@ def load_all(data_dir: Path | None = None, *, validate: bool = True) -> DataStor
         ),
     )
     if validate:
-        problems.extend(validate_store(store))
+        problems.extend(validate_store(store, solve_examples=solve_examples))
     if problems:
         raise DataValidationError(problems)
     return store

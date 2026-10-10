@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from tests.conftest import DEMO_QUESTION
 
 from askphysics.config import Settings
-from askphysics.data.loader import DataStore
-from askphysics.errors import LLMError, PlanValidationError, SolverError
+from askphysics.data.loader import CONSTANT_SYMBOL_ALIASES, DataStore
+from askphysics.errors import EmptyQuestionError, LLMError, PlanValidationError, SolverError
 from askphysics.llm.fake import FakeLLMClient
 from askphysics.models import (
     Classification,
@@ -23,12 +23,14 @@ from askphysics.pipeline import (
     compute,
     never_negative,
     refuse,
+    resolve_constant_symbols,
     sanity_check,
     score_confidence,
     validate_plan,
 )
 from askphysics.prose import FALLBACK_REFUSAL
 from askphysics.retrieval.keyword import KeywordRetriever
+from askphysics.solver.units import check_dimensions, quantity
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -73,6 +75,20 @@ def test_out_of_scope_is_refused_with_redirect(pipeline: Pipeline) -> None:
     assert answer.final_value is None
     assert "Category error" in answer.explanation
     assert "close question" in answer.explanation
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\n\t"])
+def test_a_blank_question_is_refused_with_a_reason(pipeline: Pipeline, text: str) -> None:
+    answer = pipeline.run(text)
+    assert answer.status == "refused"
+    assert answer.final_value is None
+    assert answer.question == ""
+    assert "question is empty" in answer.explanation
+
+
+def test_solve_rejects_a_blank_question_before_building_one(pipeline: Pipeline) -> None:
+    with pytest.raises(EmptyQuestionError):
+        pipeline.solve("  ")
 
 
 def test_fermi_without_planner_degrades_honestly(pipeline: Pipeline) -> None:
@@ -193,6 +209,72 @@ def test_a_chain_that_cannot_reach_the_target_says_what_is_missing(store: DataSt
     )
     with pytest.raises(SolverError, match="still missing"):
         compute(plan, data=store)
+
+
+def _constant_plan(
+    constant: KnownValue, equation_id: str, target: str, others: list[KnownValue]
+) -> Plan:
+    return Plan(
+        target=target,
+        unknowns=[target],
+        known_values=[constant, *others],
+        equation_ids=[equation_id],
+        assumptions=[],
+        strategy="s",
+    )
+
+
+def test_a_table_symbol_copied_by_the_planner_reaches_the_equation(store: DataStore) -> None:
+    # Issue #74: the constants table calls it k_B, molecular_kinetic_energy calls it kB.
+    plan = _constant_plan(
+        KnownValue(symbol="k_B", value=1.380649e-23, unit="J/K", origin="constant"),
+        "molecular_kinetic_energy",
+        "KE",
+        [KnownValue(symbol="T", value=300, unit="K", origin="given")],
+    )
+    result = compute(plan, data=store)
+    assert quantity(result.value, result.unit).to("J").magnitude == pytest.approx(
+        1.5 * 1.380649e-23 * 300, rel=1e-9
+    )
+
+
+def test_a_coulomb_constant_is_not_renamed_to_a_spring_constant(store: DataStore) -> None:
+    # k_e becomes k only where k has the constant's dimension; in Hooke's law k is N/m.
+    plan = _constant_plan(
+        KnownValue(symbol="k_e", value=8.99e9, unit="N*m^2/C^2", origin="constant"),
+        "hookes_law",
+        "F",
+        [KnownValue(symbol="x", value=0.1, unit="m", origin="given")],
+    )
+    renamed = resolve_constant_symbols(plan, store)
+    assert [k.symbol for k in renamed.known_values] == ["k_e", "x"]
+
+
+def test_every_constant_can_fill_its_matching_variable(store: DataStore) -> None:
+    # "Matching" is the rule lm/factory.py uses: the variable has the constant's alias (or the
+    # table symbol) and the constant's dimension. Each pair is run through compute with the
+    # constant under its table symbol, the way a planner copies it.
+    covered: set[str] = set()
+    for c in store.constants.values():
+        name = CONSTANT_SYMBOL_ALIASES.get(c.symbol, c.symbol)
+        for eq in store.equations.values():
+            if not any(
+                v.symbol == name and check_dimensions(quantity(1.0, c.unit), v.unit)
+                for v in eq.variables
+            ):
+                continue
+            unfilled = [v for v in eq.variables if v.symbol != name]
+            if not unfilled:
+                continue
+            target, *rest = unfilled
+            others = [
+                KnownValue(symbol=v.symbol, value=2.0, unit=v.unit, origin="assumption")
+                for v in rest
+            ]
+            constant = KnownValue(symbol=c.symbol, value=c.value, unit=c.unit, origin="constant")
+            compute(_constant_plan(constant, eq.id, target.symbol, others), data=store)
+            covered.add(c.symbol)
+    assert {"k_B", "k_e", "mu_0", "g", "G", "c", "R", "h", "sigma"} <= covered
 
 
 def test_a_symbol_with_two_meanings_is_never_chained(store: DataStore) -> None:
