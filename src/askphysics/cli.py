@@ -23,7 +23,6 @@ from askphysics.ui import (
     make_console,
     safe,
     tolerate_narrow_encodings,
-    training_progress,
 )
 
 if TYPE_CHECKING:
@@ -361,36 +360,23 @@ def train_cmd(
             style="muted",
         )
 
-    last_val: dict[str, Any] = {}
-    with training_progress(console) as progress:
-        task = progress.add_task(config.name, total=steps, loss="…", val="…", speed="")
+    from askphysics.train_view import RunInfo, TrainingMonitor
 
-        started = False
-
-        def on_step(done: int) -> None:
-            nonlocal started
-            if not started:
-                # The run starts at the resumed step, so the jump from 0 to the checkpoint is
-                # not counted as speed and the first ETA is not wildly optimistic.
-                started = True
-                progress.reset(task, completed=done)
-                progress.tracker.start(done)
-                return
-            progress.tracker.record(done)
-            progress.update(task, completed=done)
-
-        def show(entry: dict[str, Any]) -> None:
-            if "val_loss" in entry:
-                last_val.update(entry)
-                progress.update(task, val=f"{entry['val_loss']:.3f}")
-            else:
-                progress.update(
-                    task,
-                    completed=entry["step"],
-                    loss=f"{entry['loss']:.3f}",
-                    speed=f"{entry['target_tokens_per_s']:,.0f} tok/s",
-                )
-
+    try:
+        shown_device = _training_device(chosen, device)
+    except ConfigError as exc:
+        raise _fail(str(exc)) from exc
+    info = RunInfo(
+        name=config.name,
+        backend=chosen,
+        device=shown_device,
+        steps=steps,
+        out_dir=out_dir,
+        has_prose=bool(texts),
+        prose_steps=prose_steps,
+        prose_share=prose_share,
+    )
+    with TrainingMonitor(console, info) as monitor:
         try:
             if chosen == "mlx":
                 from askphysics.lm.mlx_train import train_mlx
@@ -402,8 +388,8 @@ def train_cmd(
                     out_dir,
                     cfg,
                     resume=resume,
-                    on_log=show,
-                    on_step=on_step,
+                    on_log=monitor.on_log,
+                    on_step=monitor.on_step,
                     prose=texts,
                     cache_limit_gb=mlx_cache_gb,
                     memory_limit_gb=mlx_memory_gb,
@@ -416,21 +402,24 @@ def train_cmd(
                     out_dir,
                     cfg,
                     resume=resume,
-                    on_log=show,
-                    on_step=on_step,
+                    on_log=monitor.on_log,
+                    on_step=monitor.on_step,
                     prose=texts,
                 )
         except ConfigError as exc:  # a refused resume, or a device the backend can't use
             raise _fail(str(exc)) from exc
-        progress.update(task, completed=steps)
-    by_task = [
-        f"{key.removeprefix('val_loss_')} {value:.3f}"
-        for key, value in last_val.items()
-        if key.startswith("val_loss_")
-    ]
-    if by_task:
-        console.print("  val loss by task: " + " · ".join(by_task), style="muted")
-    console.print(f"[ok]✓[/] {config.name} saved to {safe(str(out_dir))}")
+    monitor.print_summary()
+
+
+def _training_device(backend: str, device: str | None) -> str:
+    """The device name the training view shows: what the run will use, not what was asked."""
+    from askphysics.lm.backend import on_apple_silicon
+
+    if backend == "torch":
+        from askphysics.lm.device import select_device
+
+        return select_device(device).type
+    return device or ("mps" if on_apple_silicon() else "cpu")
 
 
 @model_app.command("backend")
