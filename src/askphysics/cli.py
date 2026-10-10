@@ -26,12 +26,15 @@ from askphysics.ui import (
 )
 
 if TYPE_CHECKING:
-    from askphysics.lm.evaluate import RealReport
+    from askphysics.lm.evaluate import PhrasingReport, RealReport
 
 # OpenStax Physics questions (ADR-016), in a checkout: all of them, and those with gold
 # plans the project wrote, which are the real-question eval and never training data.
 TEXTBOOK_QUESTIONS = Path("third_party/openstax-physics/questions.jsonl")
 REAL_QUESTIONS = Path("third_party/openstax-physics/real_eval.jsonl")
+# Plain questions the project wrote, and their out-of-scope look-alikes: a classifier check
+# (issue #92). Never training data either.
+PHRASING_QUESTIONS = Path("evals/real_phrasing.jsonl")
 
 app = typer.Typer(
     name="askphysics",
@@ -169,6 +172,7 @@ def build_data(
     from askphysics.lm.factory import build_dataset, load_blocklist, textbook_examples
 
     blocked = load_blocklist(blocklist)
+    phrasing = load_blocklist(PHRASING_QUESTIONS)
     if not blocked:
         console.print(f"[warn]![/] no eval questions found at {safe(str(blocklist))}")
     extra = []
@@ -180,7 +184,7 @@ def build_data(
         extra = textbook_examples(textbook, exclude=held_out, seed=seed)
     with console.status(f"[muted]generating {examples:,} examples with {workers} worker(s)"):
         manifest = build_dataset(
-            out, examples, seed=seed, workers=workers, blocklist=blocked, extra=extra
+            out, examples, seed=seed, workers=workers, blocklist=[*blocked, *phrasing], extra=extra
         )
     table = Table(
         title=Text(f"✓ dataset written to {out}", style="ok"),
@@ -547,6 +551,10 @@ def eval_cmd(
         Path,
         typer.Option(help="Real textbook questions with gold plans; skipped if missing."),
     ] = REAL_QUESTIONS,
+    phrasing: Annotated[
+        Path,
+        typer.Option(help="Plain questions to classify (issue #92); skipped if missing."),
+    ] = PHRASING_QUESTIONS,
     rescue_with: Annotated[
         str | None,
         typer.Option(help="Bigger installed model to retry the questions this one misses."),
@@ -644,6 +652,21 @@ def eval_cmd(
                 on_progress=lambda n: asking.on_tick(EvalTick("score", n, total, "question")),
             )
         report.real = asdict(real_report)
+    phrasing_report = None
+    if phrasing.exists():
+        from askphysics.llm.fermi_client import FermiClient
+        from askphysics.lm.evaluate import evaluate_phrasing, read_phrasing_questions
+        from askphysics.models import Question
+        from askphysics.normalize import normalize_question
+        from askphysics.pipeline import classify
+
+        classifier = FermiClient(model, store, directory=model_dir, decoder=decoder)
+        with working(console, f"classifying plain questions with {model}"):
+            phrasing_report = evaluate_phrasing(
+                lambda q: classify(Question(text=normalize_question(q)), llm=classifier),
+                read_phrasing_questions(phrasing),
+            )
+        report.phrasing = asdict(phrasing_report)
     (model_dir / "eval.json").write_text(report.to_json(), encoding="utf-8")
 
     console.print()
@@ -659,7 +682,23 @@ def eval_cmd(
         console.print(f"    [muted]got     [/] {safe(str(f['got']))}")
     if real_report is not None:
         _show_real(model, real_report, real)
+    if phrasing_report is not None:
+        _show_phrasing(model, phrasing_report, phrasing)
     console.print(f"  [ok]✓[/] full report in {safe(str(model_dir / 'eval.json'))}")
+
+
+def _show_phrasing(model: str, report: PhrasingReport, path: Path) -> None:
+    from askphysics.eval_view import phrasing_sections, print_results
+
+    console.print()
+    print_results(
+        console, f"{model} on {report.questions} plain questions", phrasing_sections(report)
+    )
+    for miss in report.misses:
+        console.print(f"  [bad]{safe(miss['id'])}:[/] {safe(miss['question'])}")
+        console.print(f"    [muted]expected[/] {safe(miss['expected'])}")
+        console.print(f"    [muted]got     [/] {safe(miss['got'])}")
+    console.print(f"  [muted]questions from {safe(str(path))}[/]")
 
 
 def _show_real(model: str, report: RealReport, path: Path) -> None:

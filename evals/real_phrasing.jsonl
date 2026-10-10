@@ -1,0 +1,11 @@
+{"id": "sound_issue_01", "question": "what is the speed of sound", "expected": "answerable"}
+{"id": "rock_issue_02", "question": "how fast is a dropped rock moving after falling for a while", "expected": "answerable"}
+{"id": "sound_02", "question": "how fast does sound travel through air", "expected": "answerable"}
+{"id": "sound_03", "question": "How fast is sound in air?", "expected": "answerable"}
+{"id": "sound_04", "question": "What speed do sound waves have in the air?", "expected": "answerable"}
+{"id": "car_01", "question": "What would a typical car weigh?", "expected": "answerable"}
+{"id": "person_01", "question": "How much would a grown-up weigh?", "expected": "answerable"}
+{"id": "oos_speed_01", "question": "How fast is loneliness?", "expected": "out_of_scope"}
+{"id": "oos_speed_02", "question": "What is the speed of curiosity?", "expected": "out_of_scope"}
+{"id": "oos_heavy_01", "question": "How heavy is an apology?", "expected": "out_of_scope"}
+{"id": "oos_mass_01", "question": "What is the mass of a bad mood?", "expected": "out_of_scope"}

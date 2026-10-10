@@ -8,6 +8,16 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Plain questions with no numbers, and their look-alikes, are now trained and checked (issue
+  #92; tellus needs retraining to learn them). The data gains one equation
+  (`sound_speed_ideal_gas`, 111 in all) and four Fermi assumptions (`car_mass`,
+  `air_temperature_room`, `air_adiabatic_index`, `air_molar_mass`), so "How fast is sound?" and
+  "How heavy is a car?" are fermi estimates the tables answer, each trained next to an
+  out-of-scope twin with the same frame ("How fast is sadness?"). The estimate share of
+  classify examples rises from 6% to 10%. `askphysics model eval` also classifies the plain
+  questions in `evals/real_phrasing.jsonl` (including "what is the speed of sound") and reports
+  how many are answered and how many look-alikes are refused; `build-data` keeps them out of the
+  training data.
 - A 404 page for the website and the docs (`web/404.html`, served by Vercel for any missing path).
   It has a physics joke headline, links home, to the docs and to the ask box, and a small original
   mascot, Pip, drawn in inline SVG and animated in CSS: a dance on a 2.4 s loop with an electron
@@ -154,6 +164,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A refusal no longer suggests a question the classifier would refuse too, or the question
+  itself. The suggestion is checked with one extra classify call on the refusal path, and
+  dropped when it fails (issue #92: two questions each redirected to the other).
 - `scripts/train.sh` retrains an installed model when it is run by a relative path from another
   directory (the backup step used to look for `models.sh` after changing into the repo root) (#81).
 - `make check` runs `validate-data` as well as lint, typecheck and tests, so it matches the
