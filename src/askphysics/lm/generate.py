@@ -22,13 +22,13 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cache
+from typing import TYPE_CHECKING, Any
 
-import torch
-import torch.nn.functional as F
-from torch import Tensor
+import numpy as np
 
 from askphysics.errors import AskPhysicsError, LLMError, PlanValidationError
 from askphysics.lm import templates as tpl
+from askphysics.lm.engine import Cache, Engine, Logits
 from askphysics.lm.formats import (
     FILLER_NUMBERS,
     classify_prompt,
@@ -44,7 +44,6 @@ from askphysics.lm.formats import (
     stated_quantities,
     value_numbers,
 )
-from askphysics.lm.model import FermiLM, KVCache
 from askphysics.lm.reading import (
     asked_symbols,
     asked_variables,
@@ -73,6 +72,9 @@ from askphysics.models import (
 )
 from askphysics.prose import GENERIC_REASONS, content_words
 from askphysics.solver.units import Quantity, check_dimensions, quantity
+
+if TYPE_CHECKING:  # torch is only imported when a torch model is actually given to a Decoder
+    from askphysics.lm.model import FermiLM
 
 CATEGORIES = ("standard", "fermi", "out_of_scope")
 DOMAINS = (
@@ -127,6 +129,11 @@ def encode_task(tokenizer: Tokenizer, text: str) -> list[int]:
     if has_end:
         ids.append(tokenizer.end_id)
     return ids
+
+
+def _log_softmax(logits: Logits) -> Logits:
+    shifted = logits.astype(np.float64) - float(np.max(logits))
+    return shifted - np.log(np.exp(shifted).sum())  # type: ignore[no-any-return]
 
 
 def _common_prefix(a: Sequence[int], b: Sequence[int]) -> int:
@@ -192,23 +199,35 @@ def number_guard_ok(prefix: str, piece: str, allowed: Sequence[str]) -> bool:
 class _State:
     text: str
     ids: list[int]
-    past: KVCache | None
-    logits: Tensor | None = field(default=None)
+    past: Cache | None
+    logits: Logits | None = field(default=None)
 
 
 class Decoder:
-    """Stateful constrained decoder over one model and tokenizer."""
+    """Stateful constrained decoder over one model and tokenizer.
 
-    def __init__(self, model: FermiLM, tokenizer: Tokenizer, max_slot_tokens: int = 48) -> None:
-        self.model = model.eval()
+    ``model`` is a torch ``FermiLM`` or any ``Engine`` (ADR-021). Every rule below runs over
+    numpy logits, so the two give the same text for the same weights; only a sampled
+    explanation (``temperature > 0``) differs, because torch and numpy draw differently.
+    """
+
+    def __init__(
+        self, model: FermiLM | Engine, tokenizer: Tokenizer, max_slot_tokens: int = 48
+    ) -> None:
+        if isinstance(model, Engine):
+            self.engine: Engine = model
+        else:
+            from askphysics.lm.torch_engine import TorchEngine
+
+            self.engine = TorchEngine(model.eval())
+        self.model = model
         self.tokenizer = tokenizer
         self.max_slot_tokens = max_slot_tokens
-        self.device = next(model.parameters()).device
-        vocab = model.config.vocab_size
-        usable = torch.zeros(vocab, dtype=torch.bool)
-        string_safe = torch.zeros(vocab, dtype=torch.bool)
-        prose_safe = torch.zeros(vocab, dtype=torch.bool)
-        quote_start = torch.zeros(vocab, dtype=torch.bool)
+        vocab = self.engine.config.vocab_size
+        usable = np.zeros(vocab, dtype=bool)
+        string_safe = np.zeros(vocab, dtype=bool)
+        prose_safe = np.zeros(vocab, dtype=bool)
+        quote_start = np.zeros(vocab, dtype=bool)
         special = set(tokenizer.special_ids.values())
         self._text: dict[int, str] = {}
         for i in range(min(vocab, tokenizer.vocab_size)):
@@ -222,9 +241,9 @@ class Decoder:
                 prose_safe[i] = True
                 string_safe[i] = b'"' not in raw and b"\\" not in raw
                 quote_start[i] = raw.startswith(b'"')
-        self._string_safe = string_safe.to(self.device)
-        self._prose_safe = prose_safe.to(self.device)
-        self._quote_start = quote_start.to(self.device)
+        self._string_safe = string_safe
+        self._prose_safe = prose_safe
+        self._quote_start = quote_start
         self._ids_by_text = {text: i for i, text in self._text.items()}
         self._ids_by_first: dict[str, list[int]] = {}
         for i, text in self._text.items():
@@ -239,29 +258,27 @@ class Decoder:
 
     def room(self) -> int:
         """Tokens the context window still has after the text written so far."""
-        return self.model.config.context_length - len(self._state.ids)
+        return self.engine.config.context_length - len(self._state.ids)
 
-    def _feed(self, past: KVCache | None, tokens: Sequence[int]) -> tuple[KVCache, Tensor]:
+    def _feed(self, past: Cache | None, tokens: Sequence[int]) -> tuple[Cache, Logits]:
         if not tokens:
             raise ValueError("nothing to feed")
-        used = 0 if past is None else past[0][0].shape[2]
-        if used + len(tokens) > self.model.config.context_length:
+        used = 0 if past is None else self.engine.cache_length(past)
+        if used + len(tokens) > self.engine.config.context_length:
             raise LLMError(
                 f"input of {used + len(tokens)} tokens exceeds the model's "
-                f"{self.model.config.context_length}"
+                f"{self.engine.config.context_length}"
             )
         if past is None:
-            ids = torch.tensor([list(tokens)], device=self.device)
-            logits, new_past = self.model.step(ids)
-            return new_past, logits[0, -1]
-        logits_t: Tensor | None = None
+            logits, new_past = self.engine.next_logits(tokens, None)
+            return new_past, logits
+        last: Logits | None = None
         for t in tokens:
-            out, past = self.model.step(torch.tensor([[t]], device=self.device), past)
-            logits_t = out[0, -1]
-        assert past is not None and logits_t is not None
-        return past, logits_t
+            last, past = self.engine.next_logits([t], past)
+        assert last is not None
+        return past, last
 
-    def _rollback(self, n: int) -> tuple[KVCache | None, Tensor | None, int]:
+    def _rollback(self, n: int) -> tuple[Cache | None, Logits | None, int]:
         """Cache state covering the first ``n - 1`` tokens, ready to re-feed from ``n - 1``."""
         state = self._state
         if n == len(state.ids) and state.logits is not None:
@@ -269,14 +286,14 @@ class Decoder:
         keep = max(n - 1, 0)
         if keep == 0 or state.past is None:
             return None, None, 0
-        past = [(k[:, :, :keep], v[:, :, :keep]) for k, v in state.past]
-        return past, None, keep
+        return self.engine.truncate(state.past, keep), None, keep
 
     def _sync(self, text: str) -> None:
         ids = encode_task(self.tokenizer, text)
-        if len(ids) > self.model.config.context_length:
+        if len(ids) > self.engine.config.context_length:
             raise LLMError(
-                f"input of {len(ids)} tokens exceeds the model's {self.model.config.context_length}"
+                f"input of {len(ids)} tokens exceeds the model's "
+                f"{self.engine.config.context_length}"
             )
         n = _common_prefix(self._state.ids, ids)
         past, logits, start = self._rollback(n)
@@ -294,7 +311,7 @@ class Decoder:
         total = 0.0
         for t in ids[n:]:
             assert logits is not None
-            total += float(F.log_softmax(logits.float(), dim=-1)[t])
+            total += _log_softmax(logits)[t]
             past, logits = self._feed(past, [t])
         return total
 
@@ -378,7 +395,7 @@ class Decoder:
         *,
         until_end_token: bool = False,
         temperature: float = 0.0,
-        generator: torch.Generator | None = None,
+        generator: Any = None,
         max_tokens: int | None = None,
     ) -> str:
         """Generate text for a JSON string (stops before a quote) or for prose (stops at END).
@@ -394,11 +411,11 @@ class Decoder:
         for _ in range(limit):
             logits = self._state.logits
             assert logits is not None
-            masked = logits.float().masked_fill(~allowed, float("-inf"))
+            masked = np.where(allowed, logits, np.float32(-np.inf))
             if until_end_token:
                 stop_score = float(logits[self.tokenizer.end_id])
             else:
-                stop_score = float(logits.float().masked_fill(~self._quote_start, -1e9).max())
+                stop_score = float(np.where(self._quote_start, logits, np.float32(-1e9)).max())
             choice = self._pick(masked, written, history, allowed_numbers, temperature, generator)
             run = _TRAILING_RUN.search(written)
             number_open = bool(run) and run.group(1).rstrip(".") not in [  # type: ignore[union-attr]
@@ -423,12 +440,12 @@ class Decoder:
 
     def _pick(
         self,
-        masked: Tensor,
+        masked: Logits,
         written: str,
         history: Sequence[int],
         allowed_numbers: Sequence[str],
         temperature: float,
-        generator: torch.Generator | None,
+        generator: Any,
     ) -> int | None:
         def ok(token: int) -> bool:
             piece = self._text.get(token, "")
@@ -437,14 +454,12 @@ class Decoder:
             )
 
         if temperature > 0:
-            probs = F.softmax(masked / temperature, dim=-1)
             for _ in range(8):
-                token = int(torch.multinomial(probs, 1, generator=generator))
+                token = self.engine.sample(masked, temperature, generator)
                 if ok(token):
                     return token
-        order = torch.argsort(masked, descending=True)
-        for token_t in order[:256]:
-            token = int(token_t)
+        order = np.argsort(-masked, kind="stable")
+        for token in map(int, order[:256]):
             if masked[token] == float("-inf"):
                 return None
             if ok(token):
@@ -1098,7 +1113,7 @@ def decode_explanation(
     end within that, this raises ``LLMError`` so the pipeline degrades to the template.
     """
     decoder.start(explain_prompt(question, result, equations, assumptions, issues))
-    generator = torch.Generator(device="cpu").manual_seed(seed)
+    generator = decoder.engine.generator(seed)
     numbers = explain_numbers(question, result, assumptions)
     return decoder.free_text(
         numbers,

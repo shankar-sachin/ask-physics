@@ -108,7 +108,7 @@ def measure_throughput(
         start = time.perf_counter()
         pipeline.run(question)
         times.append(time.perf_counter() - start)
-    used = str(next(client.decoder.model.parameters()).device.type)
+    used = client.decoder.engine.device
     return Throughput(
         device=used,
         median_s=round(statistics.median(times), 2),
