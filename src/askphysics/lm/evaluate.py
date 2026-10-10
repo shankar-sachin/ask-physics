@@ -15,6 +15,11 @@ whether an answer can be trusted, and it should be as close to zero as possible.
 ``evaluate_real`` asks real textbook questions (OpenStax *Physics*, ADR-016) through the
 whole pipeline, exactly as ``askphysics ask`` would, and scores the answers against gold
 plans the project wrote. The factory never saw these phrasings.
+
+``evaluate_phrasing`` is a smaller check on plain questions with no numbers ("what is the
+speed of sound") and their out-of-scope look-alikes ("how fast is loneliness"): does the
+classifier file each on the right side of the boundary? Issue #92 was a real question refused
+as maths, which the factory eval cannot catch because it is drawn from the same templates.
 """
 
 from __future__ import annotations
@@ -59,7 +64,8 @@ class PlanScore:
 class EvalReport:
     """Accuracies over ``classify`` and ``plan`` examples, plus a few failures to read.
 
-    ``real`` is the real-question eval (``RealReport``), when it was run.
+    ``real`` is the real-question eval (``RealReport``), when it was run; ``phrasing`` is the
+    plain-question check (``PhrasingReport``).
     """
 
     classify_examples: int = 0
@@ -83,6 +89,7 @@ class EvalReport:
     failures: list[dict[str, Any]] = field(default_factory=list)
     confidently_wrong: list[dict[str, Any]] = field(default_factory=list)
     real: dict[str, Any] | None = None
+    phrasing: dict[str, Any] | None = None
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2)
@@ -497,4 +504,62 @@ def evaluate_real(
         report.right_rate = hits["right"] / n
         report.flagged_wrong_rate = hits["flagged"] / n
         report.confidently_wrong_rate = hits["confident"] / n
+    return report
+
+
+# --------------------------------------------------------------------------- real phrasing
+
+
+@dataclass(frozen=True)
+class PhrasingQuestion:
+    """A plain question and which side of the out-of-scope boundary it belongs on."""
+
+    id: str
+    question: str
+    expected: str  # "answerable" (standard or fermi) or "out_of_scope"
+
+
+def read_phrasing_questions(path: Path) -> list[PhrasingQuestion]:
+    """The questions in a phrasing file (``evals/real_phrasing.jsonl``)."""
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            row = json.loads(line)
+            if row["expected"] not in ("answerable", "out_of_scope"):
+                raise ValueError(f"{row['id']}: expected must be answerable or out_of_scope")
+            out.append(PhrasingQuestion(row["id"], row["question"], row["expected"]))
+    return out
+
+
+@dataclass
+class PhrasingReport:
+    """How the classifier files plain questions: answerable ones must not be refused, and
+    look-alikes with no physical subject must be."""
+
+    questions: int = 0
+    answerable_rate: float = 0.0  # answerable questions the classifier did not refuse
+    refused_rate: float = 0.0  # out-of-scope questions the classifier refused
+    misses: list[dict[str, Any]] = field(default_factory=list)
+
+
+def evaluate_phrasing(
+    classify: Callable[[str], Classification], questions: Sequence[PhrasingQuestion]
+) -> PhrasingReport:
+    """Classify each question (``pipeline.classify`` with the model under test) and score it."""
+    report = PhrasingReport(questions=len(questions))
+    right = {"answerable": 0, "out_of_scope": 0}
+    total = {"answerable": 0, "out_of_scope": 0}
+    for q in questions:
+        category = classify(q.question).category
+        total[q.expected] += 1
+        if (category == "out_of_scope") == (q.expected == "out_of_scope"):
+            right[q.expected] += 1
+        else:
+            report.misses.append(
+                {"id": q.id, "question": q.question, "expected": q.expected, "got": category}
+            )
+    if total["answerable"]:
+        report.answerable_rate = right["answerable"] / total["answerable"]
+    if total["out_of_scope"]:
+        report.refused_rate = right["out_of_scope"] / total["out_of_scope"]
     return report

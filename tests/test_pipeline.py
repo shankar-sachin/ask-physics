@@ -1,3 +1,4 @@
+import json
 from typing import TypeVar
 
 import pytest
@@ -434,6 +435,79 @@ def test_the_slope_question_refusal_is_cleaned_up() -> None:
     )
     answer = refuse(Question(text="how do you find the slope of a curve?"), garbled)
     assert answer.explanation == f"This can't be answered as asked. {FALLBACK_REFUSAL}"
+    assert answer.redirect is None
+
+
+def _refused(redirect: str) -> Classification:
+    return Classification(
+        category="out_of_scope",
+        reasoning="Category error: a promise is an idea, not an object with mass.",
+        closest_answerable=redirect,
+    )
+
+
+def test_a_redirect_equal_to_the_question_is_dropped() -> None:
+    question = Question(text="How fast does sound travel through air?")
+    answer = refuse(question, _refused("how fast does sound travel through air?"))
+    assert answer.redirect is None
+    assert "A close question" not in answer.explanation
+
+
+def test_a_redirect_the_classifier_would_refuse_is_dropped() -> None:
+    asked: list[str] = []
+
+    def answerable(text: str) -> bool:
+        asked.append(text)
+        return False
+
+    redirect = "How fast is a dropped rock moving after falling for a while?"
+    answer = refuse(
+        Question(text="what is ten divided by three"), _refused(redirect), answerable=answerable
+    )
+    assert asked == [redirect]
+    assert answer.redirect is None
+    kept = refuse(
+        Question(text="what is ten divided by three"), _refused(redirect), answerable=lambda _: True
+    )
+    assert kept.redirect == redirect
+
+
+def test_the_pipeline_checks_a_redirect_with_one_extra_classify_call(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    seen: list[str] = []
+
+    class Refuser(FakeLLMClient):
+        def complete_json(self, *, system: str, user: str, schema: type[T]) -> T:
+            text = json.loads(user)["question"]
+            seen.append(text)
+            if text.startswith("How fast is sadness"):
+                return schema.model_validate(
+                    _refused("How fast is a rock moving after falling 20 m from rest?").model_dump()
+                )
+            return schema.model_validate(
+                {"category": "standard", "reasoning": "A standard problem.", "domains": []}
+            )
+
+    p = Pipeline(llm=Refuser(), retriever=retriever, data=store, settings=Settings())
+    answer = p.run("How fast is sadness?")
+    assert answer.status == "refused"
+    assert answer.redirect == "How fast is a rock moving after falling 20 m from rest?"
+    assert seen == ["How fast is sadness?", answer.redirect]
+
+
+def test_a_redirect_that_is_refused_in_turn_is_not_offered(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    class Looper(FakeLLMClient):
+        def complete_json(self, *, system: str, user: str, schema: type[T]) -> T:
+            return schema.model_validate(
+                _refused("How fast does sound travel through the air?").model_dump()
+            )
+
+    p = Pipeline(llm=Looper(), retriever=retriever, data=store, settings=Settings())
+    answer = p.run("what is the speed of sound")
+    assert answer.status == "refused"
     assert answer.redirect is None
 
 

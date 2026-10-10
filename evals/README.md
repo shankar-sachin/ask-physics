@@ -13,6 +13,13 @@ harness will use it.
   file fails CI. `score_answer()` and `run_suite()` raise
   `NotImplementedError` until v0.5.
 
+- `real_phrasing.jsonl`: plain questions with no numbers ("what is the speed of sound") and
+  out-of-scope look-alikes ("How fast is loneliness?"), each `{id, question, expected}` with
+  `expected` either `answerable` or `out_of_scope`. `askphysics model eval` has the model
+  classify them and reports whether answerable ones were refused (issue #92). They are kept out
+  of the training data like the questions below, and written to be different from the factory
+  templates, so a model cannot pass by memorizing them.
+
 ## Question format
 
 ```yaml

@@ -38,7 +38,7 @@ from askphysics.ui import (
 )
 
 if TYPE_CHECKING:
-    from askphysics.lm.evaluate import EvalReport, EvalTick, RealReport
+    from askphysics.lm.evaluate import EvalReport, EvalTick, PhrasingReport, RealReport
 
 RECENT = 60  # examples per kind the ETA averages over
 ETA_ROUND = 5  # seconds: the ETA moves in steps of this, so it doesn't flicker
@@ -461,6 +461,15 @@ def real_sections(report: RealReport) -> list[list[Row]]:
             Row("no answer, or wrong but flagged", report.flagged_wrong_rate, good="plain"),
             Row("confidently wrong", report.confidently_wrong_rate, good="low"),
         ],
+    ]
+
+
+def phrasing_sections(report: PhrasingReport) -> list[list[Row]]:
+    return [
+        [
+            Row("plain questions answered, not refused", report.answerable_rate),
+            Row("look-alikes with no physical subject refused", report.refused_rate),
+        ]
     ]
 
 

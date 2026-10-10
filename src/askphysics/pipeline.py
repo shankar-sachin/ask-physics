@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
@@ -105,6 +106,7 @@ NEVER_NEGATIVE = (
     "temperature",
 )
 SIG_FIGS = 6
+_WORD_RUN = re.compile(r"[a-z0-9]+")
 
 
 def _payload(**fields: Any) -> str:
@@ -578,14 +580,32 @@ def explain(
     )
 
 
-def refuse(question: Question, classification: Classification) -> Answer:
+def _same_words(a: str, b: str) -> bool:
+    """True if two questions differ only in case, spacing, or punctuation."""
+    return _WORD_RUN.findall(a.lower()) == _WORD_RUN.findall(b.lower())
+
+
+def refuse(
+    question: Question,
+    classification: Classification,
+    *,
+    answerable: Callable[[str], bool] | None = None,
+) -> Answer:
     """Answer an out-of-scope question: say why, and offer the closest answerable version.
 
     The reason and the redirect are model-written, so each is checked (``refusal_reason``,
-    ``usable_redirect``) and replaced or dropped rather than shown as word salad.
+    ``usable_redirect``) and replaced or dropped rather than shown as word salad. A redirect
+    is also dropped if it is the question itself, or if ``answerable`` says the classifier
+    would refuse it too: offering a question that is refused in turn sends the user in a
+    circle (issue #92).
     """
     reason = refusal_reason(question.text, classification.reasoning)
     redirect = usable_redirect(classification.closest_answerable)
+    if redirect and (
+        _same_words(redirect, question.text)
+        or (answerable is not None and not answerable(redirect))
+    ):
+        redirect = None
     explanation = f"This can't be answered as asked. {reason}"
     if redirect:
         explanation += f" A close question that can be answered: {redirect}"
@@ -712,7 +732,7 @@ class Pipeline:
             )
 
         if classification.category == "out_of_scope":
-            return finish(refuse(question, classification))
+            return finish(refuse(question, classification, answerable=self._would_answer))
         attempted = solved.attempt
         if attempted is None or solved.retrieval is None:
             failure = solved.outcome if isinstance(solved.outcome, _Failure) else _NO_ATTEMPT
@@ -743,6 +763,15 @@ class Pipeline:
             data=self.data,
         )
         return finish(answer, attempts)
+
+    def _would_answer(self, text: str) -> bool:
+        """False if the classifier refuses ``text``: one extra classify call, only on the
+        refusal path. A classify failure counts as answerable, as in ``solve``."""
+        try:
+            verdict = classify(Question(text=normalize_question(text)), llm=self.stages.classify)
+        except AskPhysicsError:
+            return True
+        return verdict.category != "out_of_scope"
 
     def solve(self, text: str) -> Solved:
         """Stages 1 to 5 for one question: everything ``run`` does except the explanation.

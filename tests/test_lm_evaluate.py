@@ -20,9 +20,12 @@ from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import LUNA
 from askphysics.lm.evaluate import (
     EvalTick,
+    PhrasingQuestion,
     RealQuestion,
+    evaluate_phrasing,
     evaluate_real,
     evaluate_tasks,
+    read_phrasing_questions,
     read_real_questions,
     route_plan,
     sample_examples,
@@ -40,6 +43,7 @@ from askphysics.retrieval.keyword import KeywordRetriever
 from askphysics.solver.units import Quantity, quantity
 
 OPENSTAX = Path(__file__).resolve().parents[1] / "third_party" / "openstax-physics"
+PHRASING = Path(__file__).resolve().parents[1] / "evals" / "real_phrasing.jsonl"
 
 
 def _plan(**changes: object) -> Plan:
@@ -186,6 +190,8 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
             "1",
             "--real",
             str(real),
+            "--phrasing",
+            str(PHRASING),
         ],
     )
     assert r.exit_code == 0, r.output
@@ -194,6 +200,8 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
     assert "1 real textbook questions" in r.output
     report = json.loads((tmp_path / "luna" / "eval.json").read_text())
     assert report["plan_examples"] == 1 and report["real"]["questions"] == 1
+    assert "plain questions" in r.output
+    assert report["phrasing"]["questions"] == len(read_phrasing_questions(PHRASING))
     r = CliRunner().invoke(cli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
     assert r.exit_code == 1
 
@@ -498,3 +506,57 @@ def test_a_wrong_number_is_a_miss_with_its_stage(store: DataStore) -> None:
     assert report.flagged_wrong_rate == 1.0  # "10 s" went unused, so it was flagged
     assert report.misses[0]["stage"] == "wrong, flagged"
     assert report.misses[0]["got"].endswith("t=1 s")
+
+
+# --------------------------------------------------------------------------- real phrasing
+
+
+def test_the_phrasing_file_has_both_sides_of_the_boundary() -> None:
+    questions = read_phrasing_questions(PHRASING)
+    assert len({q.id for q in questions}) == len(questions)
+    by_side = {side: [q for q in questions if q.expected == side] for side in (
+        "answerable", "out_of_scope"
+    )}  # fmt: skip
+    assert len(by_side["answerable"]) >= 5 and len(by_side["out_of_scope"]) >= 3
+    asked = {q.question.lower() for q in questions}
+    assert "what is the speed of sound" in asked
+    assert "how fast is a dropped rock moving after falling for a while" in asked
+
+
+def test_phrasing_questions_never_appear_in_training_data(store: DataStore) -> None:
+    """The build-data blocklist includes the phrasing file, so near-duplicates are dropped.
+    (A one-word fill of "What is the speed of {abstract}?" sits next to the eval question on
+    purpose, as a contrast, and is dropped rather than trained.)"""
+    from askphysics.lm.factory import LEAK_THRESHOLD, DataFactory, word_overlap
+    from askphysics.lm.tokenizer import CLASSIFY
+
+    asked = [q.question for q in read_phrasing_questions(PHRASING)]
+    for seed in (4, 7):
+        for e in DataFactory(store, seed=seed, blocklist=asked).examples(2500):
+            if e.task != "classify":
+                continue
+            question = json.loads(e.prompt[len(CLASSIFY) :])["question"]
+            for a in asked:
+                assert word_overlap(question, a) < LEAK_THRESHOLD, (question, a)
+
+
+def test_evaluate_phrasing_scores_each_side() -> None:
+    questions = [
+        PhrasingQuestion("a", "what is the speed of sound", "answerable"),
+        PhrasingQuestion("b", "how fast is a rock", "answerable"),
+        PhrasingQuestion("c", "how fast is loneliness", "out_of_scope"),
+        PhrasingQuestion("d", "how heavy is an apology", "out_of_scope"),
+    ]
+
+    def classify(text: str) -> Classification:
+        if text == "what is the speed of sound":  # a refusal: the bug in issue #92
+            return Classification(category="out_of_scope", reasoning="No.", closest_answerable="x")
+        if "loneliness" in text:
+            return Classification(category="out_of_scope", reasoning="No.", closest_answerable="x")
+        return Classification(category="fermi", reasoning="Estimate.")
+
+    report = evaluate_phrasing(classify, questions)
+    assert report.questions == 4
+    assert report.answerable_rate == 0.5
+    assert report.refused_rate == 0.5
+    assert {m["id"] for m in report.misses} == {"a", "d"}

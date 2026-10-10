@@ -761,7 +761,7 @@ class DataFactory:
                 category="fermi", reasoning=self.rng.choice(tpl.FERMI_REASONING), domains=domains
             )
             template_id = template.id
-        elif roll < 0.69:
+        elif roll < 0.73:
             estimate = self.rng.choice(tpl.ESTIMATES)
             if not self._estimate_solves(estimate):
                 self.dropped += 1
@@ -773,7 +773,7 @@ class DataFactory:
                 domains=[self.store.equations[estimate.equation].domain],
             )
             template_id = estimate.template.id
-        elif roll < 0.76:
+        elif roll < 0.80:
             # A redirect is a standard question with its values stated, so it must solve
             # through Noether; tellus once refused "How long does a dropped ball take to fall
             # from a table?", which our own math refusal had just suggested.
@@ -838,9 +838,13 @@ _EVAL_QUESTION = re.compile(r'^\s*(?:-\s*)?question:\s*"(.*)"\s*$')
 
 
 def load_blocklist(path: Path) -> list[str]:
-    """Questions from an eval YAML file (``evals/questions.yaml``), no YAML parser needed."""
+    """Questions from an eval file: ``evals/questions.yaml`` (no YAML parser needed) or a
+    ``.jsonl`` file of rows with a ``question`` (``evals/real_phrasing.jsonl``)."""
     if not path.exists():
         return []
+    if path.suffix == ".jsonl":
+        lines = path.read_text(encoding="utf-8").splitlines()
+        return [json.loads(line)["question"] for line in lines if line.strip()]
     out = []
     for line in path.read_text(encoding="utf-8").splitlines():
         match = _EVAL_QUESTION.match(line)
