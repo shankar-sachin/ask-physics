@@ -333,5 +333,5 @@ if ($NewPath) {
 }
 Write-Summary "Ask Physics is installed"
 Write-Ready "Ask Physics is ready" `
-    @('askphysics ask "How fast does a ball dropped from 20 m hit the ground?"', "askphysics --help", "uv tool uninstall askphysics") `
+    @('askphysics ask "A 20 m drop: how fast does it land?"', "askphysics --help", "uv tool uninstall askphysics") `
     @("ask a question", "see every command", "remove it again")
