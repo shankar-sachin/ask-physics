@@ -15,6 +15,7 @@ import time
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from rich import box
 from rich.console import Console, Group, RenderableType
@@ -35,13 +36,14 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-from askphysics.models import Answer, Equation
-from askphysics.pretty import pretty_equation, pretty_number, pretty_symbol, pretty_unit
+if TYPE_CHECKING:
+    from askphysics.models import Answer, Equation
 
 THEME = Theme(
     {
         "brand": "bold #8be9fd",
         "muted": "#8b93a7",
+        "faint": "dim #8b93a7",
         "label": "bold #a6accd",
         "value": "bold #f8f8f2",
         "accent": "#bd93f9",
@@ -120,6 +122,9 @@ def models_line(answer: Answer) -> Text:
 
 def answer_card(answer: Answer, equations: Mapping[str, Equation] | None = None) -> Panel:
     """The main ``ask`` output."""
+    # Imported here: pretty pulls in sympy and Pint, which the script views never need.
+    from askphysics.pretty import pretty_equation, pretty_number, pretty_symbol, pretty_unit
+
     equations = equations or {}
     style, word = STATUS[answer.status]
 
@@ -222,9 +227,11 @@ class EtaTracker:
         self,
         clock: Callable[[], float] = time.monotonic,
         window: float = TRAINING_SPEED_WINDOW,
+        max_samples: int | None = None,
     ) -> None:
         self._clock = clock
         self._window = window
+        self._max_samples = max_samples
         self._samples: deque[tuple[float, int]] = deque()
 
     def start(self, step: int) -> None:
@@ -238,6 +245,8 @@ class EtaTracker:
         # Keep the recent window, but never fewer than two samples: with one update every
         # 45 s the newest pair is still a usable rate.
         while len(self._samples) > 2 and self._samples[0][0] < now - self._window:
+            self._samples.popleft()
+        while self._max_samples is not None and len(self._samples) > self._max_samples:
             self._samples.popleft()
 
     def steps_per_second(self) -> float | None:
@@ -270,26 +279,53 @@ def format_finish(seconds_left: float, now: datetime) -> str:
 class EtaColumn(ProgressColumn):
     """``eta 0:12:34 · done ~03:42``: Rich's estimate, or ``EtaTracker``'s when Rich has none."""
 
-    def __init__(self, tracker: EtaTracker, now: Callable[[], datetime] = datetime.now) -> None:
+    def __init__(
+        self,
+        tracker: EtaTracker,
+        now: Callable[[], datetime] = datetime.now,
+        *,
+        prefer_tracker: bool = False,
+        round_to: int = 0,
+    ) -> None:
         super().__init__()
         self._tracker = tracker
         self._now = now
+        self._prefer_tracker = prefer_tracker
+        self._round_to = round_to  # seconds; a calm estimate that doesn't flicker
 
     def render(self, task: Task) -> Text:
         if task.finished:
             return Text("done", style="ok")
-        left: float | None = task.time_remaining
+        tracker: EtaTracker = task.fields.get("tracker", self._tracker)  # a bar can bring its own
+        left: float | None = None
+        if self._prefer_tracker and task.total is not None:
+            left = tracker.seconds_left(int(task.completed), int(task.total))
+        if left is None:
+            left = task.time_remaining
         if left is None and task.total is not None:
-            left = self._tracker.seconds_left(int(task.completed), int(task.total))
+            left = tracker.seconds_left(int(task.completed), int(task.total))
         if left is None:
             return Text("eta …", style="muted")
+        if self._round_to and left >= 2 * self._round_to:
+            left = round(left / self._round_to) * self._round_to
         text = Text("eta ", style="muted")
         text.append(format_duration(left), style="value")
         text.append(f" · done {format_finish(left, self._now())}", style="muted")
         return text
 
 
-class TrainingProgress(Progress):
+class FooterProgress(Progress):
+    """A progress display with an optional ``footer`` (a live panel or a line) drawn under it."""
+
+    footer: Callable[[], RenderableType] | None = None
+
+    def get_renderables(self) -> Iterable[RenderableType]:
+        yield from super().get_renderables()
+        if self.footer is not None:
+            yield self.footer()
+
+
+class TrainingProgress(FooterProgress):
     """The training bar, with an optional ``footer`` (the live panel) drawn under it."""
 
     def __init__(
@@ -316,11 +352,6 @@ class TrainingProgress(Progress):
             speed_estimate_period=TRAINING_SPEED_WINDOW,
             get_time=clock,
         )
-
-    def get_renderables(self) -> Iterable[RenderableType]:
-        yield from super().get_renderables()
-        if self.footer is not None:
-            yield self.footer()
 
 
 def training_progress(
