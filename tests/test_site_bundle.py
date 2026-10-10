@@ -56,3 +56,38 @@ def test_the_site_bundle_answers_without_torch(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "answered" in result.stdout
+
+
+@pytest.mark.skipif(shutil.which("sh") is None or shutil.which("tar") is None, reason="needs sh")
+def test_the_install_scripts_and_pages_ship_at_the_short_and_old_paths(tmp_path: Path) -> None:
+    site = tmp_path / "site"
+    subprocess.run(["sh", "scripts/build_site.sh", str(site)], cwd=ROOT, check=True)
+    for script in ("install.sh", "install.ps1"):
+        original = (ROOT / script).read_bytes()
+        assert (site / script).read_bytes() == original
+        assert (site / "installers" / script).read_bytes() == original
+    for page in ("installers", "more-installers"):
+        html = (site / page / "index.html").read_text(encoding="utf-8")
+        assert "<h1>" in html
+        refs = re.findall(r'(?:href|src)="([^"]*)"', html)
+        assert refs
+        relative = [r for r in refs if not r.startswith(("/", "#", "https://", "http://"))]
+        assert relative == [], relative
+        for ref in refs:
+            if ref.startswith("/") and not ref.startswith("//"):
+                path = ref.lstrip("/").split("#")[0]
+                target = site / path
+                if target.is_dir():
+                    target = target / "index.html"
+                assert target.exists() or path == "", ref
+    installers = (site / "installers" / "index.html").read_text(encoding="utf-8")
+    assert "curl -fsSL https://askphysics.vercel.app/install.sh | bash" in installers
+    assert "irm https://askphysics.vercel.app/install.ps1 | iex" in installers
+    assert "releases/latest/download/AskPhysicsSetup.exe" in installers
+    assert 'href="/more-installers"' in installers
+
+
+def test_the_scripts_and_docs_use_the_short_installer_urls() -> None:
+    old = re.compile(r"askphysics\.vercel\.app/installers/install\.")
+    for name in ("install.sh", "install.ps1", "README.md", "web/index.html"):
+        assert not old.search((ROOT / name).read_text(encoding="utf-8")), name

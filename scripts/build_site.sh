@@ -16,11 +16,16 @@ case ${1:-} in
   *) out=${1:-build/site} ;;
 esac
 
-# The page, the installers (copied as-is), and the artwork.
+# The page, the installer pages, the install scripts (copied as-is, at the root and at the old
+# /installers/ paths: plain copies keep `curl` and `irm` working without following a redirect),
+# and the artwork.
 stage_page() {
   rm -rf "$out"
-  mkdir -p "$out/installers" "$out/images" "$out/py"
-  cp web/index.html web/404.html web/styles.css web/app.js web/worker.js "$out/"
+  mkdir -p "$out/installers" "$out/more-installers" "$out/images" "$out/py"
+  cp web/index.html web/404.html web/styles.css web/app.js web/worker.js web/installers.css web/installers.js "$out/"
+  cp web/installers/index.html "$out/installers/index.html"
+  cp web/more-installers/index.html "$out/more-installers/index.html"
+  cp install.sh install.ps1 "$out/"
   cp install.sh install.ps1 "$out/installers/"
   cp docs/images/logo.svg docs/images/banner.png docs/images/fermi-*.jpg docs/images/demo.mp4 docs/images/demo-poster.jpg "$out/images/"
   echo "$(find "$out" -type f | wc -l | tr -d ' ') files written"

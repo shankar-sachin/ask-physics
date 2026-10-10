@@ -59,7 +59,9 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "text/javascript" });
       return res.end(js);
     }
-    const { body, type } = await serveFile(ROOT, url.pathname.endsWith("/") ? `${url.pathname}index.html` : url.pathname);
+    // Like Vercel: /installers and /installers/ both serve installers/index.html.
+    const dirish = url.pathname.endsWith("/") || !extname(url.pathname);
+    const { body, type } = await serveFile(ROOT, dirish ? `${url.pathname.replace(/\/?$/, "/")}index.html` : url.pathname);
     res.writeHead(200, { "Content-Type": type });
     res.end(body);
   } catch {
@@ -72,7 +74,7 @@ const server = createServer(async (req, res) => {
 await new Promise((resolve) => server.listen(0, resolve));
 const base = `http://localhost:${server.address().port}/`;
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 const context = await browser.newContext({ viewport: { width: 1200, height: 1600 } });
 if (local) {
   await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
@@ -115,9 +117,80 @@ async function ask(question) {
   return page.$("#result .card");
 }
 
+const GH = "https://github.com/shankar-sachin/ask-physics";
+const asset = (tag, name, size) => ({ name, size, browser_download_url: `${GH}/releases/download/${tag}/${name}` });
+const release = (tag, date, assets = []) => ({
+  tag_name: tag, html_url: `${GH}/releases/tag/${tag}`, published_at: date, draft: false, prerelease: false, assets,
+});
+// The real tags, plus a v0.4.0 with the assets the release workflow attaches.
+const MOCK_RELEASES = [
+  release("v0.4.0", "2026-10-20T10:00:00Z", [
+    asset("v0.4.0", "AskPhysicsSetup-0.4.0.exe", 61234567),
+    asset("v0.4.0", "AskPhysicsSetup-0.4.0.exe.sha256", 98),
+    asset("v0.4.0", "AskPhysicsSetup.exe", 61234567),
+    asset("v0.4.0", "AskPhysicsSetup.exe.sha256", 90),
+    asset("v0.4.0", "askphysics-winget-0.4.0.zip", 4321),
+  ]),
+  release("v0.3.0", "2026-10-06T10:00:00Z"),
+  release("v0.2.0", "2026-10-03T10:00:00Z"),
+  release("v0.1.0", "2026-10-01T10:00:00Z"),
+];
+
+// The install pages: they load, the releases table renders from a mocked GitHub API, and
+// nothing scrolls sideways at 390px. Set SMOKE_ONLY=installers to run just this part.
+async function installerPages() {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.abort());
+  let mode = "ok";
+  await ctx.route("https://api.github.com/**", (route) =>
+    mode === "ok"
+      ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_RELEASES) })
+      : route.fulfill({ status: 500, body: "boom" }),
+  );
+  const tab = await ctx.newPage();
+  const problems = [];
+  tab.on("pageerror", (error) => problems.push(error.message));
+  const fits = () => tab.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+
+  for (const path of ["installers", "more-installers", "install.sh", "install.ps1", "installers/install.sh", "installers/install.ps1"]) {
+    const response = await tab.goto(`${base}${path}`);
+    check(response.status() === 200, `/${path} answers 200`);
+    if (!path.includes(".")) check(await fits(), `at 390px, /${path} doesn't scroll sideways`);
+  }
+  await tab.goto(`${base}installers`);
+  const cmds = await tab.$$eval(".cmd code", (n) => n.map((c) => c.textContent));
+  check(cmds.includes("curl -fsSL https://askphysics.vercel.app/install.sh | bash"), "/installers shows the curl one-liner");
+  check(cmds.includes("irm https://askphysics.vercel.app/install.ps1 | iex"), "/installers shows the irm one-liner");
+  check((await tab.$$(".cmd .copy")).length === cmds.length, "every command has a copy button");
+  const setup = await tab.$eval("a[href$='/AskPhysicsSetup.exe']", (a) => a.href);
+  check(setup === `${GH}/releases/latest/download/AskPhysicsSetup.exe`, "the Windows installer button points at the latest release");
+
+  await tab.goto(`${base}more-installers`);
+  await tab.waitForSelector("table.rels tbody tr");
+  const tags = await tab.$$eval("table.rels tbody tr td.ver-cell a", (n) => n.map((a) => a.textContent));
+  check(tags.join() === "v0.4.0,v0.3.0,v0.2.0,v0.1.0", `the versions table lists every release, newest first (${tags})`);
+  check((await tab.textContent("tr.latest-row .tag.latest")) === "latest", "the newest release is marked latest");
+  const links = await tab.$$eval("tr.latest-row ul.assets a", (n) => n.map((a) => a.textContent));
+  check(links.includes("AskPhysicsSetup-0.4.0.exe") && links.includes("AskPhysicsSetup.exe.sha256") && links.includes("askphysics-winget-0.4.0.zip"), "the latest row links its installer, checksums and manifests");
+  check(await fits(), "at 390px, the versions table doesn't scroll sideways");
+
+  mode = "fail";
+  await tab.goto(`${base}more-installers`);
+  await tab.waitForSelector("#versions .state.error");
+  const back = await tab.$eval("#versions .state.error a", (a) => a.href);
+  check(back === `${GH}/releases`, "when the API fails, the page links to the GitHub releases");
+  check(problems.length === 0, `the install pages have no page errors (${problems})`);
+  await ctx.close();
+}
+
 try {
   await page.goto(base);
   check((await page.title()) === "Ask Physics", "page loads with its title");
+  await installerPages();
+  if (process.env.SMOKE_ONLY === "installers") {
+    console.log("done (installer pages only)");
+    process.exit(process.exitCode ?? 0);
+  }
 
   let card = await ask("A ball is dropped from 45 m. How fast does it hit the ground?");
   check(await card.evaluate((n) => n.classList.contains("answered")), "falling-ball question is ANSWERED");
