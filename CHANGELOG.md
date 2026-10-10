@@ -158,6 +158,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   directory (the backup step used to look for `models.sh` after changing into the repo root) (#81).
 - `make check` runs `validate-data` as well as lint, typecheck and tests, so it matches the
   commit gate in `CLAUDE.md` and `scripts/check.sh` (#73).
+- An explanation is no longer cut off after 48 tokens. The Fermi model may use the whole context
+  window left after its prompt, so the assumptions clause at the end survives. An explanation that
+  still does not finish degrades to the template answer instead of showing a fragment (#83).
 - A plan can no longer fill a speed with the speed of light or zero a variable that was
   stated or asked for (#91). A table constant filled any slot with matching units, so
   `v = 299792458 m/s` showed up in "an average speed of 23.2 m/s" and "an angular velocity

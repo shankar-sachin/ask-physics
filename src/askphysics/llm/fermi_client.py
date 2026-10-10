@@ -21,7 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import AskPhysicsError, LLMError, LLMResponseFormatError
+from askphysics.errors import AskPhysicsError, LLMError, LLMResponseFormatError, UnitParseError
 from askphysics.llm.base import Roster
 from askphysics.llm.routing import CELESTE, plan_route
 from askphysics.lm.checkpoints import load_model
@@ -35,6 +35,7 @@ from askphysics.lm.generate import (
 from askphysics.lm.paths import default_model_dir, installed_models, is_installed
 from askphysics.lm.weights import pull, read_manifest
 from askphysics.models import Classification, FermiAssumption, Plan
+from askphysics.solver.units import quantity
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -102,18 +103,19 @@ class FermiClient:
         payload = _load(user)
         try:
             equations = [self.data.equations[i] for i in payload["equation_ids"]]
+            # The unit is parsed here, once, so the decoder only ever sees a Quantity.
+            result = quantity(float(payload["result"]["value"]), str(payload["result"]["unit"]))
             return decode_explanation(
                 self.decoder,
                 str(payload["question"]),
-                float(payload["result"]["value"]),
-                str(payload["result"]["unit"]),
+                result,
                 equations,
                 [str(a) for a in payload.get("assumptions", [])],
                 [str(i) for i in payload.get("sanity", {}).get("issues", [])],
                 temperature=self.temperature,
                 seed=self.seed,
             )
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, UnitParseError) as exc:
             raise LLMError(f"{self.name} got a payload it can't read: {exc}") from exc
 
     def _plan(self, payload: dict[str, Any]) -> Plan:
