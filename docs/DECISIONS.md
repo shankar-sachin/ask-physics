@@ -503,7 +503,8 @@ writes:
 - The only assumed filler is 0 ("from rest"), and only for a variable whose
   `typical_range` includes 0: a speed can start at rest, g and a mass can't
   be zero (the fifth eval wrote g = 0). If no value is legal for a slot, the
-  decoder falls back to the loose rules and Noether degrades the answer.
+  plan fails (`PlanValidationError`) and the router tries again or the answer
+  degrades; the decoder never fills the slot in with a loose value.
   The data factory never assumes anything else. And a variable a table constant can fill (g) is
   only the target when no open variable lacks such a fallback. Added after
   the fourth eval, where "lifting it 11 m took 11000 J, what is its mass?"

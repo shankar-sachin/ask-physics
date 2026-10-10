@@ -27,9 +27,10 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from askphysics.errors import AskPhysicsError, LLMError
+from askphysics.errors import AskPhysicsError, LLMError, PlanValidationError
 from askphysics.lm import templates as tpl
 from askphysics.lm.formats import (
+    FILLER_NUMBERS,
     classify_prompt,
     dumps,
     explain_numbers,
@@ -41,6 +42,7 @@ from askphysics.lm.formats import (
     question_quantities,
     relevant_constants,
     stated_quantities,
+    value_numbers,
 )
 from askphysics.lm.model import FermiLM, KVCache
 from askphysics.lm.reading import (
@@ -79,10 +81,6 @@ DOMAINS = (
     "modern",
 )
 ORIGINS = ("given", "constant", "assumption")
-
-# The only number a standard plan may assume without it being stated: "from rest" means v0 = 0.
-# The data factory never assumes anything else, and a 1 here let the model invent m = 1 kg.
-FILLER_NUMBERS = ("0",)
 
 MAX_EQUATIONS = 3
 MAX_DOMAINS = 3
@@ -820,13 +818,19 @@ def decode_plan(
     Standard plans are also dimension-checked as they are written: the target must be a
     variable the question leaves open, each known value must be a quantity whose units fit
     its variable, and each stated quantity is used once before any constant or 0 fills a
-    slot (``target_options``, ``known_value_options``, ``assignable_options``).
+    slot (``target_options``, ``known_value_options``, ``assignable_options``). A known value
+    with no legal option raises ``PlanValidationError``: nothing is filled in for it.
+
+    Raises:
+        LLMError: there are no equations to plan with.
+        PlanValidationError: a standard plan's known value has no legal number.
     """
     if not equations:
         raise LLMError("no retrieved equations to plan with")
     fermi_used = fermi if category == "fermi" else ()
     constants = relevant_constants(equations, constants)
     numbers = plan_numbers(question, constants, fermi_used)
+    values = value_numbers(question, constants, fermi_used)
     units = plan_units(question, equations, constants, fermi_used)
     by_id = {eq.id: eq for eq in equations}
     dimensional = category == "standard"
@@ -896,16 +900,20 @@ def decode_plan(
             if dimensional
             else []
         )
-        # Nothing fits (a mass with no mass stated and nothing to assume): fall back to the
-        # loose rules, and Noether's checks turn the plan into an honest degraded answer.
         if options:
             value = decoder.choose(list(dict.fromkeys(o.number for o in options)), closer=", ")
             decoder.emit(', "unit": "')
             fitting = [o for o in options if o.number == value]
             unit = decoder.choose(list(dict.fromkeys(o.unit for o in fitting)), closer='"')
             origins = [o.origin for o in fitting if o.unit == unit]
+        elif dimensional:
+            # Nothing fits (a mass the question never states): the plan fails, and the router
+            # tries again or degrades. A filler here is how the model wrote m = 1 kg (#85).
+            raise PlanValidationError(
+                f"no legal value for {symbol}: not in the question, the tables, or an assumed 0"
+            )
         else:
-            value = decoder.choose(numbers, closer=", ")
+            value = decoder.choose(values, closer=", ")
             decoder.emit(', "unit": "')
             unit = decoder.choose(units, closer='"')
             origins = list(ORIGINS)

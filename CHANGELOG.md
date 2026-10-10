@@ -95,6 +95,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A standard plan can no longer write a value the question never states. When a
+  variable such as a mass had no legal number (none stated, nothing to assume), the
+  decoder fell back to a loose list that included the structural 1, so the model could
+  write `m = 1 kg` and the answer was computed from it. That slot now fails the plan
+  (`PlanValidationError`), and the router tries again or the answer degrades (#85). The
+  structural 0 and 1 stay available in a plan's prose. `model eval` counts such a plan as
+  a miss instead of stopping.
+
 - The training progress bar shows its time remaining. Its speed was averaged over 30 s,
   shorter than the 45 s between log lines, so the ETA always read `-:--:--`.
 

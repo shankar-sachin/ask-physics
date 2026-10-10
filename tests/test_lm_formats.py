@@ -18,6 +18,7 @@ from askphysics.lm.formats import (
     serialize_classification,
     serialize_plan,
     stated_quantities,
+    value_numbers,
 )
 from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, KnownValue, Plan
@@ -99,6 +100,16 @@ def test_allowed_numbers_and_units(store: DataStore) -> None:
     nums = plan_numbers("dropped from 20 m", consts)
     assert nums[0] == "20"
     assert "9.80665" in nums and "0" in nums and "1" in nums
+    assert set(nums) == set(value_numbers("dropped from 20 m", consts)) | {"1"}
+
+
+def test_values_never_come_from_the_structural_one(store: DataStore) -> None:
+    consts = list(store.constants.values())
+    values = value_numbers("dropped from 20 m", consts)
+    assert values[0] == "20" and "9.80665" in values
+    assert "0" in values  # the one assumed filler: "from rest"
+    assert "1" not in values  # a 1 is only ever written as a number in the question
+    assert "1" in value_numbers("A 1 kg cart is pushed.", consts)  # stated, so legal
     units = plan_units("dropped from 20 ft", [store.equations["kin_v_squared"]], consts)
     assert units[0] == "ft" and "m/s^2" in units
     assert explain_numbers("from 20 m", 19.8057, ["about 25 g"])[:3] == ["19.8057", "20", "25"]

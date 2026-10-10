@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from askphysics.data.loader import DataStore
-from askphysics.errors import LLMError
+from askphysics.errors import LLMError, PlanValidationError
 from askphysics.lm import templates as tpl
 from askphysics.lm.config import LUNA, ModelConfig
 from askphysics.lm.factory import DataFactory, Example
@@ -21,6 +21,7 @@ from askphysics.lm.formats import (
     serialize_classification,
     serialize_plan,
     stated_quantities,
+    value_numbers,
 )
 from askphysics.lm.generate import (
     Decoder,
@@ -107,10 +108,13 @@ def test_random_weights_still_produce_valid_plans(
     eqs = [store.equations[i] for i in ("kin_v_squared", "kin_x_at", "gravitational_pe")]
     consts = relevant_constants(eqs, list(store.constants.values()))
     decoder = _decoder(tokenizer, seed)
-    plan = decode_plan(decoder, QUESTION, "standard", eqs, consts)
+    try:
+        plan = decode_plan(decoder, QUESTION, "standard", eqs, consts)
+    except PlanValidationError:
+        return  # a slot with no legal value fails the plan, as designed (issue #85)
 
     assert set(plan.equation_ids) <= {e.id for e in eqs}
-    allowed = {float(n) for n in plan_numbers(QUESTION, consts)}
+    allowed = {float(n) for n in value_numbers(QUESTION, consts)}
     assert all(k.value in allowed for k in plan.known_values)
     units = plan_units(QUESTION, eqs, consts)
     assert all(k.unit in units for k in plan.known_values)
@@ -465,11 +469,38 @@ def test_zero_is_only_assumed_inside_the_typical_range(store: DataStore) -> None
     assert ValueOption("0", "m/s", "assumption") in known_value_options(kin["v0"], q, consts)
 
 
-def test_a_slot_with_no_legal_value_still_decodes(store: DataStore, tokenizer: Tokenizer) -> None:
-    eqs = [store.equations["gravitational_pe"]]
+# The force is the target and no mass is stated: m has no legal value, so the plan must
+# fail rather than write m = 1 kg (issue #85). Before the fix, random models wrote the
+# structural 1 (and a constant or a stated number with the wrong units) into m here.
+NO_MASS = "A ball accelerates at 2 m/s^2. What is the net force on it?"
+
+
+@pytest.mark.parametrize("seed", range(16))
+def test_an_unstated_mass_is_never_invented(
+    store: DataStore, tokenizer: Tokenizer, seed: int
+) -> None:
+    eqs = [store.equations["newton_second_law"]]
+    consts = relevant_constants(eqs, list(store.constants.values()))
+    try:
+        plan = decode_plan(_decoder(tokenizer, seed), NO_MASS, "standard", eqs, consts)
+    except PlanValidationError as exc:
+        assert "no legal value" in str(exc)
+        return
+    assert "m" not in {k.symbol for k in plan.known_values}
+
+
+def test_a_number_the_question_states_is_a_legal_value(store: DataStore) -> None:
     consts = list(store.constants.values())
-    plan = decode_plan(_decoder(tokenizer, 3), "How much energy is that?", "standard", eqs, consts)
-    assert plan.equation_ids == ["gravitational_pe"]
+    m = {v.symbol: v for v in store.equations["newton_second_law"].variables}["m"]
+    q = "A 1 kg box is pushed by a 10 N force. What is its acceleration?"
+    assert ValueOption("1", "kg", "given") in known_value_options(m, q, consts)
+
+
+def test_the_structural_one_is_prose_only() -> None:
+    # "KE = 1/2 m v^2" is prose the model may write; "m = 1" is a value it may not.
+    q = "How fast does a ball dropped from 20 m hit the ground?"
+    assert number_guard_ok("KE = ", "1", plan_numbers(q, []))
+    assert not number_guard_ok("m = ", "1", value_numbers(q, []))
 
 
 def test_dimensionless_values_are_bare_numbers(store: DataStore) -> None:

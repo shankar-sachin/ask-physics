@@ -78,7 +78,11 @@ failures are impossible by construction rather than caught afterwards:
 - **Equation ids:** only ids from the retrieval result can appear in
   `equation_ids`. Hallucinated equations cannot be emitted.
 - **Numbers:** a `value` can only be a number that appears in the question,
-  the constants table, or the Fermi assumptions table.
+  the constants table, the Fermi assumptions table, or the assumed 0 ("from
+  rest"). The structural 1 is never a value; it is only for prose (the
+  `assumptions` and `strategy` text, for example `1/2 m v^2`). A slot with no
+  legal value fails the plan (`PlanValidationError`): the router tries again
+  or the answer degrades. The decoder never fills it in.
 - **Units:** only strings that parse in the shared Pint registry.
 - **Dimensions (standard plans, ADR-015):** a known value must be a quantity
   from the question (its number and the unit written after it, together), a
