@@ -269,19 +269,60 @@ def _release_cached_memory(device: torch.device) -> None:
         torch.cuda.empty_cache()
 
 
+CACHE_SHARE = 0.25  # flush when the unused cache is above this share of device memory
+
+
+def _cache_is_large(device: torch.device) -> bool:
+    """Whether the cache on ``device`` holds more than ``CACHE_SHARE`` of its memory.
+
+    The cache is memory the device has reserved but no tensor uses: on MPS, driver-allocated
+    minus current-allocated bytes against the recommended working set; on CUDA, reserved minus
+    allocated bytes against the device's total memory. CPU has no such cache, so it is never
+    large. When the device's memory API is missing (an older torch) or fails, this returns
+    True, so the caller flushes on every width change as it did before this check existed.
+    """
+    if device.type == "cpu":
+        return False
+    try:
+        if device.type == "mps":
+            names = (
+                "driver_allocated_memory",
+                "current_allocated_memory",
+                "recommended_max_memory",
+            )
+            if not all(hasattr(torch.mps, name) for name in names):
+                return True
+            cached = torch.mps.driver_allocated_memory() - torch.mps.current_allocated_memory()
+            total = torch.mps.recommended_max_memory()
+        elif device.type == "cuda":
+            names = ("memory_reserved", "memory_allocated", "get_device_properties")
+            if not all(hasattr(torch.cuda, name) for name in names):
+                return True
+            cached = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+            total = torch.cuda.get_device_properties(device).total_memory
+        else:
+            return True
+    except RuntimeError:
+        return True
+    return cached > CACHE_SHARE * total
+
+
 class _WidthFlush:
     """Releases cached device memory when an optimizer step's batch width differs from the
-    previous step's. MPS keeps a cached buffer per shape, so every new width adds to the
-    cache until the watermark (``mps_env``) frees it. Flushing on a change keeps it short.
-    The training math does not change."""
+    previous step's, but only while the cache is large (over ``CACHE_SHARE`` of the device's
+    memory, see ``_cache_is_large``). MPS keeps a cached buffer per shape, so new widths add
+    to the cache until the watermark (``mps_env``) frees it; a flush on every change would
+    throw away a cache that is still useful, and widths change on about half of all steps.
+    CPU never flushes. The training math does not change."""
 
     def __init__(self, device: torch.device) -> None:
         self._device = device
         self._width: int | None = None
 
     def before_step(self, width: int) -> None:
-        """Record the width of the step about to run, flushing first if it changed."""
-        if self._width is not None and width != self._width:
+        """Record the width of the step about to run, flushing first if it changed and the
+        cache is large."""
+        if self._width is not None and width != self._width and _cache_is_large(self._device):
             _release_cached_memory(self._device)
         self._width = width
 

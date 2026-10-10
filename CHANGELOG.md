@@ -109,9 +109,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   up to the model's context, which is now its default `--width`, not 512) and runs an
   evaluation pass, so its memory reading covers training and evaluation.
 
-- Torch training releases the GPU's cached buffers whenever an optimizer step's batch width
-  differs from the previous step's, so widths that come and go don't pile up in the cache.
-  The training math is unchanged: the same seed gives the same weights and metrics.
+- Torch training releases the GPU's cached buffers when an optimizer step's batch width
+  differs from the previous step's and the unused cache is over a quarter of the device's
+  memory, so widths that come and go don't pile up in the cache. CPU never flushes. The
+  training math is unchanged: the same seed gives the same weights and metrics.
 
 - Training no longer eats all the memory. solem's run on a 48 GB Mac grew to 58 GB,
   swapped 16 GB, and slowed from 4,800 to 250 tokens/s within 150 steps. Training data

@@ -443,16 +443,103 @@ def test_prose_steps_must_leave_task_steps(
         )
 
 
-def test_width_flush_releases_the_cache_only_when_the_width_changes(
+def _mps_memory(
+    monkeypatch: pytest.MonkeyPatch, driver: int, current: int, total: int
+) -> list[str]:
+    """Mock the MPS memory readings (bytes) and empty_cache; returns the list of flushes."""
+    released: list[str] = []
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: driver)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: current)
+    monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: total)
+    monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    return released
+
+
+def test_mps_width_change_flushes_only_when_the_cache_is_large(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    total = 100 * 1024**3
+    gb = 1024**3
+    # 5 GB cached of 100 GB (5%): below the 25% share, so the width changes don't flush.
+    released = _mps_memory(monkeypatch, driver=30 * gb, current=25 * gb, total=total)
+    flush = _WidthFlush(torch.device("mps"))
+    for width in (64, 96, 64, 1024):
+        flush.before_step(width)
+    assert released == []
+    # 55 GB cached of 100 GB (55%): above the share, so each width change flushes.
+    released = _mps_memory(monkeypatch, driver=60 * gb, current=5 * gb, total=total)
+    flush = _WidthFlush(torch.device("mps"))
+    for width in (64, 64, 96, 96, 64, 64, 1024):
+        flush.before_step(width)
+    assert released == ["mps", "mps", "mps"]  # 64 to 96, 96 to 64, 64 to 1024
+    # Exactly at the share does not flush: the cache must be over it.
+    released = _mps_memory(monkeypatch, driver=50 * gb, current=25 * gb, total=total)
+    flush = _WidthFlush(torch.device("mps"))
+    flush.before_step(64)
+    flush.before_step(96)
+    assert released == []
+
+
+def test_cuda_width_change_flushes_only_when_the_cache_is_large(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gb = 1024**3
+    released: list[str] = []
+
+    class Props:
+        total_memory = 80 * gb
+
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: Props())
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: released.append("cuda"))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 10 * gb)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 15 * gb)
+    flush = _WidthFlush(torch.device("cuda"))
+    flush.before_step(64)
+    flush.before_step(96)  # 5 GB cached of 80 GB: small
+    assert released == []
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 40 * gb)
+    flush.before_step(64)  # 30 GB cached of 80 GB: large
+    assert released == ["cuda"]
+
+
+def test_cpu_never_flushes_and_never_reads_device_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unexpected(*args: object, **kwargs: object) -> int:
+        raise AssertionError("the memory API was read on CPU")
+
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", unexpected)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", unexpected)
+    released: list[str] = []
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: released.append("cuda"))
+    monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    flush = _WidthFlush(torch.device("cpu"))
+    for width in (64, 96, 1024, 64):
+        flush.before_step(width)
+    assert released == []
+
+
+def test_older_torch_without_the_memory_api_flushes_on_every_width_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     released: list[str] = []
     monkeypatch.setattr(torch.mps, "empty_cache", lambda: released.append("mps"))
+    monkeypatch.delattr(torch.mps, "recommended_max_memory", raising=False)
     flush = _WidthFlush(torch.device("mps"))
-    for width in (64, 64, 96, 96, 64, 64, 1024):
+    for width in (64, 96, 96, 64):
         flush.before_step(width)
-    # The first step has nothing to compare with; then 64 to 96, 96 to 64, and 64 to 1024.
-    assert released == ["mps", "mps", "mps"]
+    assert released == ["mps", "mps"]
+
+    released.clear()
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", _raise_runtime)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: 0)
+    monkeypatch.setattr(torch.mps, "recommended_max_memory", lambda: 1, raising=False)
+    flush = _WidthFlush(torch.device("mps"))
+    flush.before_step(64)
+    flush.before_step(96)  # the device refuses to report its memory: flush as before
+    assert released == ["mps"]
+
+
+def _raise_runtime() -> int:
+    raise RuntimeError("no MPS device")
 
 
 def test_train_flushes_on_each_width_change_and_not_otherwise(
@@ -488,5 +575,5 @@ def test_train_flushes_on_each_width_change_and_not_otherwise(
     ]
     changes = sum(a != b for a, b in itertools.pairwise(per_step))
     assert changes > 0  # the width does move, so the flush is exercised
-    # The evaluation after the last step releases the cache too.
-    assert released == ["cpu"] * (changes + 1)
+    # CPU never flushes on a width change; only the evaluation after the last step releases.
+    assert released == ["cpu"]
