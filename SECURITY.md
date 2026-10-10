@@ -6,8 +6,8 @@ Ask Physics is pre-alpha. Only the latest release on `main` receives fixes.
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | Yes       |
-| < 0.1   | No        |
+| 0.3.x   | Yes       |
+| < 0.3   | No        |
 
 ## Reporting a vulnerability
 
@@ -30,8 +30,14 @@ unless they ask not to be.
 ## What counts as a security issue here
 
 This project feeds user text to our own Fermi language models, loads model
-weights from disk, and executes symbolic math on the result. It makes no
-network calls and holds no API keys. The interesting attack surface is:
+weights from disk, and executes symbolic math on the result. It holds no API
+keys. The CLI makes no network calls except model downloads: `askphysics model
+pull`, and celeste's download the first time a question escalates to it
+(`auto_pull`, on by default). Each downloaded file must match the size and
+sha256 pinned in `src/askphysics/lm/weights.json`, or it is refused. The website
+runs in the browser and loads Pyodide, KaTeX and fonts from CDNs. The scripts in
+`scripts/` that build data and site assets fetch their sources over the network;
+they are for contributors, not the CLI. The interesting attack surface is:
 
 - **Prompt injection** that makes the pipeline ignore the retrieved context
   or emit fabricated equations presented as sourced. Constrained decoding
@@ -60,4 +66,4 @@ those, and include the question you asked.
 - Tests must run without trained weights, using `FakeLLMClient` or
   `fermi-luna-1`.
 - Only load weights you trained or that come from this repo's release assets,
-  with checksums verified (v0.9).
+  with checksums verified.

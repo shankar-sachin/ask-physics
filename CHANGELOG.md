@@ -154,6 +154,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `scripts/train.sh` retrains an installed model when it is run by a relative path from another
+  directory (the backup step used to look for `models.sh` after changing into the repo root) (#81).
+- `make check` runs `validate-data` as well as lint, typecheck and tests, so it matches the
+  commit gate in `CLAUDE.md` and `scripts/check.sh` (#73).
 - Numbers in a question are read whole (#97). "4.00 x 10^14 Hz", "1.0*10^6", "6.30x10^5",
   and "3.56e-13 J" were split into pieces ("4" and "10") or read as the wrong number, and
   "1,530 kHz" was read as 530, so the decoder never offered the right value and the plan could
@@ -271,6 +275,18 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "how strongly do they attract?" asks for a force, not an energy, and a
   question that never mentions an emissivity no longer gets one borrowed
   from another number (and a borrowed unitless value is flagged).
+- `askphysics ask ""` (and a whitespace-only question) prints a refusal that says the question
+  is empty, instead of a pydantic traceback. `Pipeline.run` returns a refused answer for a
+  blank question, and `Pipeline.solve` raises `EmptyQuestionError` for one (#76).
+- `askphysics validate-data` now checks what `docs/DATA_SCHEMA.md` lists for worked examples:
+  each example re-solves through Noether within 0.1% of its `final_answer`, and each
+  `final_answer` unit has the unknown's dimension. Before, only pytest ran these, so a bad
+  example passed the data gate (#78).
+- A plan that takes the Boltzmann, Coulomb, or magnetic constant from the constants table now
+  computes. The table calls them `k_B`, `k_e`, and `mu_0`, and the equations use `kB`, `k`, and
+  `mu0`; `compute` and `sanity_check` rename the table symbol to the equation variable when the
+  dimensions match, so a Coulomb constant never stands in for a spring constant. The table and
+  equations are unchanged, and `validate-data` checks each alias (#74).
 
 ## [0.3.0] - 2026-10-06
 

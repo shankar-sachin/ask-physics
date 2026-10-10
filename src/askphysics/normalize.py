@@ -169,7 +169,9 @@ def normalize_question(text: str) -> str:
       8 kilogram ball", "twenty-five meters" is "25 meters". Without a unit after it, a
       word stays a word ("ten divided by three"), and so does one before an English word
       Pint happens to know ("two points" are not typographic points).
+    - Whitespace at either end goes, so a blank question normalizes to "".
     """
+    text = text.strip()
     text = text.translate(_MINUS)
     text = _DETACHED_MINUS.sub(r"\1-", text)
     text = _WORD_NUMBER.sub(_word_number, text)

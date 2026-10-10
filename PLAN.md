@@ -232,7 +232,10 @@ once evals exist. Implemented in `askphysics.pipeline.score_confidence`.
 a     = 1 / (1 + 0.25 * n)               # 0 assumptions -> 1.0, 4 -> 0.5
 score = 0.35*r + 0.30*d + 0.20*s + 0.15*a
 
-if d == 0:            score = min(score, 0.2)   # dimensionally wrong is wrong
+if not dimensions_ok or not sign_ok or trivial:
+                      score = min(score, 0.2)   # wrong units, a negative value for a quantity
+                                                # that can't be negative, or a 0 the plan assumed
+if doubtful:          score = min(score, 0.4)   # a stated value went unused, or an ambiguous law fits
 if category == fermi: score = min(score, 0.6)   # inputs are guesses
 ```
 
