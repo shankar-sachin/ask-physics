@@ -109,12 +109,13 @@ Releases are tagged only with the maintainer's approval (`CLAUDE.md`).
 `AskPhysicsSetup-X.Y.Z.exe` (`packaging/windows/askphysics.iss`) is a
 per-user installer: it never asks for administrator rights, and it supports
 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`. It does not contain the program.
-It copies `install.ps1` and a small runner (`askphysics-setup.ps1`) into
-`%LOCALAPPDATA%\Programs\Ask Physics` and, at the end of setup, runs
-`install.ps1` with `ASKPHYSICS_REF=vX.Y.Z`, so it installs exactly that
-release with uv and then downloads the models. Its output goes to
-`%TEMP%\AskPhysics-setup.log`; if the script fails, Setup fails with the end
-of that log and a non-zero exit code, which WinGet relies on. The
+Before it writes anything, it runs `install.ps1` with
+`ASKPHYSICS_REF=vX.Y.Z` (from Setup's temporary folder, through a small runner,
+`askphysics-setup.ps1`), so it installs exactly that release with uv and then
+downloads the models. Its output goes to `%TEMP%\AskPhysics-setup.log`; if the
+script fails, Setup stops with the end of that log and exit code 7, which
+WinGet relies on, and leaves nothing installed. Otherwise it copies the two
+scripts into `%LOCALAPPDATA%\Programs\Ask Physics` for the uninstaller. The
 uninstaller runs `uv tool uninstall askphysics`. It does not remove uv, the
 uv-managed Python, or the downloaded models in
 `%USERPROFILE%\.cache\askphysics\models`: the models are the user's data, a

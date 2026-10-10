@@ -17,6 +17,17 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Setup can be started from PowerShell 7 (a pwsh terminal, or WinGet run from one). Its
+# PSModulePath then lists PowerShell 7's module folders, and Windows PowerShell 5.1, which
+# runs this script and install.ps1, fails to load its own core modules from them
+# ("Get-ExecutionPolicy ... the module could not be loaded"). Keep only the folders that
+# aren't PowerShell 7's, for this process and every child it starts.
+if ($PSVersionTable.PSEdition -eq "Desktop" -and $env:PSModulePath) {
+    $env:PSModulePath = (($env:PSModulePath -split ";") | Where-Object {
+        $_ -and ($_ -notmatch '\\PowerShell\\')  # WindowsPowerShell and System32 paths stay
+    }) -join ";"
+}
 if (-not $Log) { $Log = Join-Path ([System.IO.Path]::GetTempPath()) "AskPhysics-setup.log" }
 $ErrLog = "$Log.err"
 

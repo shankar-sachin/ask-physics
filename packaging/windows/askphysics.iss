@@ -9,8 +9,8 @@
 ;
 ;     AskPhysicsSetup-0.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 ;
-; It does not carry the program. It copies install.ps1 and a small runner into the app
-; folder and, at the end of setup, runs install.ps1 pinned to this release (ASKPHYSICS_REF),
+; It does not carry the program. Before it writes anything, it runs install.ps1 pinned to
+; this release (ASKPHYSICS_REF) from its temporary folder,
 ; which installs uv if needed, runs `uv tool install askphysics`, and downloads the models.
 ; Set ASKPHYSICS_SOURCE in the environment to install from a local checkout instead (the
 ; smoke tests do). The uninstaller runs `uv tool uninstall askphysics`. Downloaded models in
@@ -90,47 +90,44 @@ begin
   end;
 end;
 
-// Runs askphysics-setup.ps1 (install or uninstall) with the 64-bit Windows PowerShell,
-// hidden, and waits for it. Returns False when PowerShell could not be started.
-function RunSetupScript(const Action: String; var ResultCode: Integer): Boolean;
+// Runs askphysics-setup.ps1 (install or uninstall) from ScriptDir with the 64-bit Windows
+// PowerShell, hidden, and waits for it. Returns False when PowerShell could not be started.
+function RunSetupScript(const ScriptDir, Action: String; var ResultCode: Integer): Boolean;
 var
   Params: String;
 begin
-  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}\askphysics-setup.ps1') + '"' +
+  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + AddBackslash(ScriptDir) + 'askphysics-setup.ps1"' +
     ' -Action ' + Action + ' -Ref "' + AppReleaseTag + '" -Log "' + SetupLogPath + '"';
   Log('Running: powershell.exe ' + Params);
   Result := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params, '',
     SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+// The real install (uv, the askphysics tool, the models) runs here, before Setup writes any
+// file or registry key, from copies of the two scripts extracted to Setup's temporary folder.
+// A failure returns a message, which makes Setup stop with exit code 7 and leaves nothing
+// installed: no Apps and features entry for a program that isn't there. (An exception raised
+// after the files are installed, in CurStepChanged, does not change Setup's exit code.)
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
-  Msg: String;
 begin
-  if CurStep = ssPostInstall then
-  begin
-    if not WizardSilent then
-      WizardForm.StatusLabel.Caption :=
-        'Installing Ask Physics ' + AppReleaseTag + ' (downloads Python, the packages and the models; this can take several minutes)...';
-    if not RunSetupScript('install', ResultCode) then
-    begin
-      Msg := 'Ask Physics could not be installed: Windows PowerShell could not be started (' +
-        SysErrorMessage(ResultCode) + ').';
-      Log(Msg);
-      SuppressibleMsgBox(Msg, mbCriticalError, MB_OK, IDOK);
-      RaiseException(Msg);
-    end
-    else if ResultCode <> 0 then
-    begin
-      Msg := 'Ask Physics could not be installed: install.ps1 exited with code ' + IntToStr(ResultCode) +
-        '.' + #13#10#13#10 + LogTail(SetupLogPath, 12) + #13#10 + 'Full output: ' + SetupLogPath;
-      Log(Msg);
-      SuppressibleMsgBox(Msg, mbCriticalError, MB_OK, IDOK);
-      RaiseException('Ask Physics install.ps1 failed with exit code ' + IntToStr(ResultCode) + '; see ' + SetupLogPath);
-    end;
+  Result := '';
+  ExtractTemporaryFile('install.ps1');
+  ExtractTemporaryFile('askphysics-setup.ps1');
+  if not WizardSilent then
+    WizardForm.PreparingLabel.Caption :=
+      'Installing Ask Physics ' + AppReleaseTag + ' (downloads Python, the packages and the models; this can take several minutes)...';
+  if not RunSetupScript(ExpandConstant('{tmp}'), 'install', ResultCode) then
+    Result := 'Ask Physics could not be installed: Windows PowerShell could not be started (' +
+      SysErrorMessage(ResultCode) + ').'
+  else if ResultCode <> 0 then
+    Result := 'Ask Physics could not be installed: install.ps1 exited with code ' + IntToStr(ResultCode) +
+      '.' + #13#10#13#10 + LogTail(SetupLogPath, 12) + #13#10 + 'Full output: ' + SetupLogPath;
+  if Result <> '' then
+    Log(Result)
+  else
     Log('install.ps1 finished with exit code 0');
-  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -141,7 +138,7 @@ begin
   begin
     // `uv tool uninstall askphysics`; the script ignores a missing uv or a tool that is
     // already gone, so removing the program never fails on this.
-    if RunSetupScript('uninstall', ResultCode) then
+    if RunSetupScript(ExpandConstant('{app}'), 'uninstall', ResultCode) then
       Log('Uninstall script finished with exit code ' + IntToStr(ResultCode))
     else
       Log('Could not start PowerShell to run uv tool uninstall; skipped');
