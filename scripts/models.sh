@@ -8,7 +8,9 @@
 #   sh scripts/models.sh restore fermi-solem-1 fermi-solem-1-20261007-0412
 #
 # Backups go to $ASKPHYSICS_BACKUP_DIR (default ~/askphysics-backup). A restore first
-# backs up what it replaces, so nothing is ever lost.
+# backs up what it replaces, so nothing is ever lost. Each copy is shown file by file, with
+# sizes, a bar with speed and ETA while it runs, and the sha256 of every file checked against
+# its source.
 set -eu
 . "$(dirname "$0")/lib.sh"
 
@@ -24,6 +26,17 @@ newest_backup() {
   find "$backups" -maxdepth 1 -type d -name "$1-*" 2>/dev/null | sort | tail -n 1
 }
 
+# copy_dir SOURCE DEST TITLE: a verified copy with the file-by-file view, or plain cp -R when
+# the display module isn't available (or under DRY_RUN).
+copy_dir() {
+  if [ "${DRY_RUN:-}" != "1" ] && ui_has_python; then
+    ui_call copy --title "$3" "$1" "$2"
+  else
+    info "$3"
+    run cp -R "$1" "$2"
+  fi
+}
+
 backup() {
   name=$1
   [ -d "$models/$name" ] || {
@@ -32,17 +45,23 @@ backup() {
   }
   dest="$backups/${2:-$name-$(date +%Y%m%d-%H%M%S)}"
   [ ! -e "$dest" ] || fail "$dest already exists; not overwriting a backup"
-  info "Backing up $name to $dest"
   run mkdir -p "$backups"
-  run cp -R "$models/$name" "$dest"
+  copy_dir "$models/$name" "$dest" "Backing up $name"
+}
+
+list_dir() {
+  if [ "${DRY_RUN:-}" != "1" ] && ui_has_python; then
+    ui_call list --title "$1" "$2"
+  else
+    info "$1 ($2)"
+    ls -1 "$2" 2>/dev/null || say "  (none)"
+  fi
 }
 
 case $action in
   list)
-    info "Installed in $models"
-    ls -1 "$models" 2>/dev/null || say "  (none)"
-    info "Backups in $backups"
-    ls -1 "$backups" 2>/dev/null || say "  (none)"
+    list_dir "Installed models" "$models"
+    list_dir "Backups" "$backups"
     ;;
   backup)
     [ $# -ge 2 ] || usage 1
@@ -60,10 +79,9 @@ case $action in
       fail "no backup of $name in $backups"
     fi
     backup "$name"
-    info "Restoring $name from $source_dir"
     run rm -rf "${models:?}/$name"
     run mkdir -p "$models"
-    run cp -R "$source_dir" "$models/$name"
+    copy_dir "$source_dir" "$models/$name" "Restoring $name from $(basename "$source_dir")"
     ;;
   *) usage 1 ;;
 esac

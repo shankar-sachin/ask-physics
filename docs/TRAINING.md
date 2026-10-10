@@ -24,6 +24,12 @@ a step when the one before it worked. Each prints its options with `--help`, and
 
 `python3 scripts/compare_evals.py OLD/eval.json NEW/eval.json` compares any two reports.
 
+Every script shows its steps the same way (a spinner that turns into a tick and the time, long
+output folded into a few dimmed lines, and a log path if a step fails); see
+[`SCRIPTS.md`](SCRIPTS.md). `eval.sh` draws a bar over the examples with an ETA from the first
+example and a clock time to finish, the valid-plan rate and confidently-wrong count as they
+settle, a bar of its own for the `--rescue-with` pass, and a results panel at the end.
+
 `train.sh` starts with a one-minute speed check (`askphysics model bench`). It times a few
 training steps on each device and precision this machine has, at every batch width the
 training buckets produce up to the model's context (64, 96, ... 1024), then runs an evaluation

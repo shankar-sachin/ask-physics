@@ -38,8 +38,12 @@ the commands without running them):
 |---|---|
 | `sh scripts/setup.sh` | Creates `.venv`, installs everything, checks the data |
 | `sh scripts/update.sh` | After a merge: switches to `main`, pulls, reinstalls |
-| `sh scripts/check.sh` | Lint, typecheck, data, and tests: everything a commit needs |
+| `sh scripts/check.sh` | Lint, format, typecheck, shellcheck, data, and tests: everything a commit needs, one live line per gate |
 | `sh scripts/check.sh --conflicts [BRANCH...]` | Also test-merges against `origin/main` (or the branches named) without changing anything |
+
+Every script shows a spinner that turns into a tick, folds long output into a few dimmed
+lines (the full log is kept and its path printed on failure), and prints plain lines without a
+terminal or with `NO_COLOR`; see [`docs/SCRIPTS.md`](docs/SCRIPTS.md).
 
 No API keys, no GPU, and no trained weights are needed for development.
 Tests and the default CLI path use `FakeLLMClient`; model code is tested on

@@ -160,13 +160,18 @@ def test_restore_without_a_backup_fails(tmp_path: Path) -> None:
 
 def test_check_runs_every_gate(tmp_path: Path) -> None:
     full = _commands(_run("check.sh", tmp_path=tmp_path))
-    assert full == [
+    shellcheck = next(c for c in full if c.startswith("shellcheck "))
+    assert (
+        shellcheck.startswith("shellcheck install.sh scripts/") and "scripts/lib.sh" in shellcheck
+    )
+    assert [c for c in full if c != shellcheck] == [
         "python -m ruff check .",
         "python -m ruff format --check .",
         "python -m mypy",
         "askphysics validate-data",
         "python -m pytest -q",
     ]
+    assert full.index(shellcheck) < full.index("askphysics validate-data")
     fast = _commands(_run("check.sh", "--fast", "--conflicts", "origin/x", tmp_path=tmp_path))
     assert "python -m pytest -q" not in fast
     assert "git merge --no-commit --no-ff -q origin/x" in fast
