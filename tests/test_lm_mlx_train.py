@@ -281,13 +281,31 @@ def test_resume_refuses_an_mlx_checkpoint(
 
 
 def test_memory_limits_are_set_for_the_run_and_restored(
-    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Record the limits the run sets and restores, in order; the real calls still happen.
+    calls: list[tuple[str, int]] = []
+    previous_cache: list[int] = []  # what set_cache_limit returned: the limit before the run
+    real_memory, real_cache = mx.set_memory_limit, mx.set_cache_limit
+
+    def set_memory(limit: int) -> int:
+        calls.append(("memory", limit))
+        return real_memory(limit)
+
+    def set_cache(limit: int) -> int:
+        calls.append(("cache", limit))
+        previous_cache.append(real_cache(limit))
+        return previous_cache[-1]
+
+    monkeypatch.setattr(mx, "set_memory_limit", set_memory)
+    monkeypatch.setattr(mx, "set_cache_limit", set_cache)
     before = mx.get_memory_limit()
     cfg = TrainConfig(**{**FAST.__dict__, "steps": 2, "log_every": 2, "eval_every": 2})
     train_mlx(
         LUNA, tokenizer, dataset, tmp_path / "limits", cfg, memory_limit_gb=8.0, cache_limit_gb=1.0
     )
+    assert calls[:2] == [("cache", 1_000_000_000), ("memory", 8_000_000_000)]
+    assert calls[2:] == [("memory", before), ("cache", previous_cache[0])]  # restored, memory first
     assert mx.get_memory_limit() == before
     assert system_memory_gb() > 1.0
 
