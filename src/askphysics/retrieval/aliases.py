@@ -32,7 +32,7 @@ PHRASE_ALIASES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     (re.compile(r"\bhow long\b"), ("time",)),
     (re.compile(r"\bhow fast\b"), ("speed",)),
     (re.compile(r"\bhow far\b"), ("distance",)),
-    (re.compile(r"\bevery\b"), ("period",)),
+    (re.compile(r"\bonce every\b|\bevery \d"), ("period",)),
 )
 
 # Units written after a number, matched on the normalized query (case matters: "N" is
