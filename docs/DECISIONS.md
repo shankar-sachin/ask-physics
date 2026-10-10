@@ -319,7 +319,7 @@ without knowing what a virtualenv is. The package depends on torch, whose
 default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 
 **Decision.**
-- **Recommended:** `install.sh` (`curl ... | sh`) for macOS and Linux and
+- **Recommended:** `install.sh` (`curl ... | bash`) for macOS and Linux and
   `install.ps1` (`irm ... | iex`) for Windows. Both install uv if missing and
   run `uv tool install`, which gives `askphysics` its own isolated
   environment with a uv-managed Python 3.12. On Linux, torch comes from
@@ -333,7 +333,7 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 - **Not:** WinGet (not submitting), and PyPI only at v1.0.
 - A CI workflow runs both installers on real Linux, macOS, and Windows
   machines whenever they change.
-- The installers are served from `askphysics.vercel.app/installers/`, built
+- The installers are served from `askphysics.vercel.app/install.sh` and `install.ps1` (and, for older docs, `/installers/install.sh` and `/installers/install.ps1`), built
   from this repo's `main` by `vercel.json` (copied, never edited, with a
   `text/plain` content type so `irm | iex` works).
 
