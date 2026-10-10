@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+# Rendered by scripts/winget.sh from packaging/winget/. Edit the template.
+
+PackageIdentifier: shankars.askphysics
+PackageVersion: @VERSION@
+PackageLocale: en-US
+Publisher: Sachin Shankar
+PublisherUrl: https://github.com/shankar-sachin
+PublisherSupportUrl: https://github.com/shankar-sachin/ask-physics/issues
+Author: Sachin Shankar
+PackageName: Ask Physics
+PackageUrl: https://askphysics.vercel.app
+License: MIT
+LicenseUrl: https://github.com/shankar-sachin/ask-physics/blob/main/LICENSE
+Copyright: Copyright (c) 2026 Sachin Shankar
+ShortDescription: Answers physics questions, from textbook to absurd, with small language models and a math engine, all on your own machine.
+Description: |-
+  Ask Physics answers physics questions in the terminal. Small language models written from
+  scratch for this project (the Fermi family) classify the question, pick the equations and
+  explain the result; Noether, a math engine built on SymPy and Pint, does every calculation
+  and unit conversion, so the numbers are computed, not guessed. It runs locally, with no
+  accounts and no API keys.
+
+  The installer sets up uv (if needed) and installs the askphysics command in its own
+  isolated Python environment for the current user, then downloads the Fermi models.
+Moniker: askphysics
+Tags:
+  - physics
+  - education
+  - cli
+  - ai
+  - science
+ReleaseNotesUrl: https://github.com/shankar-sachin/ask-physics/releases/tag/v@VERSION@
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0
