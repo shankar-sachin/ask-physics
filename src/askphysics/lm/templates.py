@@ -1706,6 +1706,115 @@ ESTIMATES: tuple[Estimate, ...] = (
         "v0",
         (("h", "standing_jump_height"), ("g", "g")),
     ),
+    # Plain property lookups: no numbers, one everyday subject. Several share a frame with an
+    # out-of-scope look-alike ("How fast is sound?" next to "How fast is sadness?").
+    Estimate(
+        Template("est_sound_01", "How fast is sound?"),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_sound_02", "How fast does sound travel in a room?"),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_sound_03", "How quickly do sound waves move through the air?"),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_sound_04", "What speed does sound travel at in air?"),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_sound_05", "What is the speed of sound in the air around us?"),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_sound_06_h", "How fast do sound waves go in air?"),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_sound_07", "Tell me the speed of sound in air."),
+        "sound_speed_ideal_gas",
+        "v",
+        (
+            ("gamma", "air_adiabatic_index"),
+            ("R", "R"),
+            ("T", "air_temperature_room"),
+            ("M", "air_molar_mass"),
+        ),
+    ),
+    Estimate(
+        Template("est_weight_car_01", "How heavy is a car?"),
+        "weight",
+        "W",
+        (("m", "car_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_car_02", "How much does a car weigh?"),
+        "weight",
+        "W",
+        (("m", "car_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_car_03", "What is the weight of a car?"),
+        "weight",
+        "W",
+        (("m", "car_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_car_04_h", "How much does an average car weigh?"),
+        "weight",
+        "W",
+        (("m", "car_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_adult_03", "How heavy is a person?"),
+        "weight",
+        "W",
+        (("m", "adult_human_mass"), ("g", "g")),
+    ),
 )
 
 # --------------------------------------------------------------------------- out of scope
@@ -1958,6 +2067,16 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
         Template("oos_speed_03", "How fast is {emotion}?"),
         "Category error: {emotion} is a feeling and does not move, so it has no speed.",
         "How fast is a 2 kg ball moving if it has 9 J of kinetic energy?",
+    ),
+    (
+        Template("oos_speed_04", "What is the speed of {abstract}?"),
+        "Category error: {abstract} does not move, so it has no speed.",
+        "What is the speed of a wave with a frequency of 20 Hz and a wavelength of 4 m?",
+    ),
+    (
+        Template("oos_speed_05", "How quickly does {emotion} move?"),
+        "Category error: {emotion} is a feeling and does not move, so it has no speed.",
+        "How fast is a wave with a frequency of 50 Hz and a wavelength of 6 m?",
     ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {

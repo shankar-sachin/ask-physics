@@ -759,7 +759,7 @@ class DataFactory:
                 category="fermi", reasoning=self.rng.choice(tpl.FERMI_REASONING), domains=domains
             )
             template_id = template.id
-        elif roll < 0.69:
+        elif roll < 0.73:
             estimate = self.rng.choice(tpl.ESTIMATES)
             if not self._estimate_solves(estimate):
                 self.dropped += 1
@@ -771,7 +771,7 @@ class DataFactory:
                 domains=[self.store.equations[estimate.equation].domain],
             )
             template_id = estimate.template.id
-        elif roll < 0.76:
+        elif roll < 0.80:
             # A redirect is a standard question with its values stated, so it must solve
             # through Noether; tellus once refused "How long does a dropped ball take to fall
             # from a table?", which our own math refusal had just suggested.

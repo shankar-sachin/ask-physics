@@ -13,6 +13,7 @@ from askphysics.lm.factory import (
     LEAK_THRESHOLD,
     DataFactory,
     Example,
+    _substitutable,
     build_dataset,
     equation_phrase,
     load_blocklist,
@@ -36,6 +37,7 @@ from askphysics.lm.tokenizer import CLASSIFY, END, EXPLAIN, PLAN
 from askphysics.models import Classification, Plan
 from askphysics.normalize import normalize_question
 from askphysics.pipeline import compute
+from askphysics.solver.symbolic import solve_for
 from askphysics.solver.units import check_dimensions, quantity
 
 EVALS = Path(__file__).resolve().parents[1] / "evals" / "questions.yaml"
@@ -438,16 +440,35 @@ def test_contrast_pairs_share_wording(store: DataStore) -> None:
     assert oos["oos_speed_02_h"] == "How fast does {abstract} travel?"
     assert est["est_momentum_train_03"] == "What is the momentum of a freight train?"
     assert oos["oos_momentum_01"] == "What is the momentum of {abstract}?"
+    # Plain property lookups (issue #92): "How fast is sound?" next to "How fast is sadness?".
+    assert est["est_sound_01"] == "How fast is sound?"
+    assert est["est_weight_car_01"] == "How heavy is a car?"
+    assert oos["oos_speed_04"] == "What is the speed of {abstract}?"
+    assert "sadness" in tpl.OOS_SLOTS["emotion"]
     # The held-out Fermi phrasings must not be the only trained form of a contrast.
     trained = {e.template.id for e in tpl.ESTIMATES if not e.template.held_out}
     assert {"est_weight_train_02", "est_takeoff_01", "est_momentum_train_03"} <= trained
+    assert {"est_sound_01", "est_sound_02", "est_weight_car_01", "est_weight_car_02"} <= trained
     wanted = {"oos_heavy_01", "oos_speed_03", "oos_momentum_01", "oos_speed_02_h"}
     wanted |= {"est_weight_train_02", "est_takeoff_01", "est_momentum_train_03"}
+    wanted |= {"oos_speed_04", "est_sound_01", "est_weight_car_01"}
     labels = _classify_labels(DataFactory(store, seed=21), wanted)
     assert set(labels) == wanted
-    for tid in ("oos_heavy_01", "oos_speed_03", "oos_momentum_01", "oos_speed_02_h"):
+    for tid in (
+        "oos_heavy_01",
+        "oos_speed_03",
+        "oos_momentum_01",
+        "oos_speed_02_h",
+        "oos_speed_04",
+    ):
         assert labels[tid] == {"out_of_scope"}, tid
-    for tid in ("est_weight_train_02", "est_takeoff_01", "est_momentum_train_03"):
+    for tid in (
+        "est_weight_train_02",
+        "est_takeoff_01",
+        "est_momentum_train_03",
+        "est_sound_01",
+        "est_weight_car_01",
+    ):
         assert labels[tid] == {"fermi"}, tid
 
 
@@ -497,3 +518,17 @@ def test_some_plan_examples_chain(examples: list[Example]) -> None:
     plans = [e for e in examples if e.task == "plan"]
     chained = [e for e in plans if e.template.startswith("chain+")]
     assert 0.02 < len(chained) / len(plans) < 0.2
+
+
+def test_plain_property_questions_have_table_answers(store: DataStore) -> None:
+    """The speed of sound and a car's weight come from the tables, through Noether."""
+    factory = DataFactory(store, seed=1)
+    by_id = {e.template.id: e for e in tpl.ESTIMATES}
+    sound = by_id["est_sound_01"]
+    eq = store.equations[sound.equation]
+    outcome = solve_for(eq, sound.target, _substitutable(factory._estimate_knowns(sound), [eq]))
+    assert outcome.value.to("m/s").magnitude == pytest.approx(343, rel=0.01)
+    car = by_id["est_weight_car_01"]
+    eq = store.equations[car.equation]
+    outcome = solve_for(eq, car.target, _substitutable(factory._estimate_knowns(car), [eq]))
+    assert outcome.value.to("N").magnitude == pytest.approx(1500 * 9.80665)
