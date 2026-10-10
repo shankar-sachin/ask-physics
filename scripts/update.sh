@@ -4,7 +4,7 @@
 #   sh scripts/update.sh
 #
 # Switches to main, pulls, reinstalls (new dependencies or entry points take effect), and
-# prints the commit you are now on. Refuses if you have uncommitted changes.
+# shows the commit you are now on. Refuses if you have uncommitted changes.
 #
 # DRY_RUN=1 prints every command instead of running it.
 set -eu
@@ -21,9 +21,14 @@ need_askphysics
 if [ "${DRY_RUN:-}" != "1" ] && [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   fail "you have uncommitted changes; commit or stash them first"
 fi
-info "Updating main"
-run git checkout main
-run git pull --ff-only origin main
-info "Reinstalling"
-run python -m pip install -q -e ".[dev]"
-run git log --oneline -1
+ui_begin "Update" "Bring this checkout up to date with main" 3 20
+phase "Switch to main" git checkout main
+phase "Pull main" git pull --ff-only origin main
+phase "Reinstall askphysics" python -m pip install -q -e ".[dev]"
+
+if [ "${DRY_RUN:-}" = "1" ]; then
+  run git log --oneline -1
+else
+  info "Now at $(git log --oneline -1)"
+fi
+ui_end "Up to date" "sh scripts/check.sh::run every gate"
