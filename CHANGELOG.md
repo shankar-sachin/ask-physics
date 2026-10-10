@@ -118,6 +118,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Free text can end a sentence on an allowed whole number and can spell scientific
+  notation (#84). The number guard refused a period right after a whole number ("The answer
+  is 10." with 10 allowed), and it could not write a number such as `5e-07`, which
+  `format_number` produces for 0.0000005 and the explanation numbers include: the "e", the
+  sign, and the exponent digits each closed a number that was not allowed. The guard now
+  reads `5e-07` and `7.5e+19` as one number and checks each piece against the allowed
+  spellings; a digit after a period is still checked on its own step.
 - A plan can no longer fill a speed with the speed of light or zero a variable that was
   stated or asked for (#91). A table constant filled any slot with matching units, so
   `v = 299792458 m/s` showed up in "an average speed of 23.2 m/s" and "an angular velocity
