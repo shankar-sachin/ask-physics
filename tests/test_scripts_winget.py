@@ -53,7 +53,7 @@ def test_no_placeholder_is_left_and_the_header_is_kept(tmp_path: Path) -> None:
         assert lines[0].startswith(
             "# yaml-language-server: $schema=https://aka.ms/winget-manifest."
         )
-        assert lines[0].endswith(".1.9.0.schema.json")
+        assert lines[0].endswith(".1.12.0.schema.json")
         assert (
             lines[1] == "# Rendered by scripts/winget.sh from packaging/winget/. Edit the template."
         )
@@ -66,7 +66,7 @@ def test_every_manifest_names_the_package_and_version(tmp_path: Path) -> None:
         data = load(path)
         assert data["PackageIdentifier"] == "shankars.askphysics"
         assert data["PackageVersion"] == "0.4.0"
-        assert data["ManifestVersion"] == "1.9.0"
+        assert data["ManifestVersion"] == "1.12.0"
         types.add(data["ManifestType"])
     assert types == {"version", "installer", "defaultLocale"}
 

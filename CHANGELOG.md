@@ -189,7 +189,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   installer that runs `install.ps1` pinned to its own release and whose uninstaller runs
   `uv tool uninstall askphysics`; it is silent-capable and exits non-zero when the install fails.
   `packaging/winget/` holds the manifest templates for `winget install shankars.askphysics`
-  (schema 1.9.0, x64) and `scripts/winget.sh` renders them. The package is submitted to
+  (schema 1.12.0, x64) and `scripts/winget.sh` renders them. The package is submitted to
   `microsoft/winget-pkgs` by hand once per release (`docs/RELEASING.md`), so it becomes
   installable only after Microsoft accepts it.
 - Pushing a tag `vX.Y.Z` now creates the GitHub Release (`.github/workflows/release.yml`): it

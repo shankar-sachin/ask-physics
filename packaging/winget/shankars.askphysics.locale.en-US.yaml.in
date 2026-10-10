@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 # Rendered by scripts/winget.sh from packaging/winget/. Edit the template.
 
 PackageIdentifier: shankars.askphysics
@@ -32,4 +32,4 @@ Tags:
   - science
 ReleaseNotesUrl: https://github.com/shankar-sachin/ask-physics/releases/tag/v@VERSION@
 ManifestType: defaultLocale
-ManifestVersion: 1.9.0
+ManifestVersion: 1.12.0

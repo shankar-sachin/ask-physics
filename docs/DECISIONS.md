@@ -1234,8 +1234,8 @@ tooling cannot do; it can push a tag.
 - **WinGet package `shankars.askphysics`** (display name "Ask Physics", publisher "Sachin Shankar",
   MIT). The identifier is lowercase to share the publisher folder `manifests/s/shankars/` with the
   maintainer's other package; WinGet matches ids case-insensitively, so `winget install
-  ShankarS.AskPhysics` works too. Manifests are schema 1.9.0, templated in `packaging/winget/` and
-  rendered by `scripts/winget.sh`. Submitting them to `microsoft/winget-pkgs` stays a manual pull
+  ShankarS.AskPhysics` works too. Manifests are schema 1.12.0, the version the community
+  repository recommends, templated in `packaging/winget/` and rendered by `scripts/winget.sh`. Submitting them to `microsoft/winget-pkgs` stays a manual pull
   request from the maintainer's fork (`docs/RELEASING.md`); no token is stored in this repository.
 - **The installer is Inno Setup** (`packaging/windows/askphysics.iss`), per-user
   (`PrivilegesRequired=lowest`), silent-capable, with a fixed `AppId`. It is a thin wrapper: it

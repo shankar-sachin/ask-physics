@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 # Rendered by scripts/winget.sh from packaging/winget/. Edit the template.
 
 PackageIdentifier: shankars.askphysics
@@ -31,4 +31,4 @@ Installers:
         ProductCode: '{007795BD-A0E0-46D3-8C03-CE338CD7B57D}_is1'
         InstallerType: inno
 ManifestType: installer
-ManifestVersion: 1.9.0
+ManifestVersion: 1.12.0
