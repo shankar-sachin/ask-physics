@@ -48,6 +48,9 @@ Decoder-only transformer, written in PyTorch:
 
 Devices: Apple Silicon (MPS) first, then CUDA, then CPU, picked automatically.
 
+The website has no torch, so `lm/numpy_model.py` runs the same network in plain numpy from the same
+safetensors files, behind the `Engine` seam the constrained decoder sits on (ADR-021).
+
 ## Tokenizer
 
 Our own byte-level BPE, trained locally on the training corpus:

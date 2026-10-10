@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from askphysics.errors import ConfigError
-from askphysics.lm import checkpoints
+from askphysics.lm import checkpoints, config
 from askphysics.lm.checkpoints import (
     CONFIG_FILE,
     TOKENIZER_FILE,
@@ -60,7 +60,7 @@ def test_tampered_config_rejected(saved: Path) -> None:
 
 
 def test_wrong_format_version_rejected(saved: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(checkpoints, "FORMAT_VERSION", 999)
+    monkeypatch.setattr(config, "FORMAT_VERSION", 999)  # where the shared check reads it
     with pytest.raises(ConfigError, match="task format"):
         load_model(saved)
 
