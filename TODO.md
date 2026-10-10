@@ -48,13 +48,13 @@ model design: [`docs/MODELS.md`](docs/MODELS.md).
       category-error templates, each with reasons and redirects.
 - [x] Explanation generator from plan plus computed result.
 - [x] Eval leakage check: drop anything too similar to `evals/questions.yaml`.
-- [x] `askphysics model build-data` writing sharded JSONL with a manifest.
+- [x] `askphysics-dev model build-data` writing sharded JSONL with a manifest.
 
 ### Training
 - [x] Training loop: AdamW, warmup plus cosine schedule, gradient clipping,
       bf16 autocast on MPS and CUDA, seeded data order.
 - [x] Checkpointing and resumption; loss and throughput logging.
-- [x] `askphysics model train-tokenizer`, `train`, and `info` commands.
+- [x] `askphysics-dev model train-tokenizer`, `train`, and `info` commands.
 - [x] CI test: `fermi-luna-1` trains 50 steps on CPU and its loss drops.
 
 ---
@@ -90,9 +90,10 @@ The step-by-step training commands are in [`docs/TRAINING.md`](docs/TRAINING.md)
 ### Distribution (ADR-012)
 - [x] Export bf16 safetensors per model and a manifest (URL, size, sha256)
       (`model package`, #51).
-- [x] `askphysics model pull [--all]` with checksum verification (#51).
-- [x] Installers run `model pull` (#51). Homebrew can't write to the home
-      directory, so its formula prints a caveat instead (`docs/RELEASING.md`).
+- [x] `askphysics-dev model pull [--all]` with checksum verification (#51).
+- [x] Installers run the hidden `askphysics install-models` (was `model pull`, #51), and the
+      Homebrew formula runs it in `post_install` into `$(brew --prefix)/var/askphysics/models`
+      (ADR-022, `docs/RELEASING.md`).
 - [x] Download celeste on first escalation; clear message when no weights
       are installed (#51).
 

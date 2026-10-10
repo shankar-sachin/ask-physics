@@ -177,10 +177,11 @@ commands are in [`TRAINING.md`](TRAINING.md).
 - Stored as `safetensors`, never pickled `torch.save` files, because loading a
   pickle runs arbitrary code (see `SECURITY.md`).
 - Users never train: the maintainer trains and ships the weights as GitHub
-  release assets, pinned by a checksum manifest and fetched with
-  `askphysics model pull` (ADR-012). The installers and the Homebrew formula
-  fetch tellus and solem, the first `ask` fetches whichever of them is still missing, and
-  celeste comes down on first escalation (`ASKPHYSICS_AUTO_PULL=0` stops both).
+  release assets, pinned by a checksum manifest (ADR-012). The installers and the
+  Homebrew formula download tellus and solem when they install (ADR-022), the first `ask`
+  downloads whichever of them is still missing, and celeste comes down on first escalation
+  (`ASKPHYSICS_AUTO_PULL=0` stops the last two). Maintainers can also run
+  `askphysics-dev model pull`.
 
 ## Known limits
 

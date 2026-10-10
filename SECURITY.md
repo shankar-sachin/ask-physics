@@ -31,9 +31,9 @@ unless they ask not to be.
 
 This project feeds user text to our own Fermi language models, loads model
 weights from disk, and executes symbolic math on the result. It holds no API
-keys. The CLI makes no network calls except model downloads: `askphysics model
-pull`, and celeste's download the first time a question escalates to it
-(`auto_pull`, on by default). Each downloaded file must match the size and
+keys. The CLI makes no network calls except model downloads: the one at install
+time, the one the first question runs if the models are missing, and celeste's
+the first time a question escalates to it (`auto_pull`, on by default). Each downloaded file must match the size and
 sha256 pinned in `src/askphysics/lm/weights.json`, or it is refused. The website
 runs in the browser and loads Pyodide, KaTeX and fonts from CDNs. The scripts in
 `scripts/` that build data and site assets fetch their sources over the network;
