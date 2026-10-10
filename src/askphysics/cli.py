@@ -450,6 +450,23 @@ def backend_cmd(
         raise typer.Exit(code=1) from exc
 
 
+@model_app.command("phase", context_settings={"ignore_unknown_options": True})
+def phase_cmd(
+    command: Annotated[list[str], typer.Argument(help="The command to run, after --.")],
+    title: Annotated[str, typer.Option(help="What the phase is called.")],
+    inherit: Annotated[
+        bool,
+        typer.Option(help="Let the command draw its own live display (no spinner, no capture)."),
+    ] = False,
+) -> None:
+    """Run a command as a named phase: spinner, then a tick and the time it took (for scripts)."""
+    from askphysics.train_ui import run_phase
+
+    code = run_phase(console, title, command, inherit=inherit)
+    if code:
+        raise typer.Exit(code=code)
+
+
 @model_app.command("bench")
 def bench_cmd(
     model: Annotated[str, typer.Option(help="Model preset, e.g. fermi-solem-1.")] = "fermi-solem-1",

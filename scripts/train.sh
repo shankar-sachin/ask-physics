@@ -118,7 +118,7 @@ if [ -n "$device" ]; then
 else
   resolved=$(askphysics model backend --backend "$backend")
 fi
-info "Training backend: $resolved"
+say "Training backend: $resolved"
 
 corpus=build/corpus/prose.jsonl
 if [ "$wants_prose" = 1 ] && [ -z "$prose" ]; then
@@ -144,7 +144,7 @@ if [ "$resume" = 1 ]; then
   if [ "$fresh_data" = 1 ] || [ "$fresh_tokenizer" = 1 ]; then
     fail "--resume can't rebuild the data or tokenizer: the run would no longer match"
   fi
-  info "Resuming $model"
+  say "Resuming $model"
 else
   if [ -d "$installed" ]; then
     stamp="$model-$(date +%Y%m%d-%H%M%S)"
@@ -152,34 +152,32 @@ else
     baseline="$(backup_dir)/$stamp"
   fi
   if [ "$fresh_data" = 1 ] || [ ! -f "$data/manifest.json" ]; then
-    info "Building $examples training examples in $data"
     run rm -rf "${data:?}"
-    awake askphysics model build-data --out "$data" --examples "$examples" --workers "$workers"
+    phase "Building $examples training examples in $data" askphysics model build-data \
+      --out "$data" --examples "$examples" --workers "$workers"
   fi
   if [ "$fresh_tokenizer" = 1 ] || [ ! -f "$tokenizer" ]; then
-    info "Training the tokenizer"
     if [ -f "$corpus" ]; then
-      awake askphysics model train-tokenizer --data "$data" --out "$tokenizer" --vocab-size 8192 \
-        --prose "$corpus"
+      phase "Training the tokenizer" askphysics model train-tokenizer --data "$data" \
+        --out "$tokenizer" --vocab-size 8192 --prose "$corpus"
     else
-      awake askphysics model train-tokenizer --data "$data" --out "$tokenizer" --vocab-size 8192
+      phase "Training the tokenizer" askphysics model train-tokenizer --data "$data" \
+        --out "$tokenizer" --vocab-size 8192
     fi
   fi
   if [ "$evaluate" = 1 ] && [ -n "$baseline" ]; then
-    info "Scoring the previous $model for a baseline"
-    awake askphysics model eval --model "$model" --directory "$baseline" --data "$data" \
-      --examples "$eval_examples"
+    phase "Scoring the previous $model for a baseline" askphysics model eval --model "$model" \
+      --directory "$baseline" --data "$data" --examples "$eval_examples"
   fi
 fi
 
 if [ "$bench" = 1 ] && [ "$resolved" = torch ]; then
-  info "Checking training speed (about a minute)"
-  awake askphysics model bench --model "$model" --batch-size "$batch" --plan-steps "$steps"
+  phase "Checking training speed (about a minute)" askphysics model bench --model "$model" \
+    --batch-size "$batch" --plan-steps "$steps"
 elif [ "$bench" = 1 ]; then
-  info "Skipping the torch speed check: this run trains with $resolved"
+  say "Skipping the torch speed check: this run trains with $resolved"
 fi
 
-info "Training $model ($steps steps) with $resolved"
 set -- askphysics model train --model "$model" --data "$data" --tokenizer "$tokenizer" \
   --steps "$steps" --batch-size "$batch" --backend "$resolved"
 if [ "$wants_prose" = 1 ]; then
@@ -190,14 +188,14 @@ fi
 [ "$ckpt" = 1 ] && set -- "$@" --checkpoint-blocks
 set -- "$@" --precision "$precision"
 [ "$resume" = 1 ] && set -- "$@" --resume
-awake "$@"
+phase_live "Training $model ($steps steps) with $resolved" "$@"
 
 if [ "$evaluate" = 1 ]; then
-  info "Scoring the new $model"
-  awake askphysics model eval --model "$model" --data "$data" --examples "$eval_examples"
+  phase "Scoring the new $model" askphysics model eval --model "$model" --data "$data" \
+    --examples "$eval_examples"
   if [ -n "$baseline" ]; then
     run python3 "$(dirname "$0")/compare_evals.py" "$baseline/eval.json" "$installed/eval.json"
     say "Keep the new one, or put the old one back: sh scripts/models.sh restore $model"
   fi
 fi
-info "Done: $model"
+say "Done: $model"
