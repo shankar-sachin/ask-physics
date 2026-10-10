@@ -746,6 +746,8 @@ def train(
             tokens_seen += (labels != IGNORE_INDEX).sum()
 
         done = step + 1
+        if on_step:
+            on_step(done)
         if done % cfg.log_every == 0 or done == cfg.steps:
             now, total = time.perf_counter(), int(tokens_seen)
             rate = (total - window_tokens) / max(now - window_t0, 1e-9)

@@ -4,6 +4,7 @@ import random
 import re
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import pytest
 import torch
@@ -271,6 +272,26 @@ def test_on_step_starts_at_the_resumed_step(
         on_step=seen.append,
     )
     assert seen[0] == 10
+
+
+def _without_timing(metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {k: v for k, v in m.items() if k not in {"target_tokens_per_s", "mem_gb"}} for m in metrics
+    ]
+
+
+def test_on_step_reports_every_step_and_changes_nothing(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    config = TrainConfig(**{**FAST.__dict__, "steps": 12})
+    seen: list[int] = []
+    shown = train(LUNA, tokenizer, dataset, tmp_path / "a", config, on_step=seen.append)
+    plain = train(LUNA, tokenizer, dataset, tmp_path / "b", config)
+    assert seen == list(range(13))  # the start, then each step as it finishes
+    assert _without_timing(shown) == _without_timing(plain)  # a display hook never alters training
+    assert (tmp_path / "a" / "model.safetensors").read_bytes() == (
+        tmp_path / "b" / "model.safetensors"
+    ).read_bytes()
 
 
 def test_grad_accum_must_be_positive(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:

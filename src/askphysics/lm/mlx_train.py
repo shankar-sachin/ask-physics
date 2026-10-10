@@ -407,6 +407,8 @@ def _run(
         tokens_seen += targets
 
         done = step + 1
+        if on_step:
+            on_step(done)
         if done % cfg.log_every == 0 or done == cfg.steps:
             now = time.perf_counter()
             rate = (tokens_seen - window_tokens) / max(now - window_t0, 1e-9)
