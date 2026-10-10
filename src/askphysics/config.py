@@ -18,6 +18,9 @@ from askphysics.lm.config import PRESETS
 # auto: the Fermi models when any are installed, else the fake client (ADR-010).
 Provider = Literal["auto", "fake", "fermi"]
 
+# What to do about downloading celeste when a question needs it (ADR-022).
+CelesteDownload = Literal["ask", "always", "never"]
+
 ENV_PREFIX = "ASKPHYSICS_"
 
 
@@ -36,9 +39,13 @@ class Settings:
         plan_attempts: Plans tried with the main planner before escalating (ADR-010).
         escalations: Extra plan attempts by celeste after those, when it is installed.
         device: Torch device for the Fermi models (mps, cuda, cpu); None picks the best.
-        auto_pull: Download published weights that aren't installed: tellus and solem on the
-            first ``ask``, celeste the first time a question needs its escalation try
-            (ADR-012). Off means only installed models are used.
+        auto_pull: Download published weights that aren't installed while a question is asked:
+            tellus and solem on the first ``ask`` (ADR-012), and celeste only if the user
+            agrees (``celeste_download``). Off means only installed models are used.
+        celeste_download: What to do when a question reaches celeste's escalation try and it
+            is published but not installed (ADR-022): ``ask`` the user (on a terminal only),
+            ``always`` download, or ``never``. None uses the choice saved in
+            ``lm/preferences.py``, else ``ask``. Without a terminal, ``ask`` means skip.
     """
 
     llm_provider: Provider = "auto"
@@ -49,10 +56,18 @@ class Settings:
     escalations: int = 1
     device: str | None = None
     auto_pull: bool = True
+    celeste_download: CelesteDownload | None = None
 
     def __post_init__(self) -> None:
         if self.llm_provider not in get_args(Provider):
             raise ConfigError(f"unknown llm_provider {self.llm_provider!r}")
+        if self.celeste_download is not None and self.celeste_download not in get_args(
+            CelesteDownload
+        ):
+            raise ConfigError(
+                f"unknown celeste_download {self.celeste_download!r}; "
+                f"choose from {', '.join(get_args(CelesteDownload))}"
+            )
         if self.top_k < 1:
             raise ConfigError(f"top_k must be at least 1, got {self.top_k}")
         if not 0.0 <= self.temperature <= 1.0:
@@ -93,6 +108,7 @@ class Settings:
             escalations=int(number("escalations", int, defaults.escalations)),
             device=raw("device") or defaults.device,
             auto_pull=_flag(raw("auto_pull"), defaults.auto_pull, "auto_pull"),
+            celeste_download=cast(CelesteDownload | None, raw("celeste_download")) or None,
         )
 
 

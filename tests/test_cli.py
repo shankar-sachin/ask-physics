@@ -586,3 +586,220 @@ def test_the_user_docs_never_tell_a_user_to_run_a_dev_command() -> None:
         _no_dev_commands((root / "docs" / "pages" / f"{page}.md").read_text(encoding="utf-8"))
     readme = (root / "README.md").read_text(encoding="utf-8")
     _no_dev_commands(readme.split("## Quickstart")[0])  # the part written for users
+
+
+# --- celeste asks before it downloads (ADR-022) -----------------------------------------------
+
+CELESTE = "fermi-celeste-1"
+ALL_THREE = ("fermi-tellus-1", "fermi-solem-1", CELESTE)
+
+
+def _asker(
+    monkeypatch: pytest.MonkeyPatch, *, interactive: bool = True, quiet: bool = False, **env: str
+) -> "cli._CelesteDownloads":
+    from askphysics.config import Settings
+
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: interactive and not quiet)
+    return cli._CelesteDownloads(
+        Settings.from_env({f"ASKPHYSICS_{k.upper()}": v for k, v in env.items()}), quiet
+    )
+
+
+def _reply(monkeypatch: pytest.MonkeyPatch, text: str | None) -> list[str]:
+    """Type ``text`` at the next prompt (None: end of input). Returns the prompts seen."""
+    seen: list[str] = []
+
+    def fake_input(*args: object) -> str:
+        seen.append("asked")
+        if text is None:
+            raise EOFError
+        return text
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    return seen
+
+
+def test_the_prompt_names_celeste_and_its_real_size(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _reply(monkeypatch, "y")
+    assert _asker(monkeypatch).confirm(CELESTE, 240_100_000) is True
+    out = _flat(capsys.readouterr().out)
+    assert "This question needs celeste-1 (about 240.1 MB, a one-time download)" in out
+    assert "[a] always" in out and "[never]" in out
+
+
+@pytest.mark.parametrize("reply", ["y", "yes", "Y"])
+def test_yes_downloads_this_time_and_saves_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, reply: str
+) -> None:
+    from askphysics.lm.preferences import preferences_path, read_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, reply)
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is True
+    assert read_celeste_choice() is None and not preferences_path().exists()
+
+
+@pytest.mark.parametrize("reply", ["n", "no", "", "maybe", None])
+def test_anything_but_yes_skips_celeste_and_saves_nothing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, reply: str | None
+) -> None:
+    from askphysics.lm.preferences import preferences_path
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, reply)
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is False
+    assert not preferences_path().exists()
+
+
+def test_always_downloads_and_is_never_asked_again(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from askphysics.lm.preferences import preferences_path, read_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, "a")
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is True
+    assert read_celeste_choice() == "always"
+    out = _flat(capsys.readouterr().out)
+    assert "Saved:" in out and "To change it, delete" in out  # how to reset it
+    assert str(preferences_path()) in "".join(out.split())  # (the line wraps)
+    prompts = _reply(monkeypatch, "n")  # a later ask: no prompt, whatever would be typed
+    later = _asker(monkeypatch)
+    assert later.choice == "always" and later.enabled
+    assert later.confirm(CELESTE, 1) is True and prompts == []
+
+
+def test_always_downloads_even_without_a_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    asker = _asker(monkeypatch, interactive=False, celeste_download="always")
+    assert asker.enabled and asker.confirm(CELESTE, 1) is True
+
+
+def test_never_skips_celeste_and_is_never_asked_again(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.lm.preferences import read_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    _reply(monkeypatch, "never")
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is False
+    assert read_celeste_choice() == "never"
+    prompts = _reply(monkeypatch, "y")
+    later = _asker(monkeypatch)
+    assert later.choice == "never" and not later.enabled
+    assert later.confirm(CELESTE, 1) is False and prompts == []
+
+
+def test_the_environment_beats_the_saved_choice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.lm.preferences import save_celeste_choice
+
+    _models_dir(monkeypatch, tmp_path)
+    save_celeste_choice("never")
+    assert _asker(monkeypatch).choice == "never"
+    assert _asker(monkeypatch, celeste_download="ask").choice == "ask"
+
+
+def test_nothing_is_asked_without_an_interactive_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    prompts = _reply(monkeypatch, "y")
+    no_tty = _asker(monkeypatch, interactive=False)
+    assert not no_tty.enabled and no_tty.confirm(CELESTE, 1) is False
+    as_json = _asker(monkeypatch, quiet=True)  # --json
+    assert not as_json.enabled and as_json.confirm(CELESTE, 1) is False
+    assert prompts == []
+
+
+def test_a_choice_that_cannot_be_saved_still_applies_this_time(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    blocker = tmp_path / "file"
+    blocker.write_text("x")
+    monkeypatch.setenv("ASKPHYSICS_MODEL_DIR", str(blocker / "models"))  # can't be created
+    _reply(monkeypatch, "a")
+    assert _asker(monkeypatch).confirm(CELESTE, 1) is True
+    assert "couldn't save that choice" in _flat(capsys.readouterr().out)
+
+
+def test_ask_json_never_prompts_for_or_downloads_a_forced_celeste(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    prompts = _reply(monkeypatch, "y")
+    result = runner.invoke(cli.app, ["ask", "--json", "--model", CELESTE, DEMO_QUESTION])
+    assert result.exit_code == 0, result.output  # the stand-in answers; nothing was fetched
+    assert not any(CELESTE in url for url in opened) and not (root / CELESTE).exists()
+    assert prompts == []
+
+
+def test_ask_without_a_terminal_does_not_prompt_or_download_celeste(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    prompts = _reply(monkeypatch, "y")
+    result = runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # CliRunner: stdin is not a tty
+    assert result.exit_code == 0, result.output
+    assert not any(CELESTE in url for url in opened) and not (root / CELESTE).exists()
+    assert _kept(root, "fermi-tellus-1") and _kept(root, "fermi-solem-1")  # those still download
+    assert prompts == []
+
+
+def test_a_forced_celeste_prompts_then_downloads_on_yes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: True)
+    result = runner.invoke(cli.app, ["ask", "--model", CELESTE, DEMO_QUESTION], input="y\n")
+    assert "This question needs celeste-1" in _flat(result.output)
+    assert "fermi-celeste-1 downloaded and verified" in _flat(result.output)
+    assert _kept(root, CELESTE)
+    assert not (root / "fermi-tellus-1").exists()  # only the one that was asked for
+    assert len(opened) == 3
+
+
+def test_a_forced_celeste_prompts_then_skips_on_no(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    opened = _publish(monkeypatch, tmp_path, ALL_THREE)
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: True)
+    result = runner.invoke(cli.app, ["ask", "--model", CELESTE, DEMO_QUESTION], input="n\n")
+    assert "This question needs celeste-1" in _flat(result.output)
+    assert not (root / CELESTE).exists() and not any(CELESTE in url for url in opened)
+
+
+def test_a_forced_celeste_downloads_with_the_saved_always(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = _models_dir(monkeypatch, tmp_path)
+    _publish(monkeypatch, tmp_path, ALL_THREE)
+    monkeypatch.setenv("ASKPHYSICS_CELESTE_DOWNLOAD", "always")
+    result = runner.invoke(cli.app, ["ask", "--json", "--model", CELESTE, DEMO_QUESTION])
+    assert "This question needs" not in result.output  # no prompt, no terminal
+    assert _kept(root, CELESTE)  # saved choice: download without asking, even with --json
+
+
+def test_the_pipeline_gets_the_callbacks_only_when_celeste_may_be_offered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from askphysics.pipeline import Pipeline
+
+    _models_dir(monkeypatch, tmp_path)
+    seen: list[Any] = []
+    real = Pipeline.from_settings
+
+    def spy(settings: Any, data: Any = None, **kwargs: Any) -> Any:
+        seen.append(kwargs.get("confirm_download"))
+        return real(settings, data)
+
+    monkeypatch.setattr(Pipeline, "from_settings", staticmethod(spy))
+    runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # no terminal
+    monkeypatch.setattr(cli, "_interactive", lambda quiet: True)
+    runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # a terminal
+    monkeypatch.setenv("ASKPHYSICS_CELESTE_DOWNLOAD", "never")
+    runner.invoke(cli.app, ["ask", DEMO_QUESTION])  # a terminal, but never
+    assert [c is not None for c in seen] == [False, True, False]

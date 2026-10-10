@@ -12,13 +12,14 @@ from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
 from rich.console import Console
+from rich.status import Status
 from rich.text import Text
 
 from askphysics import __version__
-from askphysics.config import Provider, Settings
-from askphysics.errors import AskPhysicsError
+from askphysics.config import CelesteDownload, Provider, Settings
+from askphysics.errors import AskPhysicsError, ConfigError
 from askphysics.pipeline import Pipeline
-from askphysics.ui import answer_card, banner, make_console, tolerate_narrow_encodings
+from askphysics.ui import answer_card, banner, make_console, safe, tolerate_narrow_encodings
 
 if TYPE_CHECKING:
     from askphysics.lm.weights import PinnedModel
@@ -69,12 +70,18 @@ def ask(
             settings = replace(settings, llm_provider=cast(Provider, llm))
         if model is not None:
             settings = replace(settings, model=model)
-        _auto_pull(settings, json_output)
-        pipeline = Pipeline.from_settings(settings)
+        celeste = _CelesteDownloads(settings, json_output)
+        _auto_pull(settings, json_output, celeste)
+        pipeline = Pipeline.from_settings(
+            settings,
+            confirm_download=celeste.confirm if celeste.enabled else None,
+            download=celeste.download,
+        )
         if json_output:
             answer = pipeline.run(question)
         else:
-            with console.status("[muted]reading the question, then doing the math"):
+            with console.status("[muted]reading the question, then doing the math") as status:
+                celeste.status = status  # paused while celeste asks or downloads
                 answer = pipeline.run(question)
     except AskPhysicsError as exc:
         raise _fail(str(exc)) from exc
@@ -106,7 +113,111 @@ def _download_models(
             view.finish_model(name, pinned, downloaded[name], root / name)
 
 
-def _auto_pull(settings: Settings, quiet: bool) -> str | None:
+def _pull_console(quiet: bool) -> Console:
+    """Where a download is drawn: the terminal, or stderr (``--json``, no terminal)."""
+    return console if console.is_terminal and not quiet else make_console(stderr=True)
+
+
+def _interactive(quiet: bool) -> bool:
+    """Whether a person can be asked something: a terminal in and out, and not ``--json``."""
+    return not quiet and console.is_terminal and sys.stdin.isatty()
+
+
+class _CelesteDownloads:
+    """celeste never downloads by itself (ADR-022): it asks first, on a terminal.
+
+    ``choice`` is ``ASKPHYSICS_CELESTE_DOWNLOAD``, else the one saved in ``preferences.json``,
+    else ``ask``. ``always`` downloads without asking, ``never`` skips, and ``ask`` prompts only
+    on an interactive terminal (not with ``--json``, a pipe, or no stdin) and otherwise skips.
+    The pipeline only sees ``confirm`` and ``download``; all terminal I/O stays here.
+    """
+
+    def __init__(self, settings: Settings, quiet: bool) -> None:
+        from askphysics.lm.preferences import read_celeste_choice
+
+        self.choice = settings.celeste_download or read_celeste_choice() or "ask"
+        self.quiet = quiet
+        self.interactive = _interactive(quiet)
+        self.status: Status | None = None  # the "reading the question" spinner, if running
+
+    @property
+    def enabled(self) -> bool:
+        """Whether celeste may be offered at all: asked on a terminal, or always."""
+        return self.choice == "always" or (self.choice == "ask" and self.interactive)
+
+    def _pause(self) -> None:
+        if self.status is not None:
+            self.status.stop()
+
+    def _resume(self) -> None:
+        if self.status is not None:
+            self.status.start()
+
+    def confirm(self, name: str, size: int) -> bool:
+        """Whether to download ``name`` (``size`` bytes) now; asks unless the choice is saved."""
+        if self.choice == "always":
+            return True
+        if self.choice == "never" or not self.interactive:
+            return False
+        from askphysics.files_view import human_size
+
+        short = name.removeprefix("fermi-")
+        self._pause()
+        try:
+            console.print(
+                Text("? ", style="accent")
+                + Text(
+                    f"This question needs {short} (about {human_size(size)}, a one-time "
+                    "download) to try harder."
+                )
+            )
+            console.print(  # Text, not markup: the brackets are literal
+                Text("  [y] yes   [N] no   [a] always download   [never] don't ask again"),
+                style="muted",
+            )
+            try:
+                reply = console.input("  Download it? ").strip().lower()
+            except EOFError:
+                reply = ""
+        finally:
+            self._resume()
+        if reply in {"a", "always"}:
+            self._remember("always", "celeste will download whenever a question needs it")
+            return True
+        if reply in {"never", "v"}:
+            self._remember("never", "celeste won't be offered again")
+            return False
+        return reply in {"y", "yes"}
+
+    def _remember(self, choice: CelesteDownload, what: str) -> None:
+        from askphysics.lm.preferences import save_celeste_choice
+
+        try:
+            path = save_celeste_choice(choice)
+        except OSError as exc:
+            console.print(Text("! ", style="warn") + Text(f"couldn't save that choice: {exc}"))
+            return
+        console.print(f"Saved: {what}. To change it, delete {safe(str(path))}.", style="muted")
+
+    def download(self, name: str) -> None:
+        """Download the approved model with the usual progress display."""
+        from askphysics.lm.paths import default_model_dir
+        from askphysics.lm.weights import read_manifest
+
+        self._pause()
+        try:
+            _download_models(
+                [name], read_manifest(), default_model_dir(), _pull_console(self.quiet)
+            )
+        except OSError as exc:
+            raise ConfigError(str(exc)) from exc
+        finally:
+            self._resume()
+
+
+def _auto_pull(
+    settings: Settings, quiet: bool, celeste: _CelesteDownloads | None = None
+) -> str | None:
     """Download published models that aren't installed yet, before the first answer (ADR-012).
 
     Returns why the download failed, or None when nothing failed or nothing was needed.
@@ -114,12 +225,14 @@ def _auto_pull(settings: Settings, quiet: bool) -> str | None:
     and a locally trained model of the same name is never replaced. The display goes to
     stdout on a terminal and to stderr otherwise (or with ``quiet``, for ``--json``), so
     scripted use keeps a clean stdout. A failure never raises: ``ask`` degrades as it does
-    without models, and the next ``ask`` tries again.
+    without models, and the next ``ask`` tries again. celeste is the exception to "published
+    and missing means download": it is offered only through ``celeste`` (see
+    ``_CelesteDownloads``), which matters here only for ``--model fermi-celeste-1``.
     """
     if not settings.auto_pull or settings.llm_provider == "fake":
         return None
     from askphysics.files_view import human_size
-    from askphysics.llm.routing import SOLEM, TELLUS
+    from askphysics.llm.routing import CELESTE, SOLEM, TELLUS
     from askphysics.lm.paths import default_model_dir
     from askphysics.lm.weights import missing_published, read_manifest
 
@@ -129,11 +242,15 @@ def _auto_pull(settings: Settings, quiet: bool) -> str | None:
         names = missing_published(
             [settings.model] if settings.model else [TELLUS, SOLEM], root, manifest=manifest
         )
+        if CELESTE in names:
+            size = sum(f.size for f in manifest[CELESTE].files)
+            if not (celeste and celeste.enabled and celeste.confirm(CELESTE, size)):
+                names.remove(CELESTE)  # never without a yes
     except (AskPhysicsError, OSError, ValueError):
         return None  # an unreadable manifest is not worth stopping a question for
     if not names:
         return None
-    out = console if console.is_terminal and not quiet else make_console(stderr=True)
+    out = _pull_console(quiet)
     total = sum(f.size for n in names for f in manifest[n].files)
     short = ", ".join(n.removeprefix("fermi-").removesuffix("-1") for n in names)
     out.print(
