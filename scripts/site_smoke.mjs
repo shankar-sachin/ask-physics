@@ -63,8 +63,10 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": type });
     res.end(body);
   } catch {
-    res.writeHead(404);
-    res.end("not found");
+    // Like Vercel: a missing path at any depth gets the top-level 404.html, with status 404.
+    const page = await readFile(join(ROOT, "404.html")).catch(() => null);
+    res.writeHead(404, { "Content-Type": TYPES[".html"] });
+    res.end(page ?? "not found");
   }
 });
 await new Promise((resolve) => server.listen(0, resolve));
@@ -177,7 +179,17 @@ try {
   check(await fits(), "on a phone, the docs home doesn't scroll sideways");
   await small.goto(`${base}docs/kin_v_squared/`);
   check(await fits(), "on a phone, an equation page doesn't scroll sideways");
+  await small.goto(`${base}docs/no-such-equation/`);
+  check(await fits(), "on a phone, the 404 page doesn't scroll sideways");
   await phone.close();
+
+  // A missing page, at the top or under /docs/, shows the 404 page with a 404 status.
+  for (const path of ["no-such-page/", "docs/no-such-equation/"]) {
+    const response = await page.goto(base + path);
+    check(response.status() === 404, `${path} answers 404 (${response.status()})`);
+    const heading = await page.textContent("h1");
+    check(heading.includes("probability amplitude"), `${path} shows the 404 page (${heading})`);
+  }
 
   check(errors.length === 0, `no page or console errors${errors.length ? `:\n${errors.join("\n")}` : ""}`);
 } finally {

@@ -20,7 +20,7 @@ esac
 stage_page() {
   rm -rf "$out"
   mkdir -p "$out/installers" "$out/images" "$out/py"
-  cp web/index.html web/styles.css web/app.js web/worker.js "$out/"
+  cp web/index.html web/404.html web/styles.css web/app.js web/worker.js "$out/"
   cp install.sh install.ps1 "$out/installers/"
   cp docs/images/logo.svg docs/images/banner.png docs/images/fermi-*.jpg docs/images/demo.mp4 docs/images/demo-poster.jpg "$out/images/"
   echo "$(find "$out" -type f | wc -l | tr -d ' ') files written"
