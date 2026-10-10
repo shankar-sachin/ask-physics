@@ -11,6 +11,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A demo video on the website, under the hero: a question typed into the CLI, the six stages,
   Noether's working with units, the answer card, a refused question, and the four Fermi models.
   It plays muted on a loop, and holds on its poster for visitors who prefer reduced motion.
+- A livelier training view for `model train` and `scripts/train.sh`. The bar advances every
+  optimizer step and the ETA works (from recent steps per second, with a clock time to finish,
+  and correct after `--resume`). A live panel under the bar shows the phase (prose warm-up, then
+  tasks + prose), a loss sparkline, learning rate, tokens per second, backend and device, and
+  memory; a summary panel closes the run with final and best losses, total time, average speed,
+  and the weights directory. `train.sh` shows each phase with a spinner, a tick, and the time it
+  took. Without a terminal, or with `NO_COLOR`, the output is plain lines. `metrics.jsonl` and
+  the training math are unchanged.
 - `model train --checkpoint-blocks` (and `scripts/train.sh --checkpoint-blocks`) works on
   the torch backend too. Each block's activations are recomputed in the backward pass instead of
   stored, for a model whose activations don't fit on the GPU; evaluation never recomputes.
