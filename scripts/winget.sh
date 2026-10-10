@@ -17,7 +17,9 @@ set -eu
 case ${1:-} in
   -h | --help) usage 0 ;;
 esac
-[ $# -ge 2 ] && [ $# -le 3 ] || usage 1
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+  usage 1
+fi
 
 version=$1
 sha=$2
