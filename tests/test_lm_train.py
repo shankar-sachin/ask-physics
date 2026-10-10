@@ -4,9 +4,11 @@ import random
 import re
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import pytest
 import torch
+from safetensors.torch import load_file
 from typer.testing import CliRunner
 
 from askphysics import cli
@@ -252,6 +254,47 @@ def test_resume_continues_from_the_checkpoint(
     assert rates == sorted(rates, reverse=True) and rates[0] <= lr_at(9, first)
     logged = [json.loads(line)["step"] for line in (out / "metrics.jsonl").read_text().splitlines()]
     assert min(logged) <= 10 < max(logged)  # resuming keeps the earlier log
+
+
+def test_on_step_starts_at_the_resumed_step(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    # The display starts its bar there, so a resume never counts the jump as speed.
+    out = tmp_path / "luna"
+    train(LUNA, tokenizer, dataset, out, TrainConfig(**{**FAST.__dict__, "steps": 10}))
+    seen: list[int] = []
+    train(
+        LUNA,
+        tokenizer,
+        dataset,
+        out,
+        TrainConfig(**{**FAST.__dict__, "steps": 12}),
+        resume=True,
+        on_step=seen.append,
+    )
+    assert seen[0] == 10
+
+
+def _without_timing(metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {k: v for k, v in m.items() if k not in {"target_tokens_per_s", "mem_gb"}} for m in metrics
+    ]
+
+
+def test_on_step_reports_every_step_and_changes_nothing(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    config = TrainConfig(**{**FAST.__dict__, "steps": 12})
+    seen: list[int] = []
+    shown = train(LUNA, tokenizer, dataset, tmp_path / "a", config, on_step=seen.append)
+    plain = train(LUNA, tokenizer, dataset, tmp_path / "b", config)
+    assert seen == list(range(13))  # the start, then each step as it finishes
+    assert _without_timing(shown) == _without_timing(plain)  # a display hook never alters training
+    # Compare tensors, not file bytes: safetensors may order its JSON header differently.
+    shown_w = load_file(tmp_path / "a" / "model.safetensors")
+    plain_w = load_file(tmp_path / "b" / "model.safetensors")
+    assert shown_w.keys() == plain_w.keys()
+    assert all(torch.equal(shown_w[k], plain_w[k]) for k in shown_w)
 
 
 def test_grad_accum_must_be_positive(dataset: Path, tokenizer: Tokenizer, tmp_path: Path) -> None:

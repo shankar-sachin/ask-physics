@@ -669,9 +669,14 @@ def train(
     *,
     resume: bool = False,
     on_log: Callable[[dict[str, Any]], None] | None = None,
+    on_step: Callable[[int], None] | None = None,
     prose: Sequence[str] = (),
 ) -> list[dict[str, Any]]:
     """Train ``config`` on the factory data in ``data_dir``, saving to ``out_dir``.
+
+    ``on_step`` is a display hook, called with the number of steps done: once before the first
+    step, with the step a resume starts from (0 for a fresh run), then after every step. It
+    must stay cheap and must not read the device.
 
     With ``prose`` paragraphs, the first ``cfg.prose_steps`` steps are a language-modeling
     stage on them, and ``cfg.prose_share`` of later batches mix them back in (ADR-016).
@@ -720,6 +725,8 @@ def train(
         save_model(model, tokenizer, out_dir)
         _save_optimizer(opt, step, out_dir, lr=lr_at(max(0, step - 1), cfg, resumed))
 
+    if on_step:
+        on_step(start)
     for step in range(start, cfg.steps):
         micro_batches = [
             make_batch(
@@ -739,6 +746,8 @@ def train(
             tokens_seen += (labels != IGNORE_INDEX).sum()
 
         done = step + 1
+        if on_step:
+            on_step(done)
         if done % cfg.log_every == 0 or done == cfg.steps:
             now, total = time.perf_counter(), int(tokens_seen)
             rate = (total - window_tokens) / max(now - window_t0, 1e-9)

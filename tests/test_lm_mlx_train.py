@@ -262,6 +262,31 @@ def test_resume_continues_from_the_checkpoint(
     assert json.loads((out / STATE_FILE).read_text())["step"] == 12
 
 
+def test_on_step_starts_at_the_resumed_step(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    out = tmp_path / "luna"
+    train_mlx(LUNA, tokenizer, dataset, out, TrainConfig(**{**FAST.__dict__, "steps": 6}))
+    seen: list[int] = []
+    more = TrainConfig(**{**FAST.__dict__, "steps": 8})
+    train_mlx(LUNA, tokenizer, dataset, out, more, resume=True, on_step=seen.append)
+    assert seen[0] == 6
+
+
+def test_on_step_reports_every_step_and_changes_nothing(
+    dataset: Path, tokenizer: Tokenizer, tmp_path: Path
+) -> None:
+    config = TrainConfig(**{**FAST.__dict__, "steps": 8})
+    seen: list[int] = []
+    shown = train_mlx(LUNA, tokenizer, dataset, tmp_path / "a", config, on_step=seen.append)
+    plain = train_mlx(LUNA, tokenizer, dataset, tmp_path / "b", config)
+    assert seen == list(range(9))
+    ignore = {"target_tokens_per_s", "mem_gb"}
+    assert [{k: v for k, v in m.items() if k not in ignore} for m in shown] == [
+        {k: v for k, v in m.items() if k not in ignore} for m in plain
+    ]
+
+
 def test_resume_refuses_a_torch_checkpoint(
     dataset: Path, tokenizer: Tokenizer, tmp_path: Path
 ) -> None:

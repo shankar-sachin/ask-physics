@@ -241,3 +241,41 @@ def test_train_checkpoint_blocks_is_passed_on_torch(tmp_path: Path) -> None:
     assert "--backend torch" in train and "--checkpoint-blocks" in train
     unknown = _run("train.sh", "fermi-tellus-1", "--backend", "jax", tmp_path=tmp_path)
     assert unknown.returncode != 0 and "unknown --backend jax" in unknown.stderr
+
+
+def test_train_names_each_phase_instead_of_printing_arrow_lines(tmp_path: Path) -> None:
+    result = _run("train.sh", "fermi-tellus-1", "--backend", "torch", tmp_path=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "==>" not in result.stdout
+    phases = [line for line in result.stdout.splitlines() if line.startswith("-- ")]
+    assert [p.split(" in ")[0] for p in phases] == [
+        "-- Building 1000000 training examples",
+        "-- Training the tokenizer",
+        "-- Checking training speed (about a minute)",
+        "-- Training fermi-tellus-1 (1500 steps) with torch",
+        "-- Scoring the new fermi-tellus-1",
+    ]
+
+
+def test_a_phase_runs_through_the_real_cli_and_prints_plain_lines_off_a_terminal() -> None:
+    # Not a dry run: lib.sh's phase() calls "askphysics model phase", and piped output (as in
+    # CI or when teeing to a log) is plain lines with no animation or escape codes.
+    env = {
+        **os.environ,
+        "NO_CAFFEINATE": "1",
+        "PATH": str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"],
+    }
+    env.pop("DRY_RUN", None)
+    script = f'. "{SCRIPTS}/lib.sh"; phase "Checking things" python3 -c "print(1)"; '
+    script += 'phase_live "Training it" python3 -c "print(2)"; phase "Failing" false'
+    result = subprocess.run(
+        ["sh", "-c", script], env=env, capture_output=True, text=True, check=False
+    )
+    assert "\x1b" not in result.stdout
+    assert result.stdout.splitlines()[:3] == [
+        "start: Checking things",
+        "1",
+        "done: Checking things (0s)",
+    ]
+    assert "done: Training it (0s)" in result.stdout
+    assert result.returncode == 1 and "failed: Failing (exit 1, 0s)" in result.stdout

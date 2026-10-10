@@ -38,6 +38,34 @@ awake() {
   fi
 }
 
+# Run a long step as a named phase: a spinner with the time so far while it runs, then a tick
+# and how long it took (askphysics model phase). Plain lines when output is not a terminal.
+# phase_live is for a command that draws its own live display, such as training.
+#   phase "Building data" askphysics model build-data ...
+phase() {
+  _phase "" "$@"
+}
+phase_live() {
+  _phase --inherit "$@"
+}
+_phase() {
+  _mode=$1 _title=$2
+  shift 2
+  if [ "${DRY_RUN:-}" = "1" ]; then
+    say "-- $_title"
+    awake "$@"
+    return
+  fi
+  if [ "${NO_CAFFEINATE:-}" != "1" ] && command -v caffeinate >/dev/null 2>&1; then
+    set -- caffeinate -dims "$@"
+  fi
+  if [ -n "$_mode" ]; then
+    askphysics model phase --title "$_title" "$_mode" -- "$@"
+  else
+    askphysics model phase --title "$_title" -- "$@"
+  fi
+}
+
 # Go to the repository root, so every relative path (build/, .venv) means the same thing.
 to_repo_root() {
   root=$(cd "$(dirname "$0")/.." && pwd)

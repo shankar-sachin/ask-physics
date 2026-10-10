@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import codecs
 import io
-from collections.abc import Mapping
+import time
+from collections import deque
+from collections.abc import Callable, Iterable, Mapping
+from datetime import datetime, timedelta
 
 from rich import box
 from rich.console import Console, Group, RenderableType
@@ -22,9 +25,11 @@ from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     Progress,
+    ProgressColumn,
+    SpinnerColumn,
+    Task,
     TextColumn,
     TimeElapsedColumn,
-    TimeRemainingColumn,
 )
 from rich.table import Table
 from rich.text import Text
@@ -199,26 +204,133 @@ def answer_card(answer: Answer, equations: Mapping[str, Equation] | None = None)
     )
 
 
-# Rich estimates speed over this many seconds of updates. The trainer logs about every 45 s,
-# and Rich's default window of 30 s holds at most one update, so the ETA would never show.
+# Rich estimates speed over this many seconds of updates. A run that only reported every
+# logged step (about 45 s apart) needs a window longer than Rich's default 30 s, which holds
+# at most one update, or the ETA never shows.
 TRAINING_SPEED_WINDOW = 600.0
 
 
-def training_progress(console: Console) -> Progress:
+class EtaTracker:
+    """Our own steps-per-second estimate, over the recent window of reported steps.
+
+    Rich's estimate is the first choice; this one fills in when Rich has none. It starts at
+    the step the run resumed from, so a resume never counts the jump to the checkpoint as
+    speed. ``clock`` is injectable so tests need no real time.
+    """
+
+    def __init__(
+        self,
+        clock: Callable[[], float] = time.monotonic,
+        window: float = TRAINING_SPEED_WINDOW,
+    ) -> None:
+        self._clock = clock
+        self._window = window
+        self._samples: deque[tuple[float, int]] = deque()
+
+    def start(self, step: int) -> None:
+        """Begin at ``step`` (0, or the resumed step), dropping any earlier samples."""
+        self._samples.clear()
+        self._samples.append((self._clock(), step))
+
+    def record(self, step: int) -> None:
+        now = self._clock()
+        self._samples.append((now, step))
+        # Keep the recent window, but never fewer than two samples: with one update every
+        # 45 s the newest pair is still a usable rate.
+        while len(self._samples) > 2 and self._samples[0][0] < now - self._window:
+            self._samples.popleft()
+
+    def steps_per_second(self) -> float | None:
+        if len(self._samples) < 2:
+            return None
+        (t0, s0), (t1, s1) = self._samples[0], self._samples[-1]
+        if t1 <= t0 or s1 <= s0:
+            return None
+        return (s1 - s0) / (t1 - t0)
+
+    def seconds_left(self, step: int, total: int) -> float | None:
+        rate = self.steps_per_second()
+        if rate is None:
+            return None
+        return max(0, total - step) / rate
+
+
+def format_duration(seconds: float) -> str:
+    """``1:02:03`` for 3723 seconds; hours keep counting past a day."""
+    whole = max(0, round(seconds))
+    return f"{whole // 3600}:{whole % 3600 // 60:02d}:{whole % 60:02d}"
+
+
+def format_finish(seconds_left: float, now: datetime) -> str:
+    """The clock time a run ends: ``~03:42``, with the weekday when it is not today."""
+    end = now + timedelta(seconds=seconds_left)
+    return "~" + end.strftime("%H:%M" if end.date() == now.date() else "%a %H:%M")
+
+
+class EtaColumn(ProgressColumn):
+    """``eta 0:12:34 · done ~03:42``: Rich's estimate, or ``EtaTracker``'s when Rich has none."""
+
+    def __init__(self, tracker: EtaTracker, now: Callable[[], datetime] = datetime.now) -> None:
+        super().__init__()
+        self._tracker = tracker
+        self._now = now
+
+    def render(self, task: Task) -> Text:
+        if task.finished:
+            return Text("done", style="ok")
+        left: float | None = task.time_remaining
+        if left is None and task.total is not None:
+            left = self._tracker.seconds_left(int(task.completed), int(task.total))
+        if left is None:
+            return Text("eta …", style="muted")
+        text = Text("eta ", style="muted")
+        text.append(format_duration(left), style="value")
+        text.append(f" · done {format_finish(left, self._now())}", style="muted")
+        return text
+
+
+class TrainingProgress(Progress):
+    """The training bar, with an optional ``footer`` (the live panel) drawn under it."""
+
+    def __init__(
+        self,
+        console: Console,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        now: Callable[[], datetime] = datetime.now,
+        footer: Callable[[], RenderableType] | None = None,
+    ) -> None:
+        self.tracker = EtaTracker(clock)
+        self.footer = footer
+        super().__init__(
+            SpinnerColumn(style="accent", finished_text="[ok]✓[/]"),
+            TextColumn("[brand]{task.description}"),
+            BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
+            MofNCompleteColumn(),
+            TextColumn("[label]loss[/] [value]{task.fields[loss]}"),
+            TextColumn("[label]val[/] [accent]{task.fields[val]}"),
+            TextColumn("[muted]{task.fields[speed]}"),
+            TimeElapsedColumn(),
+            EtaColumn(self.tracker, now),
+            console=console,
+            speed_estimate_period=TRAINING_SPEED_WINDOW,
+            get_time=clock,
+        )
+
+    def get_renderables(self) -> Iterable[RenderableType]:
+        yield from super().get_renderables()
+        if self.footer is not None:
+            yield self.footer()
+
+
+def training_progress(
+    console: Console,
+    *,
+    clock: Callable[[], float] = time.monotonic,
+    now: Callable[[], datetime] = datetime.now,
+) -> TrainingProgress:
     """Live progress for ``askphysics model train``."""
-    return Progress(
-        TextColumn("[brand]{task.description}"),
-        BarColumn(bar_width=32, complete_style="accent", finished_style="ok"),
-        MofNCompleteColumn(),
-        TextColumn("[label]loss[/] [value]{task.fields[loss]}"),
-        TextColumn("[label]val[/] [accent]{task.fields[val]}"),
-        TextColumn("[muted]{task.fields[speed]}"),
-        TimeElapsedColumn(),
-        TextColumn("[muted]eta"),
-        TimeRemainingColumn(),
-        console=console,
-        speed_estimate_period=TRAINING_SPEED_WINDOW,
-    )
+    return TrainingProgress(console, clock=clock, now=now)
 
 
 def safe(text: str) -> str:

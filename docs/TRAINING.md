@@ -127,6 +127,25 @@ caffeinate -dims askphysics model train --model fermi-tellus-1 \
   celeste only if solem's held-out results leave room for it to help
   (open question Q16).
 
+### What the training view shows
+
+On a terminal, `model train` draws one live view: a progress bar that moves every optimizer
+step, with the loss, validation loss, speed, elapsed time, an ETA, and a clock time to finish
+("done ~03:42"). On `--resume` the bar starts at the checkpoint step, so the first estimate is
+not thrown off by the jump. The ETA comes from the recent steps per second, and shows `n/a`
+until there are enough steps to measure.
+
+Under the bar, a live panel shows the phase (`prose warm-up (steps 0-2000)`, then
+`tasks + prose`, so the jump in validation loss after the switch is expected), a sparkline of
+the recent losses, the learning rate, tokens per second, the backend and device, and memory.
+When the run ends, a summary panel gives the final train and validation losses, the best
+validation step, the total time, the average tokens per second, and where the weights are.
+
+With no terminal (CI, `| tee`, a pipe), with `NO_COLOR` set, or with `TERM=dumb`, the same
+facts print as plain lines with no animation and no escape codes: one line per logged step,
+one per validation, a line when the phase changes, and a short summary. This is display only;
+`metrics.jsonl` is the same either way.
+
 ### Backends and memory (ADR-019)
 
 On an Apple Silicon Mac, `model train` trains with MLX by default: it is faster, and it stays

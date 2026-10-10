@@ -290,6 +290,7 @@ def train_mlx(
     *,
     resume: bool = False,
     on_log: Callable[[dict[str, Any]], None] | None = None,
+    on_step: Callable[[int], None] | None = None,
     prose: Sequence[str] = (),
     cache_limit_gb: float = DEFAULT_CACHE_LIMIT_GB,
     memory_limit_gb: float | None = None,
@@ -328,6 +329,7 @@ def train_mlx(
             cfg,
             resume=resume,
             on_log=on_log,
+            on_step=on_step,
             prose=prose,
             dtype=dtype,
             compile_step=compile_step,
@@ -347,6 +349,7 @@ def _run(
     *,
     resume: bool,
     on_log: Callable[[dict[str, Any]], None] | None,
+    on_step: Callable[[int], None] | None,
     prose: Sequence[str],
     dtype: mx.Dtype,
     compile_step: bool,
@@ -383,6 +386,8 @@ def _run(
             model, tokenizer, out_dir, adam, step, lr=lr_at(max(0, step - 1), cfg, resumed)
         )
 
+    if on_step:
+        on_step(start)
     for step in range(start, cfg.steps):
         micro: list[tuple[mx.array, mx.array]] = []
         targets = 0
@@ -402,6 +407,8 @@ def _run(
         tokens_seen += targets
 
         done = step + 1
+        if on_step:
+            on_step(done)
         if done % cfg.log_every == 0 or done == cfg.steps:
             now = time.perf_counter()
             rate = (tokens_seen - window_tokens) / max(now - window_t0, 1e-9)
