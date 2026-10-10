@@ -92,6 +92,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- On a Mac, torch's MPS backend frees cached GPU buffers once they reach 70% of the
+  GPU's working set, and stops at 50%, unless `PYTORCH_MPS_HIGH_WATERMARK_RATIO` or
+  `PYTORCH_MPS_LOW_WATERMARK_RATIO` is set in your environment, which always wins. The
+  defaults are set before torch is imported, so every `askphysics` command gets them.
+  This stops training runs at many batch widths from filling memory until an allocation
+  fails.
+
 - Training no longer eats all the memory. solem's run on a 48 GB Mac grew to 58 GB,
   swapped 16 GB, and slowed from 4,800 to 250 tokens/s within 150 steps. Training data
   is now stored compactly (4 bytes a token instead of about 36), only the validation
