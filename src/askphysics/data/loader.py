@@ -180,8 +180,13 @@ def _check_example_answer(ex: WorkedExample, store: DataStore) -> list[str]:
     return []
 
 
-def validate_store(store: DataStore) -> list[str]:
-    """Cross-entry semantic checks. Returns a list of problems (empty if valid)."""
+def validate_store(store: DataStore, *, solve_examples: bool = False) -> list[str]:
+    """Cross-entry semantic checks. Returns a list of problems (empty if valid).
+
+    ``solve_examples`` also re-solves every worked example through Noether. ``validate-data``
+    turns it on; loading the store for a question leaves it off, since it costs a SymPy solve
+    per example on every start, which is slow in the browser.
+    """
     problems: list[str] = []
     broken: set[str] = set()
     for eq in store.equations.values():
@@ -209,7 +214,11 @@ def validate_store(store: DataStore) -> list[str]:
         _check_units(label, [ex.final_answer.unit], problems)
         # The solver check needs well-formed inputs: it runs only when neither this example
         # nor an equation it uses has a problem already reported above.
-        if len(problems) == before and not broken.intersection(ex.equations_used):
+        if (
+            solve_examples
+            and len(problems) == before
+            and not broken.intersection(ex.equations_used)
+        ):
             problems.extend(_check_example_answer(ex, store))
 
     for c in store.constants.values():
@@ -229,8 +238,12 @@ def validate_store(store: DataStore) -> list[str]:
     return problems
 
 
-def load_all(data_dir: Path | None = None, *, validate: bool = True) -> DataStore:
+def load_all(
+    data_dir: Path | None = None, *, validate: bool = True, solve_examples: bool = False
+) -> DataStore:
     """Load every seed data file into a ``DataStore``.
+
+    ``solve_examples`` is passed to ``validate_store``; ``validate-data`` sets it.
 
     Raises:
         DataValidationError: any structural or (if ``validate``) semantic problem.
@@ -246,7 +259,7 @@ def load_all(data_dir: Path | None = None, *, validate: bool = True) -> DataStor
         ),
     )
     if validate:
-        problems.extend(validate_store(store))
+        problems.extend(validate_store(store, solve_examples=solve_examples))
     if problems:
         raise DataValidationError(problems)
     return store

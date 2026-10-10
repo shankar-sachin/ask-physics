@@ -36,7 +36,7 @@ def test_validate_data_passes() -> None:
 
 
 def test_validate_data_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken() -> None:
+    def broken(**_: object) -> None:
         raise DataValidationError(["equation x: invalid unit 'blorps'"])
 
     monkeypatch.setattr(cli, "load_all", broken)

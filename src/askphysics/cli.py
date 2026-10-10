@@ -119,7 +119,7 @@ def version() -> None:
 def validate_data() -> None:
     """Validate every seed data file (schema, SymPy parse, units, cross-references)."""
     try:
-        store = load_all()
+        store = load_all(solve_examples=True)
     except DataValidationError as exc:
         console.print(
             Text(f"✗ data validation failed with {len(exc.problems)} problem(s)", style="bad")

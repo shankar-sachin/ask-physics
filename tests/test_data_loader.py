@@ -61,7 +61,7 @@ def test_constants_include_the_required_set(store: DataStore) -> None:
 
 def _problems(data_dir: Path) -> list[str]:
     with pytest.raises(DataValidationError) as info:
-        load_all(data_dir)
+        load_all(data_dir, solve_examples=True)
     return info.value.problems
 
 
@@ -126,7 +126,7 @@ def test_every_worked_example_re_solves(store: DataStore) -> None:
     The check runs in validate_store, so validate-data enforces it as well as pytest.
     """
     assert len(store.examples) >= 15
-    assert validate_store(store) == []
+    assert validate_store(store, solve_examples=True) == []
 
 
 def test_a_constant_alias_must_name_a_real_constant(data_dir: Path) -> None:
@@ -170,7 +170,7 @@ def test_a_re_solve_within_tolerance_passes(data_dir: Path) -> None:
         _example(d, "ex_kin_001")["final_answer"]["value"] *= 1 + EXAMPLE_TOLERANCE / 2
 
     _edit(data_dir / EXAMPLES_FILE, nudge_answer)
-    load_all(data_dir)  # raises DataValidationError if the re-solve check fails
+    load_all(data_dir, solve_examples=True)  # raises DataValidationError on a failed re-solve
 
 
 def test_worked_examples_do_not_read_like_eval_questions(store: DataStore) -> None:
