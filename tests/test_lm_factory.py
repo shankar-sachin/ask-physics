@@ -1,3 +1,4 @@
+import itertools
 import json
 import re
 from collections import Counter
@@ -151,7 +152,10 @@ def test_templates_format_cleanly() -> None:
         t.text.format(**slots)
     for t, reason, closest in tpl.OUT_OF_SCOPE:
         t.text.format(**slots)
-        assert not extract_numbers(reason.format(**slots) + closest.format(**slots))
+        assert not extract_numbers(reason.format(**slots))
+        closest.format(**slots)
+    for est in tpl.ESTIMATES:
+        assert not extract_numbers(est.template.text), est.template.id
     free_text = (
         *tpl.STANDARD_REASONING,
         *tpl.FERMI_REASONING,
@@ -183,9 +187,12 @@ def test_templates_format_cleanly() -> None:
             *tpl.EXPLAIN,
             *(s.template for s in tpl.SCENARIOS),
             *(o[0] for o in tpl.OUT_OF_SCOPE),
+            *(e.template for e in tpl.ESTIMATES),
         )
     ]
     assert len(ids) == len(set(ids))
+    assert any(e.template.held_out for e in tpl.ESTIMATES)
+    assert not all(e.template.held_out for e in tpl.ESTIMATES)
     for family in (tpl.GENERIC, tpl.KNOWN_PATTERNS, tpl.FERMI, tpl.EXPLAIN):
         assert any(t.held_out for t in family) and not all(t.held_out for t in family)
     assert any(s.template.held_out for s in tpl.SCENARIOS)
@@ -356,10 +363,105 @@ def test_every_suggested_question_is_trained_as_answerable(store: DataStore) -> 
         if e.task == "classify" and e.template.startswith("redirect_"):
             c = Classification.model_validate_json(e.target[: -len(END)])
             question = json.loads(e.prompt[len(CLASSIFY) :])["question"]
-            assert c.category == "fermi" and c.closest_answerable is None
-            assert any(r.split(" {")[0][:20].lower() in question.lower() for r in redirects)
+            assert c.category == "standard" and c.closest_answerable is None
+            assert c.domains
+            assert any(r[:20].lower() in question.lower() for r in redirects)
             seen[c.category] += 1
-    assert seen["fermi"] > 50
+    assert seen["standard"] > 50
+
+
+def test_every_redirect_is_answerable(store: DataStore) -> None:
+    """Gold path for each redirect: a standard label, retrieval finds the equation, and a
+    plan that Noether solves. Fails if any redirect isn't answerable."""
+    factory = DataFactory(store, seed=2)
+    checked = 0
+    for template, _, closest in tpl.OUT_OF_SCOPE:
+        keys = re.findall(r"{(\w+)}", closest)
+        for combo in itertools.product(*(tpl.OOS_SLOTS[k] for k in keys)):
+            redirect = closest.format(**dict(zip(keys, combo, strict=True)))
+            label = factory.redirect_label(redirect)
+            assert label is not None, (template.id, redirect)
+            assert label.category == "standard" and label.closest_answerable is None
+            problem = factory.stated_answer(redirect)
+            assert problem is not None, (template.id, redirect)
+            assert problem.equation.id in {e.id for e in problem.retrieved}, redirect
+            assert compute(problem.plan, data=store).value > 0, redirect
+            checked += 1
+    assert checked >= len(tpl.OUT_OF_SCOPE)
+
+
+def _classify_labels(factory: DataFactory, ids: set[str], cap: int = 20000) -> dict[str, set[str]]:
+    """The categories each template in ``ids`` is trained with, from classify examples.
+
+    Draws until every id has been seen (or ``cap`` draws), so a rare template is still found.
+    """
+    labels: dict[str, set[str]] = {}
+    for _ in range(cap):
+        if ids <= labels.keys():
+            break
+        e = factory.classify_example()
+        if e is None or e.template not in ids:
+            continue
+        c = Classification.model_validate_json(e.target[: -len(END)])
+        labels.setdefault(e.template, set()).add(c.category)
+    return labels
+
+
+def test_estimates_are_solved_fermi_questions(store: DataStore) -> None:
+    factory = DataFactory(store, seed=4)
+    for est in tpl.ESTIMATES:
+        assert factory._estimate_solves(est), est.template.id
+        assert not any(ch.isdigit() for ch in est.template.text), est.template.id
+    estimate_ids = {e.template.id for e in tpl.ESTIMATES}
+    labels = _classify_labels(factory, estimate_ids)
+    assert set(labels) == estimate_ids
+    for tid, categories in labels.items():
+        assert categories == {"fermi"}, tid
+    for e in factory.examples(3000):
+        if e.task == "classify" and e.template in estimate_ids:
+            c = Classification.model_validate_json(e.target[: -len(END)])
+            assert c.category == "fermi" and c.closest_answerable is None
+            question = json.loads(e.prompt[len(CLASSIFY) :])["question"]
+            assert not any(ch.isdigit() for ch in question), question
+
+
+def test_contrast_pairs_share_wording(store: DataStore) -> None:
+    """Each pair shares its frame. The out-of-scope side has no physical subject; the Fermi
+    side is a physical thing the tables answer. Both kinds are trained, so the boundary is
+    learned from both sides."""
+    oos = {t.id: t.text for t, _, _ in tpl.OUT_OF_SCOPE}
+    est = {e.template.id: e.template.text for e in tpl.ESTIMATES}
+    assert oos["oos_heavy_01"] == "How heavy is {abstract}?"
+    assert est["est_weight_train_02"] == "How heavy is a freight train?"
+    assert oos["oos_speed_03"] == "How fast is {emotion}?"
+    assert est["est_takeoff_01"] == "How fast is an adult at takeoff in a standing jump?"
+    assert oos["oos_speed_02_h"] == "How fast does {abstract} travel?"
+    assert est["est_momentum_train_03"] == "What is the momentum of a freight train?"
+    assert oos["oos_momentum_01"] == "What is the momentum of {abstract}?"
+    # The held-out Fermi phrasings must not be the only trained form of a contrast.
+    trained = {e.template.id for e in tpl.ESTIMATES if not e.template.held_out}
+    assert {"est_weight_train_02", "est_takeoff_01", "est_momentum_train_03"} <= trained
+    wanted = {"oos_heavy_01", "oos_speed_03", "oos_momentum_01", "oos_speed_02_h"}
+    wanted |= {"est_weight_train_02", "est_takeoff_01", "est_momentum_train_03"}
+    labels = _classify_labels(DataFactory(store, seed=21), wanted)
+    assert set(labels) == wanted
+    for tid in ("oos_heavy_01", "oos_speed_03", "oos_momentum_01", "oos_speed_02_h"):
+        assert labels[tid] == {"out_of_scope"}, tid
+    for tid in ("est_weight_train_02", "est_takeoff_01", "est_momentum_train_03"):
+        assert labels[tid] == {"fermi"}, tid
+
+
+def test_number_free_questions_avoid_arithmetic_words() -> None:
+    """A number-free physical question must not read like the arithmetic refusals, or the
+    classifier learns "no numbers means arithmetic" and refuses real physics."""
+    arithmetic = {
+        "divided", "times", "plus", "minus", "squared", "square", "root", "derivative",
+        "integral", "slope", "solve", "evaluate", "compute", "prime", "calculus", "algebra",
+        "arithmetic", "homework",
+    }  # fmt: skip
+    for est in tpl.ESTIMATES:
+        words = set(re.findall(r"[a-z]+", est.template.text.lower()))
+        assert not words & arithmetic, est.template.text
 
 
 def test_questions_for_twins_say_which(store: DataStore, examples: list[Example]) -> None:

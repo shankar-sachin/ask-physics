@@ -12,6 +12,7 @@ Examples whose question resembles an eval question are dropped
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import random
@@ -61,6 +62,10 @@ RETRIES_PER_TARGET = 6
 # Share of plan examples that chain two equations (``tpl.CHAINS``).
 CHAIN_SHARE = 0.1
 _WORDS = re.compile(r"[a-z]+")
+# Words that say a body starts from rest, so its initial speed "v0" is an assumed 0.
+_AT_REST = frozenset({"rest", "dropped", "released"})
+# Words that say a body falls freely: its acceleration is standard gravity.
+_FALLING = frozenset({"fall", "falls", "falling", "fallen", "drop", "drops", "dropped", "released"})
 
 
 @dataclass(frozen=True)
@@ -171,6 +176,7 @@ class DataFactory:
         self.by_symbol = {c.symbol: c for c in self.constants}
         self.retriever = KeywordRetriever(store.equations.values(), store.examples.values())
         self.dropped = 0
+        self._answers: dict[str, StandardProblem | None] = {}
 
     # ------------------------------------------------------------------ helpers
 
@@ -181,6 +187,17 @@ class DataFactory:
         for c in self.constants:
             if check_dimensions(quantity(1.0, c.unit), unit):
                 return c
+        return None
+
+    def _table_constant(self, var: Variable) -> Constant | None:
+        """The table constant a variable stands for: by name ("constant" in it), or by symbol
+        when the units match (``g`` for standard gravity, but not height ``h``)."""
+        by_name = self._constant_for(var.name, var.unit)
+        if by_name is not None:
+            return by_name
+        c = self.by_symbol.get(var.symbol)
+        if c is not None and check_dimensions(quantity(1.0, c.unit), var.unit):
+            return c
         return None
 
     def _sample(
@@ -518,6 +535,171 @@ class DataFactory:
             unit=unit_string(outcome.value.units),
         )
 
+    # ------------------------------------------------------------------ answerable questions
+
+    def stated_answer(self, question: str) -> StandardProblem | None:
+        """Solve a question from the values it states, or None if no equation can.
+
+        This is the gold path for a redirect: each equation the retriever finds for the
+        question is tried, the stated quantities fill the variables of the same dimension,
+        and one variable is solved for. A question that says the body starts from rest
+        fills its initial speed with an assumed 0. Results are cached per question.
+        """
+        if question not in self._answers:
+            self._answers[question] = self._solve_stated(question)
+        return self._answers[question]
+
+    def _solve_stated(self, question: str) -> StandardProblem | None:
+        quantities = question_quantities(question)
+        if not quantities:
+            return None
+        words = set(_WORDS.findall(question.lower()))
+        rest = bool(words & _AT_REST)
+        falling = bool(words & _FALLING)
+        hits = self.retriever.search(question, 3).equations
+        retrieved = [h.equation for h in hits]
+        for eq in retrieved:
+            for target in eq.variables:
+                if self._table_constant(target) is not None:
+                    continue
+                problem = self._solve_stated_for(
+                    question, quantities, eq, target, retrieved, rest=rest, falling=falling
+                )
+                if problem is not None:
+                    return problem
+        return None
+
+    def _solve_stated_for(
+        self,
+        question: str,
+        quantities: list[tuple[str, str]],
+        eq: Equation,
+        target: Variable,
+        retrieved: list[Equation],
+        *,
+        rest: bool,
+        falling: bool,
+    ) -> StandardProblem | None:
+        constants = [(v, c) for v in eq.variables if (c := self._table_constant(v)) is not None]
+        skip = {v.symbol for v, _ in constants} | {target.symbol}
+        open_vars = [v for v in eq.variables if v.symbol not in skip]
+        zero = [v for v in open_vars if rest and v.symbol == "v0"]
+        gravity = [v for v in open_vars if falling and v.symbol == "a" and v.unit == "m/s^2"]
+        stated = [v for v in open_vars if v not in zero and v not in gravity]
+        if len(stated) != len(quantities):
+            return None
+        for ordered in itertools.permutations(stated):
+            pairs = list(zip(quantities, ordered, strict=True))
+            if not all(check_dimensions(quantity(1.0, unit), v.unit) for (_, unit), v in pairs):
+                continue
+            knowns = [
+                KnownValue(symbol=v.symbol, value=float(num), unit=unit, origin="given")
+                for (num, unit), v in pairs
+            ]
+            knowns += [
+                KnownValue(symbol=v.symbol, value=0.0, unit=v.unit, origin="assumption")
+                for v in zero
+            ]
+            knowns += [
+                KnownValue(symbol=v.symbol, value=c.value, unit=c.unit, origin="constant")
+                for v, c in constants
+            ]
+            g = self.by_symbol["g"]
+            knowns += [
+                KnownValue(symbol=v.symbol, value=g.value, unit=g.unit, origin="constant")
+                for v in gravity
+            ]
+            try:
+                outcome = solve_for(eq, target.symbol, _substitutable(knowns, [eq]))
+            except AskPhysicsError:
+                continue
+            value = float(outcome.value.magnitude)
+            if not (math.isfinite(value) and value > 0):
+                continue
+            return self._stated_problem(question, eq, target, retrieved, knowns, value, outcome)
+        return None
+
+    def _stated_problem(
+        self,
+        question: str,
+        eq: Equation,
+        target: Variable,
+        retrieved: list[Equation],
+        knowns: list[KnownValue],
+        value: float,
+        outcome: Any,
+    ) -> StandardProblem | None:
+        constants = relevant_constants(retrieved, self.constants)
+        # Training targets must be outputs the constrained decoder could produce.
+        allowed_numbers = set(value_numbers(question, constants))
+        allowed_units = set(plan_units(question, retrieved, constants))
+        if any(
+            format_number(k.value) not in allowed_numbers or k.unit not in allowed_units
+            for k in knowns
+        ):
+            return None
+        phrase = equation_phrase(eq.name)
+        plan = Plan(
+            equation_ids=[eq.id],
+            target=target.symbol,
+            unknowns=[target.symbol],
+            known_values=knowns,
+            assumptions=list(eq.assumptions),
+            strategy=tpl.STRATEGIES[0].format(
+                eq=phrase, Eq=_capitalize(phrase), target=plain_name(target.name), sym=target.symbol
+            ),
+        )
+        return StandardProblem(
+            question=question,
+            template="stated",
+            equation=eq,
+            retrieved=retrieved,
+            constants=constants,
+            plan=plan,
+            value=float(f"{value:.6g}"),
+            unit=unit_string(outcome.value.units),
+        )
+
+    def redirect_label(self, redirect: str) -> Classification | None:
+        """The classification of a redirect: standard, in its domain, if Noether solves it."""
+        answer = self.stated_answer(redirect)
+        if answer is None:
+            return None
+        domain = answer.equation.domain
+        return Classification(
+            category="standard",
+            reasoning=self.rng.choice(tpl.STANDARD_REASONING).format(domain=domain),
+            domains=[domain],
+        )
+
+    def _estimate_knowns(self, estimate: tpl.Estimate) -> list[KnownValue]:
+        """The table values an estimate uses: Fermi assumptions and constants."""
+        out = []
+        for symbol, source in estimate.table:
+            if source in self.store.fermi:
+                a = self.store.fermi.get(source)
+                out.append(
+                    KnownValue(
+                        symbol=symbol, value=a.default_value, unit=a.unit, origin="assumption"
+                    )
+                )
+            else:
+                c = self.by_symbol[source]
+                out.append(KnownValue(symbol=symbol, value=c.value, unit=c.unit, origin="constant"))
+        return out
+
+    def _estimate_solves(self, estimate: tpl.Estimate) -> bool:
+        """True if Noether solves the estimate's target from the table values."""
+        eq = self.store.equations[estimate.equation]
+        try:
+            outcome = solve_for(
+                eq, estimate.target, _substitutable(self._estimate_knowns(estimate), [eq])
+            )
+        except AskPhysicsError:
+            return False
+        value = float(outcome.value.magnitude)
+        return math.isfinite(value) and value > 0
+
     # ------------------------------------------------------------------ examples per task
 
     @staticmethod
@@ -567,7 +749,7 @@ class DataFactory:
             )
             template_id = p.template
             question = p.question
-        elif roll < 0.68:
+        elif roll < 0.63:
             template = self.rng.choice(tpl.FERMI)
             question = self._dress(
                 template.text.format(**{k: self.rng.choice(v) for k, v in tpl.FERMI_SLOTS.items()})
@@ -577,17 +759,31 @@ class DataFactory:
                 category="fermi", reasoning=self.rng.choice(tpl.FERMI_REASONING), domains=domains
             )
             template_id = template.id
-        elif roll < 0.75:
-            # Every question a refusal suggests must itself be answerable: tellus once
-            # refused "How long does a dropped ball take to fall from a table?", which our
-            # own math refusal had just suggested.
+        elif roll < 0.69:
+            estimate = self.rng.choice(tpl.ESTIMATES)
+            if not self._estimate_solves(estimate):
+                self.dropped += 1
+                return None
+            question = self._dress(estimate.template.text)
+            c = Classification(
+                category="fermi",
+                reasoning=self.rng.choice(tpl.FERMI_REASONING),
+                domains=[self.store.equations[estimate.equation].domain],
+            )
+            template_id = estimate.template.id
+        elif roll < 0.76:
+            # A redirect is a standard question with its values stated, so it must solve
+            # through Noether; tellus once refused "How long does a dropped ball take to fall
+            # from a table?", which our own math refusal had just suggested.
             template, _, closest = self.rng.choice(tpl.OUT_OF_SCOPE)
             slots = {k: self.rng.choice(v) for k, v in tpl.OOS_SLOTS.items()}
-            question = self._dress(closest.format(**slots))
-            domains = ["energy"] if "energy" in question else []
-            c = Classification(
-                category="fermi", reasoning=self.rng.choice(tpl.FERMI_REASONING), domains=domains
-            )
+            redirect = closest.format(**slots)
+            redirect_class = self.redirect_label(redirect)
+            if redirect_class is None:
+                self.dropped += 1
+                return None
+            c = redirect_class
+            question = self._dress(redirect)
             template_id = f"redirect_{template.id}"
         else:
             template, reason, closest = self.rng.choice(tpl.OUT_OF_SCOPE)

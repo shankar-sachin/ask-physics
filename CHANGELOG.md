@@ -95,6 +95,18 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   answered right, and where each miss stopped. The book's other 180
   calculation problems become classify examples in `model build-data`, so
   the models learn how real questions are phrased.
+- Training data for real phrasings: speed changes stated "from A to B" (for `kin_v_at` and
+  `impulse_momentum`), average acceleration over a velocity change, and rest cues ("starts
+  at rest", "released from rest", "is dropped"). Pure arithmetic ("What is 48 times 6?", also
+  with digits and as a homework line) is out of scope.
+- Number-free questions the Fermi assumptions and constants tables answer are trained as
+  Fermi questions, with varied phrasings: "How heavy is a freight train?", "How much energy is
+  locked up in the mass of a rubber duck?", "How fast is an adult at takeoff in a standing
+  jump?". Each one solves through Noether at build time. A speed of sound question needs a
+  speed-of-sound entry in the tables first, so none is trained yet.
+- Contrast pairs teach the out-of-scope boundary from both sides: "How fast is sadness?" and
+  "How heavy is justice?" are out of scope, next to "How fast is an adult at takeoff in a
+  standing jump?" and "How heavy is a freight train?", which are Fermi questions.
 
 ### Fixed
 
@@ -110,7 +122,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   equation has one initial and one final value. One stated quantity is no longer written
   into two variables. These are decoder rules, so they apply to current weights without
   retraining.
-
+- Out-of-scope redirects are answerable. Each redirect is now a standard question with its
+  values stated (for example "How fast is a rock moving after falling 20 m from rest?"), and a
+  test runs every redirect through the data factory's gold path: a standard label, retrieval
+  of the equation, and a plan that Noether solves.
 - A standard plan can no longer write a value the question never states. When a
   variable such as a mass had no legal number (none stated, nothing to assume), the
   decoder fell back to a loose list that included the structural 1, so the model could

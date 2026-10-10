@@ -19,6 +19,8 @@ Rules for writing templates:
 - A unit written in a question must be one token Pint understands
   ("meters", not "meters per second"), right after its number, so the
   constrained decoder can copy it.
+- Every out-of-scope redirect is an answerable standard question with its
+  values stated, and the factory tests that each one solves (``stated_answer``).
 """
 
 from __future__ import annotations
@@ -1516,6 +1518,194 @@ FERMI_REASONING = (
     "Meaningful but underspecified; typical values make it answerable roughly.",
 )
 
+# --------------------------------------------------------------------------- table estimates
+
+
+@dataclass(frozen=True)
+class Estimate:
+    """A number-free question the Fermi assumptions and constants tables answer.
+
+    ``table`` maps each known symbol of ``equation`` to a Fermi assumption name (for example
+    ``school_bus_mass``) or to a constant's symbol (``g``). Noether must solve ``target``
+    from those values, or the question is dropped.
+    """
+
+    template: Template
+    equation: str
+    target: str
+    table: tuple[tuple[str, str], ...]
+
+
+# Questions with no numbers that the tables answer. Each is labelled fermi: the answer
+# depends on an assumed everyday quantity, and the question states none.
+ESTIMATES: tuple[Estimate, ...] = (
+    Estimate(
+        Template("est_weight_bus_01", "How much does a school bus weigh?"),
+        "weight",
+        "W",
+        (("m", "school_bus_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_bus_02", "What is the weight of a school bus?"),
+        "weight",
+        "W",
+        (("m", "school_bus_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_bus_03_h", "How heavy is a school bus?"),
+        "weight",
+        "W",
+        (("m", "school_bus_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_adult_01", "How much does an adult human weigh?"),
+        "weight",
+        "W",
+        (("m", "adult_human_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_adult_02_h", "What does an average adult weigh?"),
+        "weight",
+        "W",
+        (("m", "adult_human_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_duck_01", "How much does a rubber duck weigh?"),
+        "weight",
+        "W",
+        (("m", "rubber_duck_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_duck_02", "What is the weight of a rubber duck on Earth?"),
+        "weight",
+        "W",
+        (("m", "rubber_duck_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_weight_train_01_h", "How much does a freight train weigh?"),
+        "weight",
+        "W",
+        (("m", "freight_train_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_momentum_train_01", "How much momentum does a freight train carry?"),
+        "momentum",
+        "p",
+        (("m", "freight_train_mass"), ("v", "freight_train_speed")),
+    ),
+    Estimate(
+        Template(
+            "est_momentum_train_02_h", "What is the momentum of a freight train on the mainline?"
+        ),
+        "momentum",
+        "p",
+        (("m", "freight_train_mass"), ("v", "freight_train_speed")),
+    ),
+    Estimate(
+        Template(
+            "est_energy_train_01",
+            "How much kinetic energy does a freight train have when it rolls?",
+        ),
+        "kinetic_energy",
+        "KE",
+        (("m", "freight_train_mass"), ("v", "freight_train_speed")),
+    ),
+    Estimate(
+        Template("est_energy_train_02_h", "What kinetic energy does a moving freight train carry?"),
+        "kinetic_energy",
+        "KE",
+        (("m", "freight_train_mass"), ("v", "freight_train_speed")),
+    ),
+    Estimate(
+        Template(
+            "est_jump_pe_01", "How much potential energy does an adult gain in a standing jump?"
+        ),
+        "gravitational_pe",
+        "U",
+        (("m", "adult_human_mass"), ("h", "standing_jump_height"), ("g", "g")),
+    ),
+    Estimate(
+        Template(
+            "est_jump_pe_02_h", "How much energy does an adult human gain by jumping straight up?"
+        ),
+        "gravitational_pe",
+        "U",
+        (("m", "adult_human_mass"), ("h", "standing_jump_height"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_banana_lift_01", "How high could a banana's energy lift an adult?"),
+        "gravitational_pe",
+        "h",
+        (("U", "banana_food_energy"), ("m", "adult_human_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template(
+            "est_banana_lift_02_h", "How far up could the food energy in a banana raise an adult?"
+        ),
+        "gravitational_pe",
+        "h",
+        (("U", "banana_food_energy"), ("m", "adult_human_mass"), ("g", "g")),
+    ),
+    # Speed questions about a physical thing: the contrast for "How fast is sadness?".
+    Estimate(
+        Template(
+            "est_speed_banana_01",
+            "How fast would a school bus need to go to carry the energy of a banana?",
+        ),
+        "kinetic_energy",
+        "v",
+        (("KE", "banana_food_energy"), ("m", "school_bus_mass")),
+    ),
+    Estimate(
+        Template(
+            "est_speed_banana_02_h",
+            "How fast does a school bus have to move to match a banana's energy?",
+        ),
+        "kinetic_energy",
+        "v",
+        (("KE", "banana_food_energy"), ("m", "school_bus_mass")),
+    ),
+    Estimate(
+        Template("est_weight_train_02", "How heavy is a freight train?"),
+        "weight",
+        "W",
+        (("m", "freight_train_mass"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_momentum_train_03", "What is the momentum of a freight train?"),
+        "momentum",
+        "p",
+        (("m", "freight_train_mass"), ("v", "freight_train_speed")),
+    ),
+    Estimate(
+        Template(
+            "est_energy_duck_01", "How much energy is locked up in the mass of a rubber duck?"
+        ),
+        "mass_energy",
+        "E",
+        (("m", "rubber_duck_mass"), ("c", "c")),
+    ),
+    Estimate(
+        Template("est_energy_duck_02_h", "How much energy is stored in a rubber duck's mass?"),
+        "mass_energy",
+        "E",
+        (("m", "rubber_duck_mass"), ("c", "c")),
+    ),
+    # Speed of a person at takeoff: the contrast for "How fast is sadness?".
+    Estimate(
+        Template("est_takeoff_01", "How fast is an adult at takeoff in a standing jump?"),
+        "vertical_launch_height",
+        "v0",
+        (("h", "standing_jump_height"), ("g", "g")),
+    ),
+    Estimate(
+        Template("est_takeoff_02_h", "What takeoff speed does an adult need for a standing jump?"),
+        "vertical_launch_height",
+        "v0",
+        (("h", "standing_jump_height"), ("g", "g")),
+    ),
+)
+
 # --------------------------------------------------------------------------- out of scope
 
 # Out-of-scope questions with a reason and a redirect.
@@ -1523,17 +1713,17 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
     (
         Template("oos_mass_01", "What is the mass of {abstract}?"),
         "Category error: {abstract} is an idea, not an object with mass.",
-        "What is the mass of a typical paper notebook?",
+        "How much does a 1.5 kg notebook weigh?",
     ),
     (
         Template("oos_temp_01", "What temperature is {emotion}?"),
         "Category error: {emotion} is a feeling, not a physical system with a temperature.",
-        "What is the normal temperature of the human body?",
+        "What is the pressure of 2 mol of gas at 300 K in a 0.05 m^3 container?",
     ),
     (
         Template("oos_sound_01_h", "How loud is the {abstract2}?"),
         "Category error: the {abstract2} has no physical form to make sound.",
-        "How loud is a typical conversation in decibels?",
+        "What is the intensity of a sound from a 2 W point source at 0.5 m away?",
     ),
     (
         Template(
@@ -1541,216 +1731,231 @@ OUT_OF_SCOPE: tuple[tuple[Template, str, str], ...] = (
             "What will the exact air temperature be in {city} on a day a thousand years from now?",
         ),
         "Needs unknowable future data; physics cannot predict weather that far ahead.",
-        "What is the average yearly temperature in {city} today?",
+        "How long does a ball take to fall 20 m from rest?",
     ),
     (
         Template("oos_beyond_01", "What lies outside the observable universe?"),
         "Unknowable: no signal from beyond the observable universe can ever reach us.",
-        "How big is the observable universe?",
+        "What is the linear momentum of a 2 kg cart moving at 3 m/s?",
     ),
     (
         Template("oos_offtopic_01", "What is the best {food} topping?"),
         "Not a physics question; it is a matter of taste.",
-        "How much energy is in a typical slice of {food}?",
+        "How much kinetic energy does a 0.2 kg ball have at 3 m/s?",
     ),
     (
         Template("oos_research_01", "Derive the full quantum theory of gravity."),
         "Research-level physics with no settled answer; out of scope.",
-        "What is the gravitational force between two people standing a meter apart?",
+        "What is the universal gravitational force between 60 kg and 70 kg masses 1 m apart?",
     ),
     (
         Template("oos_speed_01", "How fast is {abstract}?"),
         "Category error: {abstract} does not move, so it has no speed.",
-        "How fast does sound travel through air?",
+        "How fast is a wave with a frequency of 440 Hz and a wavelength of 0.78 m?",
     ),
     (
         Template("oos_volume_01", "What is the volume of {emotion}?"),
         "Category error: {emotion} is a feeling and takes up no space.",
-        "What is the volume of a typical coffee mug?",
+        "What is the volume of 2 kg of water with a density of 1000 kg/m^3?",
     ),
     (
         Template("oos_energy_01_h", "How much energy is in {abstract}?"),
         "Category error: {abstract} is not a physical system that stores energy.",
-        "How much energy is stored in a typical phone battery?",
+        "How much potential energy does a 0.5 kg block gain when lifted 2 m?",
     ),
     (
         Template("oos_density_01", "What is the density of {abstract}?"),
         "Category error: {abstract} has neither mass nor volume.",
-        "What is the density of seawater?",
+        "What is the density of a 2 kg block with a volume of 0.001 m^3?",
     ),
     (
         Template("oos_stock_01", "Will {company} stock go up next week?"),
         "Not a physics question; it is a financial prediction.",
-        "How much electricity does a typical data center use?",
+        "What is the average power of a motor that does 3600 J of work in 3 s?",
     ),
     (
         Template("oos_opinion_01", "Which is cooler, {topic_a} or {topic_b}?"),
         "Not a physics question; it asks for an opinion.",
-        "How much energy does it take to heat a cup of water to boiling?",
+        "How much energy does it take to lift a 2 kg bag up 1.5 m?",
     ),
     (
         Template("oos_lottery_01", "What numbers will win the lottery in {city} next month?"),
         "Unknowable: a fair lottery draw is random by design.",
-        "How does a ball bounce when dropped onto a hard floor?",
+        "How fast is a ball moving after falling 5 m from rest?",
     ),
     (
         Template("oos_meaning_01", "What is the meaning of life?"),
         "Not a physics question; it is philosophy.",
-        "How much energy does the human body use in a day?",
+        "How much potential energy does a 60 kg runner gain when climbing 3 m?",
     ),
     (
         Template("oos_recipe_01", "How do I make the perfect {food}?"),
         "Not a physics question; it is cooking advice.",
-        "How long does it take to bring a pot of water to a boil?",
+        "How long must a cart change its velocity from 2 m/s to 6 m/s at a constant 1 m/s^2?",
     ),
     (
         Template("oos_history_01_h", "Who was the first ruler of {city}?"),
         "Not a physics question; it is history.",
-        "How tall can a stone tower be before it crushes its own base?",
+        "How much work does a 5 N force do over 3 m?",
     ),
     (
         Template("oos_color_01", "What color is {emotion}?"),
         "Category error: {emotion} is a feeling and reflects no light.",
-        "Why does the sky look blue during the day?",
+        "What is the wavelength of a 500 Hz sound wave moving at 340 m/s?",
     ),
     (
         Template("oos_dream_01", "How much does a dream weigh?"),
         "Category error: a dream is an experience, not an object with weight.",
-        "How much does the human brain weigh?",
+        "How much does a 1.4 kg brain weigh?",
     ),
     (
         Template("oos_before_01", "What happened before time existed?"),
         "Unknowable: physics has no settled account of anything without time.",
-        "How old is the universe?",
+        "How much kinetic energy does a 1000 kg car have at 20 m/s?",
     ),
     (
         Template("oos_mind_01", "What am I thinking right now?"),
         "Not answerable: physics cannot read anyone's thoughts.",
-        "How fast do signals travel along a human nerve?",
+        "What is the weight of a 2 kg mass?",
     ),
     (
         Template("oos_code_01", "Write me a poem about {food}."),
         "Not a physics question; it asks for creative writing.",
-        "How many calories are in a typical serving of {food}?",
+        "How much kinetic energy does a 60 kg runner have at 5 m/s?",
     ),
     (
         Template("oos_exact_01", "Exactly how many grains of sand are on every beach on Earth?"),
         "Unknowable to an exact count; only a rough estimate is possible.",
-        "Roughly how many grains of sand fit in a bucket?",
+        "What is the linear momentum of a 0.3 kg ball moving at 15 m/s?",
     ),
     (
         Template("oos_friction_01", "What is the friction coefficient of {abstract}?"),
         "Category error: {abstract} has no surface, so it has no friction.",
-        "What is the friction coefficient of rubber on dry concrete?",
+        "What is the net force needed to accelerate a 2 kg cart at 3 m/s^2?",
     ),
     # Look-alikes: phrased like real physics questions, about things that aren't physical.
     (
         Template("oos_weigh_02", "How much does {abstract} weigh?"),
         "Category error: {abstract} is an idea and has no weight.",
-        "How much does a typical paperback book weigh?",
+        "How much does a 70 kg person weigh?",
     ),
     (
         Template("oos_force_01", "How much force does {emotion} exert?"),
         "Category error: {emotion} is a feeling and pushes on nothing.",
-        "How much force does it take to push a shopping cart?",
+        "How much net force accelerates a 3 kg block at 2 m/s^2?",
     ),
     (
         Template("oos_energy_02", "How much energy does {abstract} contain?"),
         "Category error: {abstract} is not a physical system, so it stores no energy.",
-        "How much energy does a candy bar contain?",
+        "How much kinetic energy does a 1.5 kg bike have at 6 m/s?",
     ),
     (
         Template("oos_momentum_01", "What is the momentum of {abstract}?"),
         "Category error: {abstract} has no mass and does not move.",
-        "What is the momentum of a thrown baseball?",
+        "What is the momentum of a 0.1 kg apple moving at 2 m/s?",
     ),
     (
         Template("oos_power_01", "How much power does {emotion} use?"),
         "Category error: {emotion} is a feeling, not a device that draws power.",
-        "How much power does a laptop use?",
+        "How much power does a 500 J motor deliver in 10 s?",
     ),
     # Pure math: no physical quantity at all, however much it looks like a homework problem.
     (
         Template("oos_math_01", "What is {num_a} divided by {num_b}?"),
         "Not a physics question; it is arithmetic.",
-        "How long does a dropped ball take to fall from a table?",
+        "How long does a ball take to fall 1.2 m from rest?",
     ),
     (
         Template("oos_math_02", "What is the slope of {curve}?"),
         "Not a physics question; it is pure math.",
-        "How fast is a dropped rock moving after falling for a while?",
+        "How fast is a rock moving after falling 20 m from rest?",
     ),
     (
         Template("oos_math_03_h", "How do you find the slope of {curve}?"),
         "Not a physics question; it is pure math.",
-        "How fast is a dropped rock moving after falling for a while?",
+        "How fast is a rock moving after falling 12 m from rest?",
     ),
     (
         Template("oos_math_04", "What is the derivative of {func}?"),
         "Not a physics question; it is calculus.",
-        "How does the speed of a falling ball change with time?",
+        "What is the speed of a ball 3 s after it is dropped from rest?",
     ),
     (
         Template("oos_math_05", "What is the integral of {func}?"),
         "Not a physics question; it is calculus.",
-        "How far does a car travel while it speeds up?",
+        "How far does a car travel in 4 s from rest with a constant acceleration of 2 m/s^2?",
     ),
     (
         Template("oos_math_06", "Solve for x: {equation}"),
         "Not a physics question; it is algebra.",
-        "How much force does it take to accelerate a shopping cart?",
+        "How much net force accelerates a 3 kg cart at 2 m/s^2?",
     ),
     (
         Template("oos_math_07", "Is {integer} a prime number?"),
         "Not a physics question; it is number theory.",
-        "How many atoms are in a grain of sand, roughly?",
+        "How much kinetic energy does a 3 kg ball carry at 4 m/s?",
     ),
     # The same arithmetic with digits, so spelled-out numbers don't come to mean "math".
     (
         Template("oos_math_08", "What is {int_a} divided by {int_b}?"),
         "Not a physics question; it is arithmetic.",
-        "How long does a dropped ball take to fall from a table?",
+        "How long does a ball take to fall 1.2 m from rest?",
     ),
     (
         Template("oos_math_09_h", "What is {int_a} times {int_b}?"),
         "Not a physics question; it is arithmetic.",
-        "How long does a dropped ball take to fall from a table?",
+        "How far does a ball fall in 2 s from rest?",
     ),
     # Arithmetic as a textbook or homework line would phrase it, with no physical quantity.
     (
         Template("oos_math_10", "This came up in class: what is {int_a} times {int_b}?"),
         "Not a physics question; it is arithmetic.",
-        "How long does a dropped ball take to fall from a table?",
+        "How long does a ball take to fall 0.8 m from rest?",
     ),
     (
         Template("oos_math_11", "what's {int_a} divided by {int_b}"),
         "Not a physics question; it is arithmetic.",
-        "How fast does a dropped ball hit the floor?",
+        "How fast does a ball hit the floor after falling 5 m from rest?",
     ),
     (
         Template("oos_math_12", "compute {dec_a} squared"),
         "Not a physics question; it is arithmetic.",
-        "How far does a car travel while it speeds up?",
+        "How far does a car travel in 8 s from rest with a constant acceleration of 0.5 m/s^2?",
     ),
     (
         Template("oos_math_13_h", "What is the square root of {int_a}?"),
         "Not a physics question; it is arithmetic.",
-        "How long does a dropped ball take to fall from a table?",
+        "How far does a ball fall in 3 s from rest?",
     ),
     (
         Template("oos_math_14", "Quick check for my homework: what is {dec_a} plus {int_b}?"),
         "Not a physics question; it is arithmetic.",
-        "How fast does a dropped ball hit the floor?",
+        "How much weight does a 4 kg crate have?",
     ),
     (
         Template("oos_math_15", "Evaluate {int_a} minus {int_b}."),
         "Not a physics question; it is arithmetic.",
-        "How far does a car travel while it speeds up?",
+        "How far does a car travel in 6 s from rest with a constant acceleration of 1 m/s^2?",
     ),
     (
         Template("oos_math_16_h", "What's {int_b} times {dec_a}?"),
         "Not a physics question; it is arithmetic.",
-        "How long does a dropped ball take to fall from a table?",
+        "What is the linear momentum of a 0.5 kg cart moving at 8 m/s?",
+    ),
+    (
+        Template("oos_heavy_01", "How heavy is {abstract}?"),
+        "Category error: {abstract} is an idea and has no weight.",
+        "How much does a 1500 kg car weigh?",
+    ),
+    (
+        Template("oos_speed_02_h", "How fast does {abstract} travel?"),
+        "Category error: {abstract} does not move, so it has no speed.",
+        "How fast is a wave with a frequency of 5 Hz and a wavelength of 2 m?",
+    ),
+    (
+        Template("oos_speed_03", "How fast is {emotion}?"),
+        "Category error: {emotion} is a feeling and does not move, so it has no speed.",
+        "How fast is a 2 kg ball moving if it has 9 J of kinetic energy?",
     ),
 )
 OOS_SLOTS: dict[str, tuple[str, ...]] = {
@@ -1761,7 +1966,9 @@ OOS_SLOTS: dict[str, tuple[str, ...]] = {
     "abstract2": (
         "letter Q", "concept of zero", "word silence", "idea of blue sky", "number seven",
     ),
-    "emotion": ("jealousy", "boredom", "nostalgia", "pride", "joy", "anxiety", "hope", "regret"),
+    "emotion": (
+        "jealousy", "boredom", "nostalgia", "pride", "joy", "anxiety", "hope", "regret", "sadness",
+    ),
     "city": ("Lisbon", "Nairobi", "Osaka", "Denver", "Lima", "Oslo", "Hanoi", "Perth"),
     "food": ("pizza", "taco", "bagel", "burger", "pancake", "sushi", "salad", "curry"),
     "company": ("Acme", "a tech giant", "my favorite company", "an airline"),
