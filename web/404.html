@@ -6,15 +6,14 @@
   <title>Page not found · Ask Physics</title>
   <meta name="description" content="This page has a probability amplitude of zero here. Head back to Ask Physics.">
   <meta name="robots" content="noindex">
-  <meta name="theme-color" content="#07080f" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#07080f">
   <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* Same tokens and fonts as web/styles.css, so this page looks like the site. Dark is the
-       site's own look; light is the same palette turned down for a light system setting. */
+    /* Same tokens and fonts as web/styles.css, so this page looks like the site, which is
+       dark only. */
     :root {
       --bg: #07080f;
       --bg2: #0d0f1c;
@@ -32,22 +31,6 @@
       --body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
       color-scheme: dark;
     }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f6f7fb;
-        --bg2: #ffffff;
-        --card: #ffffff;
-        --line: #dde1ec;
-        --text: #161a2b;
-        --muted: #5d6578;
-        --label: #3b4256;
-        --cyan: #0b6f96;
-        --violet: #6a3fd0;
-        --pink: #c2338f;
-        --ring: rgba(11, 111, 150, 0.4);
-        color-scheme: light;
-      }
-    }
 
     * { box-sizing: border-box; }
     html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -60,14 +43,6 @@
       color: var(--text);
       font: 16px/1.6 var(--body);
       display: flex; flex-direction: column;
-    }
-    @media (prefers-color-scheme: light) {
-      body {
-        background:
-          radial-gradient(1000px 520px at 12% -12%, #d9eefa 0%, transparent 60%),
-          radial-gradient(900px 480px at 100% 0%, #ebe3fb 0%, transparent 55%),
-          var(--bg);
-      }
     }
     a { color: var(--cyan); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -87,9 +62,6 @@
     .brand b {
       background: linear-gradient(90deg, #8be9fd, #a5b4fc 55%, #bd93f9);
       -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700;
-    }
-    @media (prefers-color-scheme: light) {
-      .brand b { background: linear-gradient(90deg, #0b6f96, #4f5bd5 55%, #6a3fd0); -webkit-background-clip: text; background-clip: text; }
     }
     .nav nav { display: flex; gap: 20px; font-size: 14px; }
     .nav nav a { color: var(--label); }
@@ -113,7 +85,6 @@
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     .lede { max-width: 560px; margin: 0 0 28px; color: #c8cbe0; font-size: 18px; }
-    @media (prefers-color-scheme: light) { .lede { color: var(--label); } }
     .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     .btn {
       display: inline-block; padding: 12px 20px; border-radius: 10px;
