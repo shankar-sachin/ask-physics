@@ -36,6 +36,12 @@ EXAMPLES_FILE = "examples.json"
 CONSTANTS_FILE = "constants.json"
 FERMI_FILE = "fermi_assumptions.json"
 
+# Constants whose table symbol is not the name the equations use (issue #74). The planner is
+# shown the table and copies its symbol, so plans reach compute as k_B, and the equations say
+# kB. pipeline.resolve_constant_symbols renames them. Keys are constants.json symbols; values
+# are equations.json variables. validate_store checks that both sides exist.
+CONSTANT_SYMBOL_ALIASES: dict[str, str] = {"k_B": "kB", "k_e": "k", "mu_0": "mu0"}
+
 M = TypeVar("M", bound=BaseModel)
 
 
@@ -210,6 +216,16 @@ def validate_store(store: DataStore) -> list[str]:
         _check_units(f"constant {c.name}", [c.unit], problems)
     for a in store.fermi:
         _check_units(f"fermi assumption {a.quantity}", [a.unit], problems)
+
+    table_symbols = {c.symbol for c in store.constants.values()}
+    variable_names = {v.symbol for eq in store.equations.values() for v in eq.variables}
+    for table_symbol, variable in CONSTANT_SYMBOL_ALIASES.items():
+        if table_symbol not in table_symbols:
+            problems.append(f"constant alias {table_symbol!r}: no constant has that symbol")
+        if variable not in variable_names:
+            problems.append(
+                f"constant alias {table_symbol!r}: no equation has variable {variable!r}"
+            )
     return problems
 
 

@@ -129,6 +129,26 @@ def test_every_worked_example_re_solves(store: DataStore) -> None:
     assert validate_store(store) == []
 
 
+def test_a_constant_alias_must_name_a_real_constant(data_dir: Path) -> None:
+    def rename_constant(d: list[dict[str, Any]]) -> None:
+        next(c for c in d if c["symbol"] == "k_B")["symbol"] = "kb"
+
+    _edit(data_dir / CONSTANTS_FILE, rename_constant)
+    assert any("'k_B': no constant has that symbol" in p for p in _problems(data_dir))
+
+
+def test_a_constant_alias_must_name_a_real_variable(data_dir: Path) -> None:
+    def rename_variable(d: list[dict[str, Any]]) -> None:
+        for eq in d:
+            for v in eq["variables"]:
+                if v["symbol"] == "kB":
+                    v["symbol"] = "kb"
+            eq["sympy_expr"] = eq["sympy_expr"].replace("kB", "kb")
+
+    _edit(data_dir / EQUATIONS_FILE, rename_variable)
+    assert any("'k_B': no equation has variable 'kB'" in p for p in _problems(data_dir))
+
+
 def test_a_wrong_example_value_fails_the_re_solve(data_dir: Path) -> None:
     def scale_answer(d: list[dict[str, Any]]) -> None:
         _example(d, "ex_kin_001")["final_answer"]["value"] *= 1000
