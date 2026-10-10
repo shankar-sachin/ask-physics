@@ -14,7 +14,8 @@
 #   --rescue-with MODEL  let this bigger installed model plan the questions the first
 #                        one misses, as ask's escalation does (e.g. fermi-celeste-1)
 #
-# Each report is saved as eval.json in the model's directory.
+# Each pass shows a live bar with an ETA and a clock time to finish, then a results panel. Each
+# report is saved as eval.json in the model's directory.
 # DRY_RUN=1 prints every command instead of running it.
 set -eu
 . "$(dirname "$0")/lib.sh"
@@ -48,16 +49,24 @@ if [ -n "$rescue_with" ]; then
   rescue_args="--rescue-with $rescue_with"
 fi
 
+steps=1
+[ -z "$against" ] || steps=$((steps + 2))
+about="Score $model on held-out questions"
+[ -z "$rescue_with" ] || about="$about, with $rescue_with rescuing the misses"
+ui_begin "Eval" "$about" "$steps"
+
+# The scorer draws its own live display: a bar with an ETA, the valid-plan rate, and the
+# confidently-wrong count, then a results panel.
 if [ -n "$against" ]; then
-  info "Scoring $against"
   # shellcheck disable=SC2086
-  awake askphysics model eval --model "$model" --directory "$against" --data "$data" \
-    --examples "$examples" $rescue_args
+  phase_live "Scoring $against" askphysics model eval --model "$model" --directory "$against" \
+    --data "$data" --examples "$examples" $rescue_args
 fi
-info "Scoring $directory"
 # shellcheck disable=SC2086
-awake askphysics model eval --model "$model" --directory "$directory" --data "$data" \
-  --examples "$examples" $rescue_args
+phase_live "Scoring $directory" askphysics model eval --model "$model" --directory "$directory" \
+  --data "$data" --examples "$examples" $rescue_args
 if [ -n "$against" ]; then
-  run python3 "$(dirname "$0")/compare_evals.py" "$against/eval.json" "$directory/eval.json"
+  phase_live "Comparing the two" python3 "$(dirname "$0")/compare_evals.py" "$against/eval.json" \
+    "$directory/eval.json"
 fi
+ui_end "Scored $model" "Eval failed"

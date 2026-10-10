@@ -19,6 +19,7 @@ from askphysics.llm.base import Roster
 from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import LUNA
 from askphysics.lm.evaluate import (
+    EvalTick,
     RealQuestion,
     evaluate_real,
     evaluate_tasks,
@@ -267,6 +268,46 @@ def test_a_rescue_run_retries_exactly_the_misses(store: DataStore, dataset: Path
     assert report.routed_with_rescue_rate == pytest.approx((main_right + report.rescued) / n)
     assert report.routed_with_rescue_rate >= report.routed_right_rate
     assert json.loads(report.to_json())["rescue_tried"] == report.rescue_tried
+
+
+def test_ticks_report_each_example_then_the_rescue_pass_over_just_the_misses(
+    store: DataStore, dataset: Path
+) -> None:
+    torch.manual_seed(0)
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    decoder = Decoder(FermiLM(LUNA).eval(), tokenizer, max_slot_tokens=8)
+    picked = sample_examples(read_examples(dataset / "val"), per_task=3)
+    ticks: list[EvalTick] = []
+    progress: list[int] = []
+    report = evaluate_tasks(
+        decoder, picked, store, attempts=2, rescue=decoder, on_tick=ticks.append,
+        on_progress=progress.append,
+    )  # fmt: skip
+    scoring = [t for t in ticks if t.stage == "score"]
+    assert [t.done for t in scoring] == list(range(1, len(picked) + 1)) == progress
+    assert {t.total for t in scoring} == {len(picked)}
+    assert [t.task for t in scoring] == [e.task for e in picked]
+    last = scoring[-1]
+    assert last.plans == report.plan_examples
+    assert last.valid == round(report.valid_plan_rate * report.plan_examples)
+    assert last.confident == round(report.confidently_wrong_rate * report.plan_examples)
+    # The rescue pass starts after scoring, at 0 of the number of misses, and counts up to it.
+    rescue = [t for t in ticks if t.stage == "rescue"]
+    assert ticks[len(scoring) :] == rescue
+    assert rescue[0].done == 0 and {t.total for t in rescue} == {report.rescue_tried}
+    assert [t.done for t in rescue] == list(range(report.rescue_tried + 1))
+    assert rescue[-1].rescued == report.rescued
+    assert rescue[-1].rescue_confident == report.rescue_confidently_wrong
+
+
+def test_without_a_rescuer_there_are_only_scoring_ticks(store: DataStore, dataset: Path) -> None:
+    torch.manual_seed(0)
+    tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
+    decoder = Decoder(FermiLM(LUNA).eval(), tokenizer, max_slot_tokens=8)
+    picked = sample_examples(read_examples(dataset / "val"), per_task=2)
+    ticks: list[EvalTick] = []
+    evaluate_tasks(decoder, picked, store, on_tick=ticks.append)
+    assert {t.stage for t in ticks} == {"score"} and len(ticks) == len(picked)
 
 
 def test_eval_sh_passes_the_rescuer_through() -> None:
