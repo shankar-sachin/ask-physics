@@ -50,7 +50,7 @@ git clone https://github.com/shankar-sachin/ask-physics && cd ask-physics
 python3 -m venv .venv && source .venv/bin/activate
 make install                      # pip install -e ".[dev]"; on an arm64 Mac it also installs mlx
 python -c "import torch; print(torch.backends.mps.is_available())"   # want: True
-make check                        # lint, typecheck, tests
+make check                        # lint, typecheck, validate-data, tests
 askphysics validate-data          # the seed data the factory builds from
 ```
 

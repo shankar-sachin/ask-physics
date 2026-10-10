@@ -8,6 +8,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A 404 page for the website and the docs (`web/404.html`, served by Vercel for any missing path).
+  It has a physics joke headline, links home, to the docs and to the ask box, and a small original
+  mascot, Pip, drawn in inline SVG and animated in CSS: a dance on a 2.4 s loop with an electron
+  orbiting it. It holds still under `prefers-reduced-motion`, has no JavaScript, fits a phone
+  without sideways scroll, and follows light and dark system settings.
 - A fluid, continuous display for every shell script (`docs/SCRIPTS.md`, ADR-020). Each script
   opens with a header and closes with a summary (total time, what to run next); each step is a
   spinner that settles into a tick and the time it took, with a long command's output folded into
@@ -24,9 +29,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `askphysics model pull` shows the same bars and verdicts. `corpus.sh` and `build_site.sh` show
   their stages with counts. Without a terminal, or with `NO_COLOR`, everything prints plain
   lines with no escape codes; `DRY_RUN=1` output is unchanged.
-- A demo video on the website, under the hero: a question typed into the CLI, the six stages,
-  Noether's working with units, the answer card, a refused question, and the four Fermi models.
-  It plays muted on a loop, and holds on its poster for visitors who prefer reduced motion.
+- A demo video on the website, under the hero (1:59, with an original soundtrack): a question
+  typed into the CLI, the six stages, Noether's working with units, the answer card, a refused
+  question, a training run, the website answering in the browser, the equation database, the
+  four Fermi models, and how to install it, free in the browser or the terminal. It plays muted
+  on a loop with controls to unmute, and holds on its poster for visitors who prefer reduced
+  motion.
 - A livelier training view for `model train` and `scripts/train.sh`. The bar advances every
   optimizer step and the ETA works (from recent steps per second, with a clock time to finish,
   and correct after `--resume`). A live panel under the bar shows the phase (prose warm-up, then
@@ -146,6 +154,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `scripts/train.sh` retrains an installed model when it is run by a relative path from another
+  directory (the backup step used to look for `models.sh` after changing into the repo root) (#81).
+- `make check` runs `validate-data` as well as lint, typecheck and tests, so it matches the
+  commit gate in `CLAUDE.md` and `scripts/check.sh` (#73).
 - An explanation is no longer cut off after 48 tokens. The Fermi model may use the whole context
   window left after its prompt, so the assumptions clause at the end survives. An explanation that
   still does not finish degrades to the template answer instead of showing a fragment (#83).

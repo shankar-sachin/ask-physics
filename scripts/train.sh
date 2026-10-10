@@ -46,7 +46,9 @@
 #
 # DRY_RUN=1 prints every command instead of running it.
 set -eu
-. "$(dirname "$0")/lib.sh"
+# Absolute, so the sibling scripts still resolve after to_repo_root changes directory.
+here=$(cd "$(dirname "$0")" && pwd)
+. "$here/lib.sh"
 
 case ${1:-} in
   -h | --help | "") usage 0 ;;
@@ -148,7 +150,7 @@ else
   ui_begin "Train $model" "Back up, build data, train, and score; $steps steps on $resolved" 0 20
   if [ -d "$installed" ]; then
     stamp="$model-$(date +%Y%m%d-%H%M%S)"
-    sh "$(dirname "$0")/models.sh" backup "$model" "$stamp"
+    sh "$here/models.sh" backup "$model" "$stamp"
     baseline="$(backup_dir)/$stamp"
   fi
   if [ "$fresh_data" = 1 ] || [ ! -f "$data/manifest.json" ]; then
@@ -194,7 +196,7 @@ if [ "$evaluate" = 1 ]; then
   phase "Scoring the new $model" askphysics model eval --model "$model" --data "$data" \
     --examples "$eval_examples"
   if [ -n "$baseline" ]; then
-    phase_live "Comparing with the previous $model" python3 "$(dirname "$0")/compare_evals.py" \
+    phase_live "Comparing with the previous $model" python3 "$here/compare_evals.py" \
       "$baseline/eval.json" "$installed/eval.json"
   fi
 fi

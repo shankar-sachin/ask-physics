@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found · Ask Physics</title>
+  <meta name="description" content="This page has a probability amplitude of zero here. Head back to Ask Physics.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#07080f">
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Same tokens and fonts as web/styles.css, so this page looks like the site, which is
+       dark only. */
+    :root {
+      --bg: #07080f;
+      --bg2: #0d0f1c;
+      --card: #11131f;
+      --line: #23263a;
+      --text: #e6e8f2;
+      --muted: #8b93a7;
+      --label: #a6accd;
+      --cyan: #8be9fd;
+      --violet: #bd93f9;
+      --pink: #ff79c6;
+      --ring: rgba(139, 233, 253, 0.42);
+      --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body {
+      margin: 0; min-height: 100vh; overflow-x: hidden;
+      background:
+        radial-gradient(1200px 600px at 15% -10%, #1d2042 0%, transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, #1a1433 0%, transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font: 16px/1.6 var(--body);
+      display: flex; flex-direction: column;
+    }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* header: the site's brand and nav, without its scripts or stylesheet */
+    .nav {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 14px max(16px, calc((100% - 1080px) / 2));
+      border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px; color: var(--text);
+      font: 700 21px var(--display); letter-spacing: -0.02em; line-height: 1; white-space: nowrap;
+    }
+    .brand:hover { text-decoration: none; }
+    .brand img { width: 34px; height: 34px; flex: none; filter: drop-shadow(0 0 10px rgba(139, 233, 253, 0.35)); }
+    .brand b {
+      background: linear-gradient(90deg, #8be9fd, #a5b4fc 55%, #bd93f9);
+      -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700;
+    }
+    .nav nav { display: flex; gap: 20px; font-size: 14px; }
+    .nav nav a { color: var(--label); }
+    .nav nav a:hover { color: var(--text); text-decoration: none; }
+
+    /* the page */
+    .lost {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      max-width: 720px; width: 100%; margin: 0 auto; padding: 32px 20px 56px; text-align: center;
+    }
+    .eyebrow {
+      margin: 0 0 8px; color: var(--muted); font: 600 13px var(--mono); letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .eyebrow b { color: var(--violet); font-weight: 600; }
+    h1 {
+      margin: 0 0 14px; font: 700 clamp(30px, 6vw, 48px)/1.08 var(--display); letter-spacing: -0.02em;
+    }
+    .grad {
+      background: linear-gradient(90deg, var(--cyan), var(--violet));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lede { max-width: 560px; margin: 0 0 28px; color: #c8cbe0; font-size: 18px; }
+    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; padding: 12px 20px; border-radius: 10px;
+      border: 1px solid var(--line); background: var(--card); color: var(--text);
+      font: 600 15px var(--body);
+    }
+    .btn:hover { border-color: var(--cyan); text-decoration: none; }
+    .btn.primary { background: linear-gradient(90deg, #2f74d0, #7a5cd6); border-color: transparent; color: #fff; }
+    .btn.primary:hover { filter: brightness(1.1); }
+    .btn:focus-visible, .brand:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+    /* the mascot: an original particle with tiny legs, dancing on a 2.4 s loop while an
+       electron circles it on a 4.8 s orbit. Pure CSS; the pose below is the still frame. */
+    .stage { position: relative; width: min(280px, 72vw); margin: 0 auto 4px; }
+    .mascot { display: block; width: 100%; height: auto; overflow: visible; }
+    .mascot .ring { fill: none; stroke: var(--ring); stroke-width: 2; stroke-dasharray: 2 6; stroke-linecap: round; }
+    .mascot .shadow { fill: var(--line); }
+    .mascot .body { stroke: rgba(255, 255, 255, 0.22); stroke-width: 2; }
+    .mascot .face { fill: #fff; }
+    .mascot .pupil { fill: #10132a; }
+    .mascot .mouth { fill: none; stroke: #10132a; stroke-width: 4; stroke-linecap: round; }
+    .mascot .cheek { fill: var(--pink); opacity: 0.45; }
+    .mascot .limb { stroke: #5a5fd6; stroke-width: 9; stroke-linecap: round; fill: none; }
+    .mascot .foot { fill: #5a5fd6; }
+    .mascot .hand { fill: #8be9fd; }
+    .mascot .electron { fill: var(--cyan); }
+    .mascot .spark { fill: var(--cyan); }
+    .mascot .electron, .mascot .spark { filter: drop-shadow(0 0 4px rgba(139, 233, 253, 0.7)); }
+
+    .bounce, .sway, .leg, .arm, .eye, .shadow, .spark, .electron { transform-box: view-box; }
+    .bounce { transform-origin: 100px 186px; animation: bounce 1.2s ease-in-out infinite alternate; }
+    .sway { transform-origin: 100px 186px; animation: sway 2.4s ease-in-out infinite; }
+    .leg-l { transform-origin: 88px 134px; animation: kick 1.2s ease-in-out infinite alternate; }
+    .leg-r { transform-origin: 112px 134px; animation: kick 1.2s ease-in-out infinite alternate-reverse; }
+    .arm-l { transform-origin: 56px 102px; animation: wave 1.2s ease-in-out infinite alternate; }
+    .arm-r { transform-origin: 144px 102px; animation: wave 1.2s ease-in-out infinite alternate-reverse; }
+    .shadow { transform-origin: 100px 186px; animation: shadow 1.2s ease-in-out infinite alternate; }
+    .eye { transform-origin: center; transform-box: fill-box; animation: blink 4.8s infinite; }
+    .spark { transform-origin: center; transform-box: fill-box; animation: twinkle 2.4s ease-in-out infinite; }
+    .spark.two { animation-delay: -1.2s; }
+    .electron { transform: translate(79.9px, -26px); animation: orbit 4.8s linear infinite; }
+
+    @keyframes bounce {
+      from { transform: translateY(0) scale(1.03, 0.97); }
+      to { transform: translateY(-14px) scale(0.98, 1.03); }
+    }
+    @keyframes sway {
+      0%, 100% { transform: rotate(-7deg); }
+      50% { transform: rotate(7deg); }
+    }
+    @keyframes kick {
+      from { transform: rotate(-16deg); }
+      to { transform: rotate(16deg); }
+    }
+    @keyframes wave {
+      from { transform: rotate(-30deg); }
+      to { transform: rotate(24deg); }
+    }
+    @keyframes shadow {
+      from { transform: scale(1.12, 1); opacity: 0.9; }
+      to { transform: scale(0.82, 1); opacity: 0.55; }
+    }
+    @keyframes blink {
+      0%, 93%, 100% { transform: scaleY(1); }
+      96% { transform: scaleY(0.1); }
+    }
+    @keyframes twinkle {
+      0%, 100% { transform: scale(0.6); opacity: 0.35; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+    @keyframes orbit {
+      0% { transform: translate(79.9px, -26px); }
+      8.33% { transform: translate(73.2px, -10.1px); }
+      16.67% { transform: translate(46.9px, 8.4px); }
+      25% { transform: translate(8px, 24.7px); }
+      33.33% { transform: translate(-33px, 34.4px); }
+      41.67% { transform: translate(-65.2px, 34.8px); }
+      50% { transform: translate(-79.9px, 26px); }
+      58.33% { transform: translate(-73.2px, 10.1px); }
+      66.67% { transform: translate(-46.9px, -8.4px); }
+      75% { transform: translate(-8px, -24.7px); }
+      83.33% { transform: translate(33px, -34.4px); }
+      91.67% { transform: translate(65.2px, -34.8px); }
+      100% { transform: translate(79.9px, -26px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bounce, .sway, .leg, .arm, .eye, .shadow, .spark, .electron { animation: none; }
+    }
+
+    .caption { margin: 10px 0 26px; color: var(--muted); font: 13px var(--mono); }
+    footer { padding: 20px 16px 36px; color: var(--muted); font-size: 14px; text-align: center; }
+    footer a { color: var(--label); }
+
+    @media (max-width: 640px) {
+      .nav { padding: 12px 16px; }
+      .nav nav { gap: 14px; font-size: 13px; }
+      .brand { font-size: 19px; }
+      .brand img { width: 30px; height: 30px; }
+      .lede { font-size: 17px; }
+      .btn { width: 100%; text-align: center; }
+      .cta { flex-direction: column; width: 100%; max-width: 320px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="/" aria-label="Ask Physics home">
+      <img src="/images/logo.svg" alt="" width="34" height="34">
+      <span>Ask <b>Physics</b></span>
+    </a>
+    <nav aria-label="Site">
+      <a href="/">Home</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+  </header>
+
+  <main class="lost">
+    <p class="eyebrow">Error <b>404</b> · page not found</p>
+
+    <div class="stage">
+      <svg class="mascot" viewBox="0 0 200 200" role="img" aria-label="Pip, a cheerful particle with tiny legs, dancing next to an electron orbit">
+        <defs>
+          <linearGradient id="pip-body" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#4a9dff"/>
+            <stop offset="1" stop-color="#a06bff"/>
+          </linearGradient>
+        </defs>
+        <ellipse class="shadow" cx="100" cy="186" rx="46" ry="6"/>
+        <ellipse class="ring" cx="100" cy="100" rx="84" ry="26" transform="rotate(-18 100 100)"/>
+
+        <g class="bounce">
+          <g class="sway">
+            <g class="leg leg-l">
+              <path class="limb" d="M88 134 L82 168"/>
+              <ellipse class="foot" cx="78" cy="170" rx="11" ry="5.5"/>
+            </g>
+            <g class="leg leg-r">
+              <path class="limb" d="M112 134 L118 168"/>
+              <ellipse class="foot" cx="122" cy="170" rx="11" ry="5.5"/>
+            </g>
+
+            <circle class="body" cx="100" cy="100" r="46" fill="url(#pip-body)"/>
+
+            <g class="arm arm-l">
+              <path class="limb" d="M56 102 L30 80"/>
+              <circle class="hand" cx="27" cy="77" r="7"/>
+            </g>
+            <g class="arm arm-r">
+              <path class="limb" d="M144 102 L170 80"/>
+              <circle class="hand" cx="173" cy="77" r="7"/>
+            </g>
+
+            <g class="eye"><ellipse class="face" cx="84" cy="96" rx="7" ry="9"/><circle class="pupil" cx="86" cy="98" r="4"/></g>
+            <g class="eye"><ellipse class="face" cx="116" cy="96" rx="7" ry="9"/><circle class="pupil" cx="118" cy="98" r="4"/></g>
+            <ellipse class="cheek" cx="72" cy="114" rx="7" ry="4.5"/>
+            <ellipse class="cheek" cx="128" cy="114" rx="7" ry="4.5"/>
+            <path class="mouth" d="M88 116 Q100 127 112 116"/>
+          </g>
+        </g>
+
+        <circle class="electron" cx="100" cy="100" r="6"/>
+        <path class="spark" d="M166 22 L168 30 L176 32 L168 34 L166 42 L164 34 L156 32 L164 30 Z"/>
+        <path class="spark two" d="M28 40 L29.5 45 L34.5 46.5 L29.5 48 L28 53 L26.5 48 L21.5 46.5 L26.5 45 Z"/>
+      </svg>
+    </div>
+    <p class="caption">fig. 1: Pip, a particle. Not found at this address.</p>
+
+    <h1>This page has a <span class="grad">probability amplitude</span> of zero here.</h1>
+    <p class="lede">
+      We checked every position this URL could have been in, and it isn't in any of them. It may
+      have moved, been renamed, or been redshifted out of view. These will get you back on track.
+    </p>
+    <nav class="cta" aria-label="Where to go next">
+      <a class="btn primary" href="/">Back to the home page</a>
+      <a class="btn" href="/docs/">Read the docs</a>
+      <a class="btn" href="/#ask">Ask a question</a>
+    </nav>
+  </main>
+
+  <footer>
+    Ask Physics is <a href="https://github.com/shankar-sachin/ask-physics">open source</a> under the MIT license.
+  </footer>
+</body>
+</html>
