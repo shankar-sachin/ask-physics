@@ -294,12 +294,12 @@ def test_real_question_results_use_the_same_panel() -> None:
 
 def test_a_row_with_no_value_is_a_heading_and_a_count_is_not_a_percentage() -> None:
     panel = results_panel(
-        "t", [[Row("heading", None, "a note"), Row("how many", 3, good="low", count=True)]]
+        "t", [[Row("heading", None, "an aside"), Row("how many", 3, good="low", count=True)]]
     )
     console, buffer = _console(terminal=True)
     console.print(panel)
     shown = _shown(buffer)
-    assert "heading" in shown and "a note" in shown and re.search(r"how many\s+3\b", shown)
+    assert "heading" in shown and "an aside" in shown and re.search(r"how many\s+3\b", shown)
     assert "%" not in shown
 
 

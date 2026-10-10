@@ -347,7 +347,7 @@ class Row:
 
     label: str
     value: float | int | None = None
-    note: str = ""
+    hint: str = ""
     good: str = "high"  # "high", "low", or "plain" (no verdict)
     count: bool = False  # show value as a count, not a percentage
 
@@ -385,14 +385,14 @@ def results_panel(
             grid.add_section()
         for row in rows:
             if row.value is None:
-                grid.add_row(Text(row.label, style="label"), Text(row.note), "", "")
+                grid.add_row(Text(row.label, style="label"), Text(row.hint), "", "")
             elif row.count:
                 style = "bad" if row.value and row.good == "low" else "ok"
-                grid.add_row(Text(row.label), Text(row.note), "", Text(str(row.value), style=style))
+                grid.add_row(Text(row.label), Text(row.hint), "", Text(str(row.value), style=style))
             else:
                 grid.add_row(
                     Text(row.label),
-                    Text(row.note),
+                    Text(row.hint),
                     meter(float(row.value), row.good),
                     Text(f"{row.value:.1%}", style="value"),
                 )
@@ -475,8 +475,8 @@ def print_results(
                     console.print(Text(f"  {row.label}"), soft_wrap=True)
                     continue
                 shown = str(row.value) if row.count else f"{row.value:.1%}"
-                note = f" ({row.note})" if row.note else ""
-                console.print(Text(f"  {row.label}{note}: {shown}"), soft_wrap=True)
+                hint = f" ({row.hint})" if row.hint else ""
+                console.print(Text(f"  {row.label}{hint}: {shown}"), soft_wrap=True)
         for line in footer:
             console.print(Text(f"  {line}"), soft_wrap=True)
         return
