@@ -172,11 +172,10 @@ def test_refusals_can_only_name_what_the_question_names() -> None:
     assert not any(r.startswith("Category error:") for r in reasons)  # no template matched
     math = "Not a physics question; it is pure math."
     assert redirect_options(question, math) == [
-        "How fast is a dropped rock moving after falling for a while?"
+        "How fast is a rock moving after falling 20 m from rest?",
+        "How fast is a rock moving after falling 12 m from rest?",
     ]
-    assert "How much does the human brain weigh?" in redirect_options(
-        "How much does a dream weigh?"
-    )
+    assert "How much does a 1.4 kg brain weigh?" in redirect_options("How much does a dream weigh?")
 
 
 def test_slots_are_filled_only_from_their_own_position() -> None:
@@ -190,9 +189,10 @@ def test_slots_are_filled_only_from_their_own_position() -> None:
         "out_of_scope", "How long does a dropped ball take to fall from a table"
     )
     assert not any("dropped ball take" in r for r in reasons)
+    # Redirects are fixed, answerable questions (#92): no slot text from the question.
     assert redirect_options(
         "What is the best taco topping?", "Not a physics question; it is a matter of taste."
-    ) == ["How much energy is in a typical slice of taco?"]
+    ) == ["How much kinetic energy does a 0.2 kg ball have at 3 m/s?"]
 
 
 def test_gold_classifications_are_always_options(store: DataStore) -> None:
