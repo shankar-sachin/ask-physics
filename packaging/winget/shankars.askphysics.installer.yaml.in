@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+# Rendered by scripts/winget.sh from packaging/winget/. Edit the template.
+
+PackageIdentifier: shankars.askphysics
+PackageVersion: @VERSION@
+InstallerType: inno
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+InstallerSwitches:
+  Silent: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+  SilentWithProgress: /SILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+UpgradeBehavior: install
+Commands:
+  - askphysics
+ReleaseDate: @DATE@
+Dependencies:
+  PackageDependencies:
+    - PackageIdentifier: astral-sh.uv
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/shankar-sachin/ask-physics/releases/download/v@VERSION@/AskPhysicsSetup-@VERSION@.exe
+    InstallerSha256: @SHA_X64@
+    ProductCode: '{007795BD-A0E0-46D3-8C03-CE338CD7B57D}_is1'
+    AppsAndFeaturesEntries:
+      - DisplayName: Ask Physics
+        Publisher: Sachin Shankar
+        DisplayVersion: @VERSION@
+        ProductCode: '{007795BD-A0E0-46D3-8C03-CE338CD7B57D}_is1'
+        InstallerType: inno
+ManifestType: installer
+ManifestVersion: 1.12.0

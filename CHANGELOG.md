@@ -184,6 +184,19 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Contrast pairs teach the out-of-scope boundary from both sides: "How fast is sadness?" and
   "How heavy is justice?" are out of scope, next to "How fast is an adult at takeoff in a
   standing jump?" and "How heavy is a freight train?", which are Fermi questions.
+- A Windows installer and a WinGet package (ADR-023, reversing ADR-011's "not submitting").
+  `packaging/windows/askphysics.iss` builds `AskPhysicsSetup-X.Y.Z.exe`, a per-user Inno Setup
+  installer that runs `install.ps1` pinned to its own release and whose uninstaller runs
+  `uv tool uninstall askphysics`; it is silent-capable and exits non-zero when the install fails.
+  `packaging/winget/` holds the manifest templates for `winget install shankars.askphysics`
+  (schema 1.12.0, x64) and `scripts/winget.sh` renders them. The package is submitted to
+  `microsoft/winget-pkgs` by hand once per release (`docs/RELEASING.md`), so it becomes
+  installable only after Microsoft accepts it.
+- Pushing a tag `vX.Y.Z` now creates the GitHub Release (`.github/workflows/release.yml`): it
+  builds and smoke-tests the installer on Windows, then publishes the Release with the notes from
+  this changelog (`scripts/release_notes.py`), the installer, its SHA-256, an unversioned
+  `AskPhysicsSetup.exe` for a stable download link, and the rendered WinGet manifests. Pull
+  requests that touch the installer build and smoke-test it as well.
 
 ### Changed
 

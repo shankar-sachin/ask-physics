@@ -312,7 +312,7 @@ installed, without loading weights; `llm/fermi_client.py` wraps each one.
 
 ## ADR-011: Install channels: curl, irm, and a Homebrew tap
 
-**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: every channel downloads the models when it installs, and the Homebrew formula keeps them in `var`.
+**Status:** Accepted (v0.2.0), decided by the maintainer. Amended by ADR-022: every channel downloads the models when it installs, and the Homebrew formula keeps them in `var`. Amended by ADR-023: WinGet is now a channel.
 
 **Context.** People should be able to try Ask Physics with one command,
 without knowing what a virtualenv is. The package depends on torch, whose
@@ -330,7 +330,7 @@ default Linux wheel bundles about 2 GB of CUDA libraries the CLI never uses.
 - **Also:** a Homebrew tap, `shankar-sachin/homebrew-tap` (`brew install shankar-sachin/tap/askphysics`), for people
   who live in brew. Its formula builds a virtualenv in `libexec` from the
   release tarball.
-- **Not:** WinGet (not submitting), and PyPI only at v1.0.
+- **Not:** WinGet (not submitting; reversed by ADR-023), and PyPI only at v1.0.
 - A CI workflow runs both installers on real Linux, macOS, and Windows
   machines whenever they change.
 - The installers are served from `askphysics.vercel.app/installers/`, built
@@ -1216,3 +1216,51 @@ the user's home directory.
 - Installed models are not replaced when a later release publishes new weights (the download
   skips what is installed; unchanged from #107). That matters more now that Homebrew keeps models
   across upgrades: Q21.
+
+---
+
+## ADR-023: Ship on WinGet, with a per-user installer, and let a tag create the Release
+
+**Status:** Accepted (2026-10-10), decided by the maintainer. Reverses the "Not: WinGet (not
+submitting)" line of ADR-011.
+
+**Context.** ADR-011 left Windows with a PowerShell one-liner and said WinGet was not worth
+submitting. Windows users expect `winget install`, and the maintainer wants it. WinGet needs a
+real installer (an `.exe`, `.msi` or MSIX) at a stable URL with a known hash, which `install.ps1`
+alone is not. Separately, releases were drafted by hand in the GitHub UI, which the maintainer's
+tooling cannot do; it can push a tag.
+
+**Decision.**
+- **WinGet package `shankars.askphysics`** (display name "Ask Physics", publisher "Sachin Shankar",
+  MIT). The identifier is lowercase to share the publisher folder `manifests/s/shankars/` with the
+  maintainer's other package; WinGet matches ids case-insensitively, so `winget install
+  ShankarS.AskPhysics` works too. Manifests are schema 1.12.0, the version the community
+  repository recommends, templated in `packaging/winget/` and rendered by `scripts/winget.sh`. Submitting them to `microsoft/winget-pkgs` stays a manual pull
+  request from the maintainer's fork (`docs/RELEASING.md`); no token is stored in this repository.
+- **The installer is Inno Setup** (`packaging/windows/askphysics.iss`), per-user
+  (`PrivilegesRequired=lowest`), silent-capable, with a fixed `AppId`. It is a thin wrapper: it
+  copies `install.ps1` into the app folder and runs it pinned to its own release tag, so the
+  install logic stays in one place (ADR-011). Its uninstaller runs `uv tool uninstall askphysics`.
+  Models in `~/.cache/askphysics/models` are left alone (user data, shared with other install
+  methods, reused on reinstall); neither uv nor its Python is removed. The manifest declares
+  `astral-sh.uv` as a dependency though `install.ps1` installs uv anyway.
+- **x64 only** in the manifest. Windows on ARM would run the same installer (x64 compatible) but
+  `install.ps1` has not been tried there and torch wheels for it are unverified; this is left as
+  an open question (Q11).
+- **Pushing a tag `vX.Y.Z` creates the GitHub Release** (`.github/workflows/release.yml`): it
+  builds and smoke-tests the installer, then attaches it (versioned, plus an unversioned
+  `AskPhysicsSetup.exe` for a stable download link) with its SHA-256, the rendered WinGet
+  manifests, and the CHANGELOG section as notes (`scripts/release_notes.py`). Pull requests that
+  touch the installer build and smoke-test it too.
+
+**Consequences.**
+- A release needs the CHANGELOG section written before the tag, and the tag must equal the version
+  in `pyproject.toml`; the workflow refuses otherwise.
+- The installer is not code-signed; SmartScreen may warn on a direct download. WinGet verifies the
+  hash instead.
+- Installing takes minutes (it downloads Python, torch and the models), which Microsoft's
+  validation pipeline or a reviewer may question. If WinGet review pushes back, the fallback is
+  the PowerShell one-liner and the direct download.
+- The installer's `AppId` must never change; the manifest's `ProductCode` is derived from it.
+- Manifest changes requested in review must be made in the templates as well, or the next version
+  loses them.
