@@ -131,6 +131,10 @@ explains itself in its docs.
 and the equation database), `fermi` (the models, training, and weights), and
 `ask-physics` (the pipeline, CLI, website, and docs, built on the other two).
 
+**Amended (ADR-018, 2026-10-11):** Noether splits out first, in v0.5, and fermi follows once the
+models are trained and stable. Where this leaves the v0.5.0 eval harness below is still to be
+decided.
+
 **Deliverables**
 - Untangle the imports first: compute and sanity checks, normalization, and
   the shared models move so that fermi depends only on noether.

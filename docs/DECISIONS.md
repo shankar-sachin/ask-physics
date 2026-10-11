@@ -826,7 +826,8 @@ between requests.
 
 ## ADR-018: Noether and Fermi as their own packages, in three repositories
 
-**Status:** Proposed by the maintainer; work starts after `fermi-celeste-1` is trained
+**Status:** Proposed by the maintainer. Amended 2026-10-11: Noether splits out first, in v0.5;
+the `fermi` repository waits until the models are trained and stable.
 
 **Context.** One package, `askphysics`, holds three things that change at
 different speeds and could each be useful alone: Noether, the math engine
@@ -864,9 +865,25 @@ the same CI, and the same release.
   likely noether, since plans are its input.
 - Moving history: `git filter-repo` per package keeps each file's history.
 - The release, installer, and Homebrew flows, which today ship one package.
+- **Package names.** `noether`, `fermi` and `noether-physics` are already taken on PyPI (checked
+  2026-10-11), so neither package can publish under its repository's name. Unclaimed then:
+  `noether-math`, `noether-solver`, `noether-engine`, `pynoether`, `noetherpy`, `emmy-noether` and
+  `askphysics-noether`; for later, `fermi-models` and `askphysics-fermi`. The distribution name
+  can differ from the import name (`pip install noether-math`, then `import noether`), but an
+  import named `noether` collides with the existing PyPI package of that name for anyone who has
+  both installed, so a matching import name (`import noether_math`) is the safer choice. To
+  decide before the split.
+
+**Order (amended 2026-10-11, decided by the maintainer).** Two steps instead of one:
+
+1. **v0.5: Noether.** Split Noether out first, leaving two repositories, noether and
+   ask-physics. Noether changes slowly, has no torch, and is useful on its own, so it is the
+   cheaper split and the one that pays off now. The Fermi code stays in ask-physics for now.
+2. **Later: Fermi.** The `fermi` repository waits until every model is trained and its results
+   are stable, so training changes don't have to cross repositories while they are frequent.
 
 **Consequences.** Smaller, faster CI per repository, and Noether usable on its
-own. The cost is three release trains and cross-repo changes, which is why it
+own. The cost is more release trains and cross-repo changes, which is why Fermi
 waits until the models stop changing weekly.
 
 ## ADR-019: Train on Apple Silicon with MLX; PyTorch stays for inference and other platforms
