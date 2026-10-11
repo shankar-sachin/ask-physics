@@ -263,7 +263,7 @@ assumptions. v0.5 eval data will be used to fit the weights (see
 
 ## 8b. Distribution and access
 
-- **Install:** one-line installers (`curl ... | sh` on macOS and Linux,
+- **Install:** one-line installers (`curl ... | bash` on macOS and Linux,
   `irm ... | iex` on Windows) and a Homebrew tap (ADR-011). PyPI at v1.0.
 - **Users never train.** We train the Fermi models and ship the weights as
   checksummed release assets; the installers fetch them (ADR-012).

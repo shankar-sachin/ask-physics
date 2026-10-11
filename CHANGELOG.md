@@ -8,6 +8,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Two install pages on the website: `/installers` (every way to install, each with a copy button:
+  curl, irm, Homebrew, WinGet, pip, the Windows installer, the raw scripts) and `/more-installers` (for
+  developers: the `sh` and `wget` variants, pinning with `ASKPHYSICS_REF`, source installs,
+  uninstalling, verifying a download, and a table of every release with its installers, fetched
+  from the GitHub API in the browser).
 - celeste asks before it downloads (ADR-022). It used to download by itself the first time a
   question reached its escalation try; now, when it is published but not installed, `askphysics
   ask` on a terminal asks `This question needs celeste-1 (about 240.1 MB, a one-time download)
@@ -200,6 +205,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Shorter installer URLs: `curl -fsSL https://askphysics.vercel.app/install.sh | bash` and
+  `irm https://askphysics.vercel.app/install.ps1 | iex`. The old `/installers/install.sh` and
+  `/installers/install.ps1` paths still serve the same files. `install.sh` runs the same under
+  `bash` and `sh`.
 - The maintainer commands moved to a second command, `askphysics-dev`: `askphysics-dev
   validate-data` and `askphysics-dev model build-data / train-tokenizer / train / backend /
   bench / eval / pull / package / info`, with the same options as before. `askphysics` now has

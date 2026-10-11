@@ -1,7 +1,8 @@
 #!/bin/sh
 # Ask Physics installer for macOS and Linux.
 #
-#   curl -LsSf https://askphysics.vercel.app/installers/install.sh | sh
+#   curl -fsSL https://askphysics.vercel.app/install.sh | bash
+#   (the script is plain POSIX sh, so `| sh` works too)
 #
 # Installs the `askphysics` command in its own isolated environment with uv
 # (https://docs.astral.sh/uv/), installing uv first if it's missing. Nothing

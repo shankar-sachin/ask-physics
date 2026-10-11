@@ -3,13 +3,13 @@
 **macOS and Linux**
 
 ```bash
-curl -LsSf https://askphysics.vercel.app/installers/install.sh | sh
+curl -fsSL https://askphysics.vercel.app/install.sh | bash
 ```
 
 **Windows** (PowerShell)
 
 ```powershell
-irm https://askphysics.vercel.app/installers/install.ps1 | iex
+irm https://askphysics.vercel.app/install.ps1 | iex
 ```
 
 **Homebrew** (macOS and Linux)
@@ -20,7 +20,7 @@ brew install shankar-sachin/tap/askphysics
 
 The installers put `askphysics` in its own environment with [uv](https://docs.astral.sh/uv/)
 and never touch your system Python. Uninstall with `uv tool uninstall askphysics` (or
-`brew uninstall askphysics`).
+`brew uninstall askphysics`). Every way to install is on [askphysics.vercel.app/installers](https://askphysics.vercel.app/installers).
 
 Or skip installing and use the website, [askphysics.vercel.app](https://askphysics.vercel.app),
 which runs the same package inside your browser (with the fake model for now; see the

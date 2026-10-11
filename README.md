@@ -82,13 +82,13 @@ Every screenshot is real CLI output, regenerated with `make screenshots`.
 **macOS and Linux**
 
 ```bash
-curl -LsSf https://askphysics.vercel.app/installers/install.sh | sh
+curl -fsSL https://askphysics.vercel.app/install.sh | bash
 ```
 
 **Windows** (PowerShell)
 
 ```powershell
-irm https://askphysics.vercel.app/installers/install.ps1 | iex
+irm https://askphysics.vercel.app/install.ps1 | iex
 ```
 
 **WinGet** (Windows)
@@ -111,10 +111,19 @@ no administrator rights and runs the same steps as the PowerShell script, pinned
 brew install shankar-sachin/tap/askphysics
 ```
 
+**pip** (Python 3.11+, from v0.4.0)
+
+```bash
+pip install askphysics
+```
+
 The scripts install `askphysics` into its own isolated environment with
 [uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
 touch your system Python. Every channel downloads the Fermi models (about 66 MB, once) when it
 installs; if that can't happen, the first question downloads them. Pin a version with `ASKPHYSICS_REF=v0.3.0`.
+All the ways to install, with copy buttons: [askphysics.vercel.app/installers](https://askphysics.vercel.app/installers)
+(and [/more-installers](https://askphysics.vercel.app/more-installers) for developers: every version,
+pinning, source installs).
 Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`, or
 `winget uninstall shankars.askphysics`).
 The installer URLs serve the scripts in this repo's `main` branch

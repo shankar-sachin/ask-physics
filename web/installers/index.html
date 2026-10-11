@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install Ask Physics</title>
+  <meta name="description" content="Every way to install the Ask Physics command line: a one-line script for macOS, Linux and Windows, Homebrew, WinGet, pip, or a Windows installer.">
+  <meta name="theme-color" content="#07080f">
+  <meta property="og:title" content="Install Ask Physics">
+  <meta property="og:description" content="Every way to install the Ask Physics command line: a one-line script for macOS, Linux and Windows, Homebrew, WinGet, pip, or a Windows installer.">
+  <meta property="og:image" content="https://askphysics.vercel.app/images/banner.png">
+  <link rel="canonical" href="https://askphysics.vercel.app/installers">
+  <link rel="icon" href="/images/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/installers.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="/" aria-label="Ask Physics home">
+      <img src="/images/logo.svg" alt="" width="34" height="34">
+      <span>Ask <b>Physics</b></span>
+    </a>
+    <nav>
+      <a href="/#ask">Try it</a>
+      <a href="/#how">How it works</a>
+      <a href="/#models">Models</a>
+      <a href="/docs/">Docs</a>
+      <a href="/installers" class="install-btn" aria-current="page"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span class="label">Install</span></a>
+      <a href="https://github.com/shankar-sachin/ask-physics" class="gh" aria-label="Ask Physics on GitHub" title="GitHub"><svg viewBox="0 0 16 16" width="22" height="22" aria-hidden="true" fill="currentColor"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg></a>
+    </nav>
+  </header>
+
+  <main class="install-page">
+    <div class="page-head">
+      <h1>Install <span class="grad">Ask Physics</span></h1>
+      <p class="lede">
+        Pick whichever fits your machine. Every option puts the <code>askphysics</code> command in its
+        own environment, away from your system Python, and needs no account or API key.
+      </p>
+    </div>
+
+    <section aria-labelledby="scripts">
+      <h2 id="scripts">One line</h2>
+      <p class="sub">The quickest way. It installs <a href="https://docs.astral.sh/uv/">uv</a> first if you don't have it.</p>
+      <div class="opts">
+        <article class="opt">
+          <div class="opt-head"><h3>macOS and Linux</h3><span class="tag os">bash</span></div>
+          <p class="note">Paste into a terminal.</p>
+          <div class="cmd wrap-mobile"><code>curl -fsSL https://askphysics.vercel.app/install.sh | bash</code><button type="button" class="copy">Copy</button></div>
+        </article>
+        <article class="opt">
+          <div class="opt-head"><h3>Windows</h3><span class="tag os">PowerShell</span></div>
+          <p class="note">Paste into PowerShell (Windows PowerShell 5.1 or 7+).</p>
+          <div class="cmd wrap-mobile"><code>irm https://askphysics.vercel.app/install.ps1 | iex</code><button type="button" class="copy">Copy</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="managers">
+      <h2 id="managers">Package managers</h2>
+      <div class="opts">
+        <article class="opt">
+          <div class="opt-head"><h3>Homebrew</h3><span class="tag os">macOS and Linux</span></div>
+          <div class="cmd wrap-mobile"><code>brew install shankar-sachin/tap/askphysics</code><button type="button" class="copy">Copy</button></div>
+        </article>
+        <article class="opt">
+          <div class="opt-head"><h3>WinGet</h3><span class="tag os">Windows</span><span class="tag soon">pending</span></div>
+          <p class="note">Available once the package is accepted into WinGet. Until then, use the installer or the one-liner above.</p>
+          <div class="cmd wrap-mobile"><code>winget install ShankarS.AskPhysics</code><button type="button" class="copy">Copy</button></div>
+        </article>
+        <article class="opt">
+          <div class="opt-head"><h3>pip</h3><span class="tag os">Python 3.11+</span><span class="tag soon">from v0.4.0</span></div>
+          <p class="note">Install it into a virtual environment or with <code>pipx</code>. The models download the first time you ask.</p>
+          <div class="cmd wrap-mobile"><code>pip install askphysics</code><button type="button" class="copy">Copy</button></div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="windows-installer">
+      <h2 id="windows-installer">Windows installer</h2>
+      <div class="opts">
+        <article class="opt">
+          <div class="opt-head"><h3>AskPhysicsSetup.exe</h3><span class="tag os">Windows</span></div>
+          <p>A normal setup program, if you would rather click than type. It is the latest release's installer.</p>
+          <div class="dl-row">
+            <a class="btn primary" href="https://github.com/shankar-sachin/ask-physics/releases/latest/download/AskPhysicsSetup.exe"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Download for Windows</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="raw">
+      <h2 id="raw">Read the scripts first</h2>
+      <p class="sub">The one-liners just download and run these two files. Fetch one, read it, then run it yourself.</p>
+      <div class="opts">
+        <article class="opt">
+          <div class="dl-row">
+            <a class="btn small" href="/install.sh" download="install.sh"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>install.sh</a>
+            <a class="btn small" href="/install.ps1" download="install.ps1"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>install.ps1</a>
+          </div>
+          <p class="note">Both are copied unchanged from <a href="https://github.com/shankar-sachin/ask-physics/blob/main/install.sh">the repository</a>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="models">
+      <h2 id="models">Then ask</h2>
+      <div class="callout">
+        <p>The Fermi models download automatically, either at install or on your first question, so there is nothing else to run.</p>
+      </div>
+      <div class="cmd wrap-mobile"><code>askphysics ask "How fast does a ball dropped from 20 m hit the ground?"</code><button type="button" class="copy">Copy</button></div>
+    </section>
+
+    <section aria-labelledby="more">
+      <h2 id="more">Developer?</h2>
+      <p class="sub">Pin a version, install from a branch or a local checkout, skip the model download, uninstall, or see every release: <a href="/more-installers">more options for developers</a>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="https://github.com/shankar-sachin/ask-physics">GitHub</a> · MIT license ·
+      <a href="https://github.com/shankar-sachin/ask-physics/blob/main/THIRD_PARTY_LICENSES.md">Third-party licenses</a> ·
+      <a href="/docs/">Docs</a> · <a href="/installers">Install</a> · <a href="/more-installers">More installers</a>
+    </p>
+  </footer>
+
+  <script src="/installers.js" type="module"></script>
+</body>
+</html>
