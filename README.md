@@ -91,6 +91,20 @@ curl -fsSL https://askphysics.vercel.app/install.sh | bash
 irm https://askphysics.vercel.app/install.ps1 | iex
 ```
 
+**WinGet** (Windows)
+
+```powershell
+winget install shankars.askphysics
+```
+
+This becomes available once the package is accepted into the Windows Package Manager
+community repository (`microsoft/winget-pkgs`); until then use the PowerShell line above, or
+download
+[`AskPhysicsSetup.exe`](https://github.com/shankar-sachin/ask-physics/releases/latest/download/AskPhysicsSetup.exe)
+from the latest release (each release also has a versioned `AskPhysicsSetup-X.Y.Z.exe` and a
+`.sha256`). WinGet matches ids case-insensitively, so `winget install ShankarS.AskPhysics` works too. The installer needs
+no administrator rights and runs the same steps as the PowerShell script, pinned to that release.
+
 **Homebrew** (macOS and Linux)
 
 ```bash
@@ -110,7 +124,8 @@ installs; if that can't happen, the first question downloads them. Pin a version
 All the ways to install, with copy buttons: [askphysics.vercel.app/installers](https://askphysics.vercel.app/installers)
 (and [/more-installers](https://askphysics.vercel.app/more-installers) for developers: every version,
 pinning, source installs).
-Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`).
+Uninstall with `uv tool uninstall askphysics` (or `brew uninstall askphysics`, or
+`winget uninstall shankars.askphysics`).
 The installer URLs serve the scripts in this repo's `main` branch
 ([`install.sh`](install.sh), [`install.ps1`](install.ps1)); read them first if you like.
 No API keys, no accounts: everything runs on your machine.
@@ -234,7 +249,7 @@ v1.0 comes the hosted API. The CLI is the main interface, and
 - [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md) and [`docs/DATA_SOURCING.md`](docs/DATA_SOURCING.md): what data looks like and where it comes from
 - [`docs/EVALS.md`](docs/EVALS.md): how answers are graded
 - [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/RISKS.md`](docs/RISKS.md), [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md)
-- [`docs/RELEASING.md`](docs/RELEASING.md): how a release is tagged and the Homebrew tap bumped
+- [`docs/RELEASING.md`](docs/RELEASING.md): how a release is tagged (the tag creates the GitHub Release) and the Homebrew tap and WinGet package updated
 - [`docs/TRAINING.md`](docs/TRAINING.md): the runbook for training the Fermi models
 
 ## Contributing

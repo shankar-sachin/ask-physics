@@ -312,10 +312,20 @@ if (-not (($env:Path -split ";") -contains $BinDir)) {
     $NewPath = $true
 }
 
-# The installed command starts, and says which version it is.
+# The installed command starts, and says which version it is. Its output is captured, not
+# shown, so Python writes to a pipe: make that UTF-8, or the banner's glyphs can't be encoded
+# in the console's code page. The whole output is read before its first line is taken, since
+# Windows PowerShell stops a native command early on `| Select-Object -First 1` and its exit
+# code is then not the command's own.
+$env:PYTHONIOENCODING = "utf-8"
 $Exe = Join-Path $BinDir "askphysics.exe"
-$Version = & $Exe version | Select-Object -First 1
-if ($LASTEXITCODE -ne 0) { Write-Fail "installed, but askphysics did not start" }
+$VersionOutput = @(& $Exe version | ForEach-Object { "$_" })  # stderr stays on the console
+$VersionCode = $LASTEXITCODE
+$Version = $VersionOutput | Select-Object -First 1
+if ($VersionCode -ne 0) {
+    $VersionOutput | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" }
+    Write-Fail "installed, but askphysics did not start (exit $VersionCode)"
+}
 Write-Result "Check that askphysics starts" "$Version"
 
 # 4. Models (tellus and solem, checked against the manifest the package pins)
