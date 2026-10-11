@@ -4,7 +4,7 @@ Where the equations, worked examples, constants, and Fermi assumptions come
 from, what each source costs us, and the gate every entry has to pass.
 
 **The rule:** no entry enters the database without passing schema
-validation (`askphysics validate-data`) and a SymPy parse test. No
+validation (`askphysics-dev validate-data`) and a SymPy parse test. No
 exceptions for "obviously correct" entries, bulk imports, or the
 maintainer's own additions.
 
@@ -141,7 +141,7 @@ the project, with a textbook cited as the `source` for verification, are
 
 Every data PR, human or scripted, must pass:
 
-- [ ] `askphysics validate-data` exits 0 (schema, SymPy parse, unit parse,
+- [ ] `askphysics-dev validate-data` exits 0 (schema, SymPy parse, unit parse,
       symbol coverage, dimensional consistency, referential integrity).
 - [ ] `source` is specific enough for a reviewer to verify (book plus
       chapter, URL plus access date, or CODATA year).

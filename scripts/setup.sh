@@ -40,7 +40,7 @@ fi
 
 phase "Update pip" .venv/bin/python -m pip install --upgrade pip
 phase "Install askphysics" .venv/bin/python -m pip install -e ".[dev]"
-phase "Check the data" .venv/bin/askphysics validate-data
+phase "Check the data" .venv/bin/askphysics-dev validate-data
 
 ui_end "Setup complete"
 ui_ready "Ask Physics is ready" \

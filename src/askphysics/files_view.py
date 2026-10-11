@@ -328,7 +328,7 @@ def check_assets(console: Console, model: str, asset_dir: Path, manifest_path: P
 
 
 class PullView:
-    """The display of ``askphysics model pull``: a bar per file, then a settled line per file."""
+    """The display of a model download: a bar per file, then a settled line per file."""
 
     def __init__(
         self,

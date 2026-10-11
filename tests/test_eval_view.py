@@ -1,4 +1,4 @@
-"""The live view of ``askphysics model eval``: the ETA, the running rates, the results panel."""
+"""The live view of ``askphysics-dev model eval``: the ETA, the running rates, the results panel."""
 
 import io
 import re

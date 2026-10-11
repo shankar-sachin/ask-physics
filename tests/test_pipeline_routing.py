@@ -12,7 +12,7 @@ from tests.conftest import DEMO_QUESTION
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import ConfigError, LLMError
+from askphysics.errors import ConfigError, DownloadDeclinedError, LLMError
 from askphysics.llm.base import Roster
 from askphysics.llm.fake import FakeLLMClient
 from askphysics.models import Plan
@@ -264,3 +264,36 @@ def test_a_chained_plan_answers_with_its_steps(
     assert [(s.equation_id, s.symbol) for s in answer.steps] == [("kin_v_at", "a")]
     assert answer.steps[0].value == pytest.approx(2.5)
     assert {e.id for e in answer.equations_used} == {"newton_second_law", "kin_v_at"}
+
+
+class DecliningPlanner(FakeLLMClient):
+    """A planner whose model the user chose not to download."""
+
+    name = "celeste"
+
+    def complete_json(self, *, system: str, user: str, schema: type[T]) -> T:
+        if schema is Plan:
+            raise DownloadDeclinedError("fermi-celeste-1 wasn't downloaded")
+        return super().complete_json(system=system, user=user, schema=schema)
+
+
+def test_a_declined_download_skips_the_try_and_keeps_the_real_failure(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    solem = FlakyPlanner("solem", failures=99)
+    roster = Roster(
+        classify=FakeLLMClient(), plan=(solem,) * 2 + (DecliningPlanner(),), explain=solem
+    )
+    answer = _pipeline(store, retriever, roster).run(DEMO_QUESTION)
+    assert answer.status == "degraded"
+    assert any("solem fumbled" in c for c in [*answer.caveats, answer.explanation])
+    assert not any("wasn't downloaded" in c for c in [*answer.caveats, answer.explanation])
+
+
+def test_a_declined_download_changes_nothing_when_solem_succeeds(
+    store: DataStore, retriever: KeywordRetriever
+) -> None:
+    solem = FlakyPlanner("solem", failures=0)
+    roster = Roster(classify=FakeLLMClient(), plan=(solem, DecliningPlanner()), explain=solem)
+    answer = _pipeline(store, retriever, roster).run(DEMO_QUESTION)
+    assert answer.status == "answered" and answer.models["plan"] == "solem"

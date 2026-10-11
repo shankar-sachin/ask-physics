@@ -59,16 +59,16 @@ def test_train_backs_up_scores_both_and_compares(tmp_path: Path) -> None:
         ["mkdir", "-p", str(tmp_path / "backups")],
         ["cp", "-R", str(tmp_path / "models" / "fermi-solem-1")],
         ["rm", "-rf", str(tmp_path / "data")],
-        ["askphysics", "model", "build-data"],
-        ["askphysics", "model", "train-tokenizer"],
-        ["askphysics", "model", "eval"],  # the backed-up model: the baseline
-        ["askphysics", "model", "bench"],
-        ["askphysics", "model", "train"],
-        ["askphysics", "model", "eval"],  # the new one
+        ["askphysics-dev", "model", "build-data"],
+        ["askphysics-dev", "model", "train-tokenizer"],
+        ["askphysics-dev", "model", "eval"],  # the backed-up model: the baseline
+        ["askphysics-dev", "model", "bench"],
+        ["askphysics-dev", "model", "train"],
+        ["askphysics-dev", "model", "eval"],  # the new one
         ["python3", str(SCRIPTS / "compare_evals.py"), steps[-1][2]],
     ]
     assert steps[-1][2].startswith(str(tmp_path / "backups" / "fermi-solem-1-"))
-    train = next(c for c in _commands(result) if c.startswith("askphysics model train "))
+    train = next(c for c in _commands(result) if c.startswith("askphysics-dev model train "))
     assert f"--prose {prose} --prose-steps 2000 --prose-share 0.1" in train
     assert "--steps 5000" in train and "--resume" not in train
     assert train.endswith("--precision auto")
@@ -126,8 +126,8 @@ def test_train_resume_skips_backup_and_rebuilds(tmp_path: Path) -> None:
                   tmp_path=tmp_path)  # fmt: skip
     assert result.returncode == 0, result.stderr
     assert _commands(result) == [
-        "askphysics model bench --model fermi-tellus-1 --batch-size 32 --plan-steps 1500",
-        "askphysics model train --model fermi-tellus-1 --data build/data --tokenizer "
+        "askphysics-dev model bench --model fermi-tellus-1 --batch-size 32 --plan-steps 1500",
+        "askphysics-dev model train --model fermi-tellus-1 --data build/data --tokenizer "
         "build/tokenizer.json --steps 1500 --batch-size 32 --backend torch "
         "--precision auto --resume",
     ]
@@ -140,8 +140,8 @@ def test_train_precision_and_no_bench(tmp_path: Path) -> None:
                   "--backend", "torch", tmp_path=tmp_path)  # fmt: skip
     assert result.returncode == 0, result.stderr
     commands = _commands(result)
-    assert not any(c.startswith("askphysics model bench") for c in commands)
-    train = next(c for c in commands if c.startswith("askphysics model train "))
+    assert not any(c.startswith("askphysics-dev model bench") for c in commands)
+    train = next(c for c in commands if c.startswith("askphysics-dev model train "))
     assert train.endswith("--batch-size 32 --backend torch --precision fp32")
 
 
@@ -149,11 +149,11 @@ def test_train_grad_accum_is_passed_only_when_set(tmp_path: Path) -> None:
     flags = ["--no-bench", "--no-eval", "--no-prose"]
     result = _run("train.sh", "fermi-celeste-1", "--grad-accum", "2", *flags, tmp_path=tmp_path)
     assert result.returncode == 0, result.stderr
-    train = next(c for c in _commands(result) if c.startswith("askphysics model train "))
+    train = next(c for c in _commands(result) if c.startswith("askphysics-dev model train "))
     assert "--grad-accum 2" in train
     assert train.index("--grad-accum 2") < train.index("--precision")
     plain = _run("train.sh", "fermi-celeste-1", *flags, tmp_path=tmp_path)
-    train = next(c for c in _commands(plain) if c.startswith("askphysics model train "))
+    train = next(c for c in _commands(plain) if c.startswith("askphysics-dev model train "))
     assert "--grad-accum" not in train
     for bad in ("0", "-1", "two"):
         refused = _run("train.sh", "fermi-celeste-1", "--grad-accum", bad, *flags,
@@ -205,10 +205,10 @@ def test_check_runs_every_gate(tmp_path: Path) -> None:
         "python -m ruff check .",
         "python -m ruff format --check .",
         "python -m mypy",
-        "askphysics validate-data",
+        "askphysics-dev validate-data",
         "python -m pytest -q",
     ]
-    assert full.index(shellcheck) < full.index("askphysics validate-data")
+    assert full.index(shellcheck) < full.index("askphysics-dev validate-data")
     fast = _commands(_run("check.sh", "--fast", "--conflicts", "origin/x", tmp_path=tmp_path))
     assert "python -m pytest -q" not in fast
     assert "git merge --no-commit --no-ff -q origin/x" in fast
@@ -219,7 +219,9 @@ def test_eval_against_compares_on_the_same_questions(tmp_path: Path) -> None:
     result = _run("eval.sh", "fermi-solem-1", "--against", "/old", "--examples", "200",
                   tmp_path=tmp_path)  # fmt: skip
     commands = _commands(result)
-    assert commands[0].startswith("askphysics model eval --model fermi-solem-1 --directory /old")
+    assert commands[0].startswith(
+        "askphysics-dev model eval --model fermi-solem-1 --directory /old"
+    )
     assert all("--examples 200" in c for c in commands[:2])
     assert commands[-1].endswith(f"/old/eval.json {tmp_path}/models/fermi-solem-1/eval.json")
 
@@ -229,7 +231,7 @@ def test_release_packages_each_installed_model(tmp_path: Path) -> None:
         (tmp_path / "models" / name).mkdir(parents=True)
     result = _run("release_weights.sh", "models-v0.4.0", tmp_path=tmp_path)
     assert result.returncode == 0, result.stderr
-    packaged = [c for c in _commands(result) if c.startswith("askphysics model package")]
+    packaged = [c for c in _commands(result) if c.startswith("askphysics-dev model package")]
     assert [c.split("--model ")[1].split(" ")[0] for c in packaged] == [
         "fermi-tellus-1",
         "fermi-solem-1",
@@ -266,8 +268,8 @@ def test_train_backend_mlx_skips_the_torch_bench(tmp_path: Path) -> None:
                   "--checkpoint-blocks", "--no-eval", "--no-prose", tmp_path=tmp_path)  # fmt: skip
     assert result.returncode == 0, result.stderr
     commands = _commands(result)
-    assert not any(c.startswith("askphysics model bench") for c in commands)
-    train = next(c for c in commands if c.startswith("askphysics model train "))
+    assert not any(c.startswith("askphysics-dev model bench") for c in commands)
+    train = next(c for c in commands if c.startswith("askphysics-dev model train "))
     assert "--backend mlx" in train and "--checkpoint-blocks" in train
     assert "--device cpu" in train and train.index("--checkpoint-blocks") < train.index(
         "--precision"
@@ -279,7 +281,7 @@ def test_train_checkpoint_blocks_is_passed_on_torch(tmp_path: Path) -> None:
     on_torch = _run("train.sh", "fermi-tellus-1", "--backend", "torch", "--checkpoint-blocks",
                     "--no-bench", "--no-eval", tmp_path=tmp_path)  # fmt: skip
     assert on_torch.returncode == 0, on_torch.stderr
-    train = next(c for c in _commands(on_torch) if c.startswith("askphysics model train "))
+    train = next(c for c in _commands(on_torch) if c.startswith("askphysics-dev model train "))
     assert "--backend torch" in train and "--checkpoint-blocks" in train
     unknown = _run("train.sh", "fermi-tellus-1", "--backend", "jax", tmp_path=tmp_path)
     assert unknown.returncode != 0 and "unknown --backend jax" in unknown.stderr
@@ -300,7 +302,7 @@ def test_train_names_each_phase_instead_of_printing_arrow_lines(tmp_path: Path) 
 
 
 def test_a_phase_runs_through_the_real_cli_and_prints_plain_lines_off_a_terminal() -> None:
-    # Not a dry run: lib.sh's phase() calls "askphysics model phase", and piped output (as in
+    # Not a dry run: lib.sh's phase() calls "askphysics-dev model phase", and piped output (as in
     # CI or when teeing to a log) is plain lines with no animation or escape codes.
     env = {
         **os.environ,

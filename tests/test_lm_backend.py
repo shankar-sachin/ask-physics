@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from askphysics import cli
+from askphysics import devcli
 from askphysics.errors import ConfigError
 from askphysics.lm import backend
 from askphysics.lm.backend import resolve_backend
@@ -55,22 +55,22 @@ def test_explicit_mlx_without_mlx_is_refused(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_cli_refuses_mlx_when_it_is_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(backend, "mlx_available", lambda: False)
-    r = CliRunner().invoke(cli.app, ["model", "train", "--backend", "mlx"])
+    r = CliRunner().invoke(devcli.app, ["model", "train", "--backend", "mlx"])
     assert r.exit_code == 1 and "not installed" in _plain(r.output)
 
 
 def test_cli_backend_command_prints_the_choice(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(backend, "on_apple_silicon", lambda: False)
-    r = CliRunner().invoke(cli.app, ["model", "backend", "--backend", "auto", "--device", "cpu"])
+    r = CliRunner().invoke(devcli.app, ["model", "backend", "--backend", "auto", "--device", "cpu"])
     assert r.exit_code == 0 and r.output.strip() == "torch"
     monkeypatch.setattr(backend, "mlx_available", lambda: False)
-    r = CliRunner().invoke(cli.app, ["model", "backend", "--backend", "mlx"])
+    r = CliRunner().invoke(devcli.app, ["model", "backend", "--backend", "mlx"])
     assert r.exit_code == 1
 
 
 def test_mlx_memory_limit_needs_mlx() -> None:
     args = ["model", "train", "--backend", "torch", "--mlx-memory-gb", "8"]
-    r = CliRunner().invoke(cli.app, args)
+    r = CliRunner().invoke(devcli.app, args)
     assert r.exit_code == 1 and "mlx backend" in _plain(r.output)
 
 
@@ -90,7 +90,7 @@ def test_cli_trains_with_the_torch_backend(tmp_path: Path) -> None:
     data, tok = _small_data(tmp_path)
     out = tmp_path / "models" / "fermi-luna-1"
     r = CliRunner().invoke(
-        cli.app,
+        devcli.app,
         ["model", "train", "--data", str(data), "--tokenizer", str(tok), "--out", str(out),
          "--steps", "2", "--batch-size", "4", "--device", "cpu", "--backend", "torch"],
     )  # fmt: skip
@@ -104,7 +104,7 @@ def test_cli_trains_with_the_mlx_backend(tmp_path: Path) -> None:
     data, tok = _small_data(tmp_path)
     out = tmp_path / "models" / "fermi-luna-1"
     r = CliRunner().invoke(
-        cli.app,
+        devcli.app,
         ["model", "train", "--data", str(data), "--tokenizer", str(tok), "--out", str(out),
          "--steps", "2", "--batch-size", "4", "--device", "cpu", "--backend", "mlx"],
     )  # fmt: skip
@@ -121,7 +121,7 @@ def test_cli_reports_a_refused_resume_without_a_traceback(tmp_path: Path) -> Non
     # A torch run's optimizer state: no "backend" field, so it counts as torch's.
     (out / "train_state.json").write_text('{"step": 5, "lr": 0.001, "param_groups": []}')
     r = CliRunner().invoke(
-        cli.app,
+        devcli.app,
         ["model", "train", "--model", "fermi-luna-1", "--data", str(data), "--tokenizer", str(tok),
          "--out", str(out), "--steps", "2", "--batch-size", "4", "--device", "cpu",
          "--backend", "mlx", "--resume"],

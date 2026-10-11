@@ -125,7 +125,12 @@
     .eye { transform-origin: center; transform-box: fill-box; animation: blink 4.8s infinite; }
     .spark { transform-origin: center; transform-box: fill-box; animation: twinkle 2.4s ease-in-out infinite; }
     .spark.two { animation-delay: -1.2s; }
+    /* two copies share the orbit: .electron-back sits under Pip and shows on the far (top) flyby,
+       .electron-front sits over him and shows on the near (bottom) flyby. The switches at 12.5%
+       and 62.5% are where the electron is clear of Pip's sides. The still frame is the 0% pose. */
     .electron { transform: translate(79.9px, -26px); animation: orbit 4.8s linear infinite; }
+    .electron-back { animation: orbit 4.8s linear infinite, show-back 4.8s step-end infinite; }
+    .electron-front { animation: orbit 4.8s linear infinite, show-front 4.8s step-end infinite; }
 
     @keyframes bounce {
       from { transform: translateY(0) scale(1.03, 0.97); }
@@ -170,8 +175,21 @@
       91.67% { transform: translate(65.2px, -34.8px); }
       100% { transform: translate(79.9px, -26px); }
     }
+    @keyframes show-back {
+      0% { opacity: 1; }
+      12.5% { opacity: 0; }
+      62.5% { opacity: 1; }
+      100% { opacity: 1; }
+    }
+    @keyframes show-front {
+      0% { opacity: 0; }
+      12.5% { opacity: 1; }
+      62.5% { opacity: 0; }
+      100% { opacity: 0; }
+    }
     @media (prefers-reduced-motion: reduce) {
       .bounce, .sway, .leg, .arm, .eye, .shadow, .spark, .electron { animation: none; }
+      .electron-back { display: none; }
     }
 
     .caption { margin: 10px 0 26px; color: var(--muted); font: 13px var(--mono); }
@@ -215,6 +233,8 @@
         <ellipse class="shadow" cx="100" cy="186" rx="46" ry="6"/>
         <ellipse class="ring" cx="100" cy="100" rx="84" ry="26" transform="rotate(-18 100 100)"/>
 
+        <circle class="electron electron-back" cx="100" cy="100" r="6" aria-hidden="true"/>
+
         <g class="bounce">
           <g class="sway">
             <g class="leg leg-l">
@@ -245,7 +265,7 @@
           </g>
         </g>
 
-        <circle class="electron" cx="100" cy="100" r="6"/>
+        <circle class="electron electron-front" cx="100" cy="100" r="6"/>
         <path class="spark" d="M166 22 L168 30 L176 32 L168 34 L166 42 L164 34 L156 32 L164 30 Z"/>
         <path class="spark two" d="M28 40 L29.5 45 L34.5 46.5 L29.5 48 L28 53 L26.5 48 L21.5 46.5 L26.5 45 Z"/>
       </svg>

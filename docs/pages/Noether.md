@@ -20,7 +20,7 @@ units, and it does every piece of math in Ask Physics.
 - **Handles Celsius and Fahrenheit.** They're converted to kelvin before the math, by what
   the value means: "water at 20 °C" is 293.15 K, but "heated by 20 °C" is a change of 20 K.
 - **Checks the database.** Every equation's units must balance before it is accepted;
-  `askphysics validate-data` checks all of them.
+  `askphysics-dev validate-data` checks all of them.
 
 ## Safety
 

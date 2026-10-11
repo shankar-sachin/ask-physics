@@ -37,7 +37,6 @@ jobs:
           export PATH="$(uv tool dir --bin):$PATH"
           cd "$RUNNER_TEMP"
           askphysics version
-          askphysics validate-data
           askphysics ask "A ball is dropped from 20 m. How fast does it land?"
 
   windows:
@@ -58,5 +57,4 @@ jobs:
           $env:Path = "$((uv tool dir --bin).Trim());$env:Path"
           Set-Location $env:RUNNER_TEMP
           askphysics version
-          askphysics validate-data
           askphysics ask "A ball is dropped from 20 m. How fast does it land?"

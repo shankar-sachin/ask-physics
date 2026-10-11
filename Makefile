@@ -28,7 +28,7 @@ ask:  ## Ask a question with the fake LLM: make ask Q="..."
 	askphysics ask "$(Q)"
 
 validate:  ## Validate all seed data
-	askphysics validate-data
+	askphysics-dev validate-data
 
 check: lint typecheck validate test  ## Everything a commit needs (CI also runs the CLI and site smoke tests)
 

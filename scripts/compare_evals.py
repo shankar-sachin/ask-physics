@@ -56,7 +56,7 @@ def main(argv: list[str]) -> int:
     for arg in argv:
         path = Path(arg)
         if not path.is_file():
-            print(f"no eval report at {path}; run askphysics model eval first", file=sys.stderr)
+            print(f"no eval report at {path}; run askphysics-dev model eval first", file=sys.stderr)
             return 1
         reports.append(json.loads(path.read_text(encoding="utf-8")))
     print(compare(reports[0], reports[1]))

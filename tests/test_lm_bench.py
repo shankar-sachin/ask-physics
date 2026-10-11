@@ -2,7 +2,7 @@ import pytest
 import torch
 from typer.testing import CliRunner
 
-from askphysics import cli
+from askphysics import devcli
 from askphysics.lm.bench import (
     available_settings,
     bench,
@@ -89,7 +89,7 @@ def test_projected_hours() -> None:
 
 def test_cli_bench_names_the_fastest() -> None:
     args = ["model", "bench", "--model", "fermi-luna-1", "--batch-size", "2", "--width", "128"]
-    r = CliRunner().invoke(cli.app, [*args, "--steps", "1", "--warmup", "0", "--device", "cpu"])
+    r = CliRunner().invoke(devcli.app, [*args, "--steps", "1", "--warmup", "0", "--device", "cpu"])
     assert r.exit_code == 0, r.output
     assert "fastest: cpu fp32" in r.output
     assert "--device cpu --precision fp32" in r.output
@@ -98,8 +98,8 @@ def test_cli_bench_names_the_fastest() -> None:
 
 def test_cli_bench_defaults_to_the_model_context_and_its_buckets() -> None:
     args = ["model", "bench", "--model", "fermi-luna-1", "--batch-size", "1", "--device", "cpu"]
-    r = CliRunner().invoke(cli.app, [*args, "--steps", "1", "--warmup", "0"])
+    r = CliRunner().invoke(devcli.app, [*args, "--steps", "1", "--warmup", "0"])
     assert r.exit_code == 0, r.output
     assert "64, 96, 128, 192, 256, 384, 512, 768, 1024" in " ".join(r.output.split())
-    bad = CliRunner().invoke(cli.app, [*args[:-1], "4", "--steps", "1"])
+    bad = CliRunner().invoke(devcli.app, [*args[:-1], "4", "--steps", "1"])
     assert bad.exit_code != 0

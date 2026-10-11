@@ -55,5 +55,5 @@ jobs:
       - name: CLI smoke test
         run: |
           askphysics version
-          askphysics validate-data
+          askphysics-dev validate-data
           askphysics ask "How fast does a falling object hit the ground if it is dropped from 20 m?"

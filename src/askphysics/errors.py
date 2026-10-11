@@ -51,6 +51,14 @@ class LLMError(AskPhysicsError):
     """The LLM provider failed (network, auth, refusal, rate limit)."""
 
 
+class DownloadDeclinedError(LLMError):
+    """A model needs downloading first, and the user said no (or can't be asked).
+
+    The pipeline skips the attempt instead of counting it as a failure: it is the same as the
+    model not being available.
+    """
+
+
 class LLMResponseFormatError(LLMError):
     """The LLM returned output that does not match the requested schema."""
 

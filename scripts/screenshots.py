@@ -24,7 +24,7 @@ from pathlib import Path
 from rich.console import Console
 from typer.testing import CliRunner
 
-from askphysics import cli
+from askphysics import cli, devcli
 from askphysics.ui import make_console
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,10 +45,12 @@ def capture(
         color_system="truecolor",
         file=io.StringIO(),
     )
-    cli.console = console
+    # The title is the command shown, so it says which program draws it.
+    module = devcli if title.startswith("askphysics-dev") else cli
+    module.console = console
     if before:
         before()
-    result = CliRunner().invoke(cli.app, args)
+    result = CliRunner().invoke(module.app, args)
     if result.exit_code not in (0, 1):
         raise SystemExit(f"{name} failed:\n{result.output}")
     svg = console.export_svg(title=title)
@@ -73,14 +75,14 @@ def main() -> None:
             "askphysics ask",
             ["ask", "How many rubber ducks would it take to stop a freight train?"],
         ),
-        capture("validate-data", "askphysics validate-data", ["validate-data"]),
+        capture("validate-data", "askphysics-dev validate-data", ["validate-data"]),
     ]
     with tempfile.TemporaryDirectory() as tmp:
         os.chdir(tmp)  # short relative paths in the screenshots
         data, tok, models = Path("build/data"), Path("build/tokenizer.json"), Path("models")
         quiet = CliRunner()
         quiet.invoke(
-            cli.app,
+            devcli.app,
             [
                 "model",
                 "build-data",
@@ -93,7 +95,7 @@ def main() -> None:
             ],
         )
         quiet.invoke(
-            cli.app,
+            devcli.app,
             [
                 "model",
                 "train-tokenizer",
@@ -108,7 +110,7 @@ def main() -> None:
         svgs.append(
             capture(
                 "model-train",
-                "askphysics model train",
+                "askphysics-dev model train",
                 [
                     "model",
                     "train",
@@ -131,7 +133,9 @@ def main() -> None:
         )
         svgs.append(
             capture(
-                "model-info", "askphysics model info", ["model", "info", "--directory", str(models)]
+                "model-info",
+                "askphysics-dev model info",
+                ["model", "info", "--directory", str(models)],
             )
         )
         os.chdir(ROOT)

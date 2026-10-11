@@ -11,7 +11,7 @@ import pytest
 import torch
 from typer.testing import CliRunner
 
-from askphysics import cli
+from askphysics import devcli
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
 from askphysics.errors import PlanValidationError
@@ -172,7 +172,7 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
     tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
     save_model(FermiLM(LUNA), tokenizer, tmp_path / "luna")
     r = CliRunner().invoke(
-        cli.app,
+        devcli.app,
         [
             "model",
             "eval",
@@ -202,7 +202,7 @@ def test_cli_eval(dataset: Path, tmp_path: Path) -> None:
     assert report["plan_examples"] == 1 and report["real"]["questions"] == 1
     assert "plain questions" in r.output
     assert report["phrasing"]["questions"] == len(read_phrasing_questions(PHRASING))
-    r = CliRunner().invoke(cli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
+    r = CliRunner().invoke(devcli.app, ["model", "eval", "--directory", str(tmp_path / "none")])
     assert r.exit_code == 1
 
 
@@ -212,7 +212,7 @@ def test_cli_eval_with_a_rescuer(dataset: Path, tmp_path: Path) -> None:
     tokenizer = train_tokenizer(dataset, vocab_size=LUNA.vocab_size)
     save_model(FermiLM(LUNA), tokenizer, tmp_path / "luna")
     r = CliRunner().invoke(
-        cli.app,
+        devcli.app,
         [
             "model",
             "eval",

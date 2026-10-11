@@ -13,7 +13,7 @@ Validation runs in two layers:
    validity, symbol coverage, referential integrity, uniqueness, dimensional
    consistency.
 
-`askphysics validate-data` runs both and exits non-zero on any failure.
+`askphysics-dev validate-data` runs both and exits non-zero on any failure.
 
 ---
 
@@ -150,7 +150,7 @@ Validation runs in two layers:
   unknown's declared unit in the equation that defines it.
 - Every example re-solves: Noether solves `equations_used` for the first
   unknown (chaining them when there are several) and lands within 0.1% of
-  `final_answer` (checked by `validate_store`, so `askphysics validate-data` runs it; a v0.4
+  `final_answer` (checked by `validate_store`, so `askphysics-dev validate-data` runs it; a v0.4
   exit criterion).
 - No example reads like an eval question (same word-overlap check the data
   factory uses).

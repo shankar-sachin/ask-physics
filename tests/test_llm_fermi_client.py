@@ -12,7 +12,7 @@ import torch
 
 from askphysics.config import Settings
 from askphysics.data.loader import DataStore
-from askphysics.errors import ConfigError, LLMError, LLMResponseFormatError
+from askphysics.errors import ConfigError, DownloadDeclinedError, LLMError, LLMResponseFormatError
 from askphysics.llm.fermi_client import FermiClient, build_roster
 from askphysics.lm.checkpoints import save_model
 from askphysics.lm.config import LUNA
@@ -159,6 +159,149 @@ def test_a_failed_download_is_an_llm_error(store: DataStore, tmp_path: Path) -> 
 
     client = FermiClient(LUNA.name, store, directory=tmp_path / "x", device="cpu", fetch=fetch)
     with pytest.raises(LLMError, match="couldn't download"):
+        client.complete_json(
+            system="", user=json.dumps({"question": QUESTION}), schema=Classification
+        )
+
+
+# --- celeste never downloads by itself (ADR-022) ----------------------------------------------
+
+CELESTE_NAME = "fermi-celeste-1"
+CELESTE_FILES = {"model.safetensors": b"c" * 40, "config.json": b"{}", "tokenizer.json": b"{}"}
+
+
+def _celeste_world(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, list[str]]:
+    """tellus and solem installed (placeholder files), celeste published as file:// URLs.
+
+    Returns the models directory and the list of URLs opened.
+    """
+    import hashlib
+
+    from askphysics.lm import weights
+
+    root = tmp_path / "models"
+    for name in ("fermi-tellus-1", "fermi-solem-1"):
+        (root / name).mkdir(parents=True)
+        for file in CELESTE_FILES:
+            (root / name / file).write_bytes(b"x")
+    served = tmp_path / "served"
+    served.mkdir()
+    entries = {}
+    for file, data in CELESTE_FILES.items():
+        (served / file).write_bytes(data)
+        entries[file] = {
+            "url": (served / file).as_uri(),
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+    manifest = tmp_path / "weights.json"
+    manifest.write_text(
+        json.dumps(
+            {"format_version": 1, "models": {CELESTE_NAME: {"release": "t", "files": entries}}}
+        )
+    )
+    monkeypatch.setattr(weights, "manifest_path", lambda: manifest)
+    opened: list[str] = []
+    real_open = weights._open
+    monkeypatch.setattr(weights, "_open", lambda url: (opened.append(url), real_open(url))[1])
+
+    def no_weights(*args: object, **kwargs: object) -> None:
+        raise ConfigError("placeholder weights")  # no real model loads (golden rule 6)
+
+    monkeypatch.setattr("askphysics.llm.fermi_client.load_model", no_weights)
+    return root, opened
+
+
+def _celeste_client(store: DataStore, roster_plan: tuple[object, ...]) -> FermiClient:
+    last = roster_plan[-1]
+    assert isinstance(last, FermiClient) and last.name == CELESTE_NAME
+    return last
+
+
+def test_celeste_is_not_on_the_roster_unless_someone_can_be_asked(
+    store: DataStore, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The website (Pipeline.from_settings with no callback) and --json look like this.
+    root, opened = _celeste_world(monkeypatch, tmp_path)
+    roster = build_roster(Settings(llm_provider="fermi", device="cpu"), store, root)
+    assert [c.name for c in roster.plan if isinstance(c, FermiClient)] == ["fermi-solem-1"] * 5
+    assert opened == []
+
+
+def test_celeste_is_not_offered_when_auto_pull_is_off(
+    store: DataStore, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root, _ = _celeste_world(monkeypatch, tmp_path)
+    settings = Settings(llm_provider="fermi", device="cpu", auto_pull=False)
+    roster = build_roster(settings, store, root, confirm_download=lambda name, size: True)
+    assert CELESTE_NAME not in [getattr(c, "name", "") for c in roster.plan]
+
+
+def test_celeste_asks_once_with_its_real_size_and_downloads_on_yes(
+    store: DataStore, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root, opened = _celeste_world(monkeypatch, tmp_path)
+    asked: list[tuple[str, int]] = []
+
+    def yes(name: str, size: int) -> bool:
+        asked.append((name, size))
+        return True
+
+    settings = Settings(llm_provider="fermi", device="cpu", escalations=2)
+    roster = build_roster(settings, store, root, confirm_download=yes)
+    celeste = _celeste_client(store, roster.plan)
+    assert asked == [] and opened == []  # building the roster asks and downloads nothing
+    with pytest.raises(ConfigError, match="placeholder weights"):  # it got as far as loading
+        _ = celeste.decoder
+    assert asked == [(CELESTE_NAME, 40 + 2 + 2)]  # the real size from the manifest
+    assert len(opened) == 3
+    assert all((root / CELESTE_NAME / f).read_bytes() == b for f, b in CELESTE_FILES.items())
+
+
+def test_a_yes_uses_the_download_hook_the_cli_passes(
+    store: DataStore, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root, opened = _celeste_world(monkeypatch, tmp_path)
+    drawn: list[str] = []
+    roster = build_roster(
+        Settings(llm_provider="fermi", device="cpu"),
+        store,
+        root,
+        confirm_download=lambda name, size: True,
+        download=drawn.append,
+    )
+    with pytest.raises(ConfigError):
+        _ = _celeste_client(store, roster.plan).decoder
+    assert drawn == [CELESTE_NAME] and opened == []  # the hook did the downloading
+
+
+def test_a_no_skips_celeste_and_is_not_asked_again(
+    store: DataStore, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root, opened = _celeste_world(monkeypatch, tmp_path)
+    asked: list[str] = []
+
+    def no(name: str, size: int) -> bool:
+        asked.append(name)
+        return False
+
+    settings = Settings(llm_provider="fermi", device="cpu", escalations=3)
+    roster = build_roster(settings, store, root, confirm_download=no)
+    celeste_tries = [c for c in roster.plan if getattr(c, "name", "") == CELESTE_NAME]
+    assert len(celeste_tries) == 3
+    for client in celeste_tries:  # every escalation try, one question
+        with pytest.raises(DownloadDeclinedError):
+            _ = _celeste_client(store, (client,)).decoder
+    assert asked == [CELESTE_NAME]
+    assert opened == [] and not (root / CELESTE_NAME).exists()
+
+
+def test_a_declined_download_is_not_a_failed_download(store: DataStore, tmp_path: Path) -> None:
+    def declined() -> None:
+        raise DownloadDeclinedError("not downloaded")
+
+    client = FermiClient(LUNA.name, store, directory=tmp_path / "x", device="cpu", fetch=declined)
+    with pytest.raises(DownloadDeclinedError):
         client.complete_json(
             system="", user=json.dumps({"question": QUESTION}), schema=Classification
         )

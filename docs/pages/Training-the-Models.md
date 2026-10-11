@@ -10,7 +10,7 @@ cd ask-physics
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-askphysics validate-data
+askphysics-dev validate-data
 ```
 
 An Apple Silicon Mac (MPS) or an NVIDIA GPU (CUDA) is picked automatically; the CPU works
@@ -19,9 +19,9 @@ for the tiny test model.
 ## A one-minute smoke test
 
 ```bash
-askphysics model build-data --out build/smoke --examples 5000 --workers 4
-askphysics model train-tokenizer --data build/smoke --out build/smoke-tok.json --vocab-size 512
-askphysics model train --model fermi-luna-1 --data build/smoke --tokenizer build/smoke-tok.json --steps 300
+askphysics-dev model build-data --out build/smoke --examples 5000 --workers 4
+askphysics-dev model train-tokenizer --data build/smoke --out build/smoke-tok.json --vocab-size 512
+askphysics-dev model train --model fermi-luna-1 --data build/smoke --tokenizer build/smoke-tok.json --steps 300
 ```
 
 ## The real thing, in one command each
@@ -38,13 +38,13 @@ fermi-solem-1` puts the old one back. Add `--help` to any script for its options
 
 ## The real thing, step by step
 
-1. Build the data: `askphysics model build-data --out build/data --examples 1000000 --workers 10`.
+1. Build the data: `askphysics-dev model build-data --out build/data --examples 1000000 --workers 10`.
 2. Build the prose corpus: `python scripts/build_corpus.py`. It downloads the textbooks
    and books (see [Corpus and licenses](Corpus-and-Licenses)) and takes a while; it is
    quiet while it downloads books, and safe to rerun.
 3. Train the tokenizer, then tellus, solem, and celeste, with the exact commands in
    `docs/TRAINING.md`.
-4. Score each one: `askphysics model eval --model fermi-solem-1 --examples 3000`.
+4. Score each one: `askphysics-dev model eval --model fermi-solem-1 --examples 3000`.
 
 Trained weights land in `~/.cache/askphysics/models/<model>/`, and `askphysics ask` uses
 them automatically.

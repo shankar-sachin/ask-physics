@@ -16,6 +16,12 @@
 
 <p align="center"><b><em>100% free, forever. That's why it's the best way to go.</em></b></p>
 
+<p align="center">
+  <a href="https://askphysics.vercel.app"><img src="docs/images/demo.webp" alt="Demo: askphysics answers how fast a rock dropped from 45 m lands, shows the six pipeline stages, solves v² = v₀² + 2ad with units checked to 29.7 m/s, then refuses &quot;How much does the color blue weigh?&quot; with the reason and a question it can answer instead" width="820"></a>
+</p>
+
+<p align="center"><sub>40 seconds of the demo. The full two-minute video is on <a href="https://askphysics.vercel.app">askphysics.vercel.app</a>.</sub></p>
+
 Ask any physics question, from a textbook problem to "how many rubber ducks
 would it take to stop a freight train?", and get an answer you can check: the
 equations it used (with ids and sources), every assumption spelled out, units
@@ -69,15 +75,6 @@ More in [`docs/MODELS.md`](docs/MODELS.md).
   <img src="docs/images/ask-partial.png" alt="An absurd Fermi question that the v0.2 fake model can't plan yet, reported honestly" width="820">
 </p>
 
-<p align="center">
-  <img src="docs/images/model-train.png" alt="askphysics model train: fermi-luna-1 training with a live progress bar" width="820">
-</p>
-
-<p align="center">
-  <img src="docs/images/validate-data.png" alt="askphysics validate-data" width="400">
-  <img src="docs/images/model-info.png" alt="askphysics model info" width="400">
-</p>
-
 Every screenshot is real CLI output, regenerated with `make screenshots`.
 
 ## Install
@@ -108,7 +105,8 @@ pip install askphysics
 
 The scripts install `askphysics` into its own isolated environment with
 [uv](https://docs.astral.sh/uv/), installing uv first if needed; they never
-touch your system Python. Pin a version with `ASKPHYSICS_REF=v0.3.0`.
+touch your system Python. Every channel downloads the Fermi models (about 66 MB, once) when it
+installs; if that can't happen, the first question downloads them. Pin a version with `ASKPHYSICS_REF=v0.3.0`.
 All the ways to install, with copy buttons: [askphysics.vercel.app/installers](https://askphysics.vercel.app/installers)
 (and [/more-installers](https://askphysics.vercel.app/more-installers) for developers: every version,
 pinning, source installs).
@@ -145,10 +143,11 @@ itself. Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Quickstart
 
-Requires Python 3.11 or newer. No API keys, ever. Once the Fermi models' weights are
-published (v0.4), the first `askphysics ask` downloads them by itself (set
-`ASKPHYSICS_AUTO_PULL=0` to stop that, and use `askphysics model pull` yourself); until
-then, or without a download, the default language model is a deterministic fake.
+This is the from-source setup for working on the project. To just use Ask Physics, install
+it as above. Requires Python 3.11 or newer. No API keys, ever. Once the Fermi models' weights
+are published (v0.4), the first `askphysics ask` downloads any that are missing (set
+`ASKPHYSICS_AUTO_PULL=0` to stop that); until then, or without a download, the default
+language model is a deterministic fake.
 
 ```bash
 git clone https://github.com/shankar-sachin/ask-physics.git
@@ -160,20 +159,24 @@ make test               # pytest with coverage
 make lint typecheck     # ruff + mypy --strict
 
 askphysics version
-askphysics validate-data
+askphysics-dev validate-data
 askphysics ask "How fast does a falling object hit the ground if it is dropped from 20 m?"
 askphysics ask --json "A rock is dropped from 45 meters. How fast does it land?"
 askphysics ask "How much does the color blue weigh?"     # refused, with a redirect
 ```
 
+`pip install -e` also installs `askphysics-dev`, the maintainer commands (`validate-data` and
+`model ...`). It runs only from a source checkout like this one; `askphysics` itself has just
+`ask` and `version`.
+
 Train a Fermi model yourself (the tiny `fermi-luna-1` takes a minute on CPU;
 `fermi-solem-1` wants the GPU in an Apple Silicon Mac or similar):
 
 ```bash
-askphysics model build-data --examples 20000 --workers 4
-askphysics model train-tokenizer --vocab-size 512
-askphysics model train --model fermi-luna-1 --steps 1000
-askphysics model info
+askphysics-dev model build-data --examples 20000 --workers 4
+askphysics-dev model train-tokenizer --vocab-size 512
+askphysics-dev model train --model fermi-luna-1 --steps 1000
+askphysics-dev model info
 ```
 
 Once a model is trained, `askphysics ask` uses it automatically: tellus
@@ -196,12 +199,13 @@ of making something up.
 | Dimensional consistency and order-of-magnitude sanity checks | Works |
 | Keyword retrieval over the equation database | Works |
 | Seed data with full validation: 110 equations, 20 worked examples (each re-solved by a test), 11 constants, 8 Fermi assumptions | Works |
-| CLI: `ask`, `version`, `validate-data`, `model build-data / train-tokenizer / train / info` | Works |
+| CLI for users: `ask`, `version` | Works |
+| Maintainer CLI, `askphysics-dev`: `validate-data`, `model build-data / train-tokenizer / train / info` | Works |
 | Confidence scoring (crude, documented formula) | Works |
 | Eval set (8 questions) with a validating loader | Works |
 | Fermi models: tokenizer, transformer, constrained decoding, data factory, training | Works |
 | Fermi models answering in the CLI (router: tellus, solem, celeste) | Works with locally trained weights |
-| `askphysics model pull`: checksum-pinned downloads, installers fetch the models | Works; weights publish with v0.4 |
+| Checksum-pinned model downloads: installers, Homebrew, and the first question fetch the models | Works; weights publish with v0.4 |
 | Multi-equation chaining, Celsius and Fahrenheit | Works |
 | Eval scoring and runner | Stub until v0.5 |
 | Vector and hybrid retrieval | Stub until v0.6 |
@@ -238,9 +242,13 @@ v1.0 comes the hosted API. The CLI is the main interface, and
 Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first. The short version: the LLM
 never does arithmetic, every number has units, every equation has a source
 and a license, and data never enters the database without passing
-`askphysics validate-data`. Security reports go through
+`askphysics-dev validate-data`. Security reports go through
 [`SECURITY.md`](SECURITY.md). Participation is covered by the
 [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
+Not ready to send a pull request? Ask it something absurd and
+[open an issue](https://github.com/shankar-sachin/ask-physics/issues/new) with what it got wrong,
+or star the repository so more people find it.
 
 ## Limitations
 

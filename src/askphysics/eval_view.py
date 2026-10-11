@@ -1,4 +1,4 @@
-"""The live view of ``askphysics model eval`` (and so ``scripts/eval.sh``).
+"""The live view of ``askphysics-dev model eval`` (and so ``scripts/eval.sh``).
 
 On a terminal: a bar over the examples with an ETA that shows after the first example (and a
 clock time to finish), the valid-plan rate and the confidently-wrong count as they settle, and

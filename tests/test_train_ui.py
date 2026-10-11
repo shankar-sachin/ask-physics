@@ -133,8 +133,8 @@ def test_a_failed_plain_phase_names_its_command() -> None:
 
 
 def test_the_keep_awake_wrapper_is_left_out_of_the_command_shown() -> None:
-    assert display_command(["caffeinate", "-dims", "askphysics", "model", "eval"]) == (
-        "askphysics model eval"
+    assert display_command(["caffeinate", "-dims", "askphysics-dev", "model", "eval"]) == (
+        "askphysics-dev model eval"
     )
     assert display_command(["python", "-c", "print(1)"]) == "python -c 'print(1)'"
 

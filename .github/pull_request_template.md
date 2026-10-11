@@ -19,7 +19,7 @@
 - [ ] `CHANGELOG.md` updated under `Unreleased` if user-visible
 - [ ] Golden rules respected: the LLM does no arithmetic, every number has
       units, every equation has a source and license
-- [ ] For data changes: `askphysics validate-data` passes and no eval
+- [ ] For data changes: `askphysics-dev validate-data` passes and no eval
       questions leaked into retrieval data
 
 ## Testing

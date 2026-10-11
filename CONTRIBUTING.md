@@ -12,7 +12,7 @@ keep the answers honest, so read the golden rules before writing code.
    Use Pint quantities or the `(value, unit)` fields on the pydantic models.
 3. **Every equation has a source and a license.** No source, no merge.
 4. **Never silently add data.** Every equation, worked example, constant, or
-   Fermi assumption goes through `askphysics validate-data` and code review.
+   Fermi assumption goes through `askphysics-dev validate-data` and code review.
 
 The reasoning behind these is in [`PLAN.md`](PLAN.md) and
 [`docs/DECISIONS.md`](docs/DECISIONS.md).
@@ -29,7 +29,13 @@ make install          # pip install -e ".[dev]"
 make test             # pytest with coverage
 make lint             # ruff check + ruff format --check
 make typecheck        # mypy
+askphysics-dev validate-data   # the seed data
 ```
+
+`pip install -e` gives you two commands. `askphysics` is what users get: `ask` and `version`.
+`askphysics-dev` is yours: `validate-data` and `model build-data / train-tokenizer / train /
+backend / bench / eval / pull / package / info`. It refuses to run outside a source checkout
+(ADR-022), so it never reaches a user's machine in a usable form.
 
 Or let the scripts do it (each prints its options with `--help`, and `DRY_RUN=1` shows
 the commands without running them):
@@ -81,7 +87,7 @@ covered in [`docs/MODELS.md`](docs/MODELS.md).
 Data lives in `src/askphysics/data/*.json` and follows
 [`docs/DATA_SCHEMA.md`](docs/DATA_SCHEMA.md). Before a data PR:
 
-- [ ] `askphysics validate-data` passes.
+- [ ] `askphysics-dev validate-data` passes.
 - [ ] Every equation's `sympy_expr` parses and every symbol in it is listed
       under `variables`.
 - [ ] Every unit is a valid Pint unit.

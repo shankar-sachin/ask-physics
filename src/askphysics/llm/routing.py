@@ -58,7 +58,10 @@ def plan_route(
         ConfigError: no usable model is installed, or ``forced`` isn't installed.
     """
     have = set(installed)
-    hint = "train one (docs/TRAINING.md) or set ASKPHYSICS_MODEL_DIR"
+    hint = (
+        "ask again once you are online to download them, "
+        "or set ASKPHYSICS_MODEL_DIR to a folder that has them"
+    )
     if forced is not None:
         if forced not in have:
             raise ConfigError(f"{forced} is not installed; {hint}")

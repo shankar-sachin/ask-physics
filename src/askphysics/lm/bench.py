@@ -1,4 +1,4 @@
-"""Time full training steps on each device and precision (``askphysics model bench``)."""
+"""Time full training steps on each device and precision (``askphysics-dev model bench``)."""
 
 from __future__ import annotations
 

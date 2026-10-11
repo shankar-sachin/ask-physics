@@ -26,7 +26,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 to_repo_root
-need_askphysics
+need_askphysics_dev
 
 branches=${*:-origin/main}
 steps=5
@@ -46,7 +46,7 @@ if [ "${DRY_RUN:-}" = "1" ] || command -v shellcheck >/dev/null 2>&1; then
 else
   ui_result skip "shellcheck" "not installed"
 fi
-gate "validate-data" first askphysics validate-data
+gate "validate-data" first askphysics-dev validate-data
 if [ "$fast" = 0 ]; then
   gate "pytest" pytest python -m pytest -q
 fi
