@@ -38,3 +38,7 @@ htmlcov/
 *.sqlite3
 *.db
 node_modules/
+
+# Agent notes stay local.
+CLAUDE.md
+CLAUDE.md 
